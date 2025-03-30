@@ -22,6 +22,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "src/core/call/metadata.h"
 #include "src/core/client_channel/client_channel_factory.h"
 #include "src/core/client_channel/config_selector.h"
 #include "src/core/client_channel/subchannel.h"
@@ -29,7 +30,6 @@
 #include "src/core/filter/blackboard.h"
 #include "src/core/lib/promise/observable.h"
 #include "src/core/lib/surface/channel.h"
-#include "src/core/lib/transport/metadata.h"
 #include "src/core/load_balancing/lb_policy.h"
 #include "src/core/resolver/resolver.h"
 #include "src/core/service_config/service_config.h"
@@ -74,7 +74,7 @@ class ClientChannel : public Channel {
   grpc_call* CreateCall(grpc_call* parent_call, uint32_t propagation_mask,
                         grpc_completion_queue* cq,
                         grpc_pollset_set* /*pollset_set_alternative*/,
-                        Slice path, absl::optional<Slice> authority,
+                        Slice path, std::optional<Slice> authority,
                         Timestamp deadline, bool registered_method) override;
 
   void StartCall(UnstartedCallHandler unstarted_handler) override;
@@ -139,7 +139,7 @@ class ClientChannel : public Channel {
 
   absl::Status CreateOrUpdateLbPolicyLocked(
       RefCountedPtr<LoadBalancingPolicy::Config> lb_policy_config,
-      const absl::optional<std::string>& health_check_service_name,
+      const std::optional<std::string>& health_check_service_name,
       Resolver::Result result) ABSL_EXCLUSIVE_LOCKS_REQUIRED(*work_serializer_);
   OrphanablePtr<LoadBalancingPolicy> CreateLbPolicyLocked(
       const ChannelArgs& args) ABSL_EXCLUSIVE_LOCKS_REQUIRED(*work_serializer_);

@@ -15,12 +15,12 @@
 #ifndef GRPC_SRC_CORE_CLIENT_CHANNEL_RETRY_INTERCEPTOR_H
 #define GRPC_SRC_CORE_CLIENT_CHANNEL_RETRY_INTERCEPTOR_H
 
+#include "src/core/call/interception_chain.h"
 #include "src/core/call/request_buffer.h"
 #include "src/core/client_channel/client_channel_args.h"
 #include "src/core/client_channel/retry_service_config.h"
 #include "src/core/client_channel/retry_throttle.h"
 #include "src/core/filter/filter_args.h"
-#include "src/core/lib/transport/interception_chain.h"
 #include "src/core/util/backoff.h"
 
 namespace grpc_core {
@@ -34,7 +34,7 @@ class RetryState {
 
   // if nullopt --> commit & don't retry
   // if duration --> retry after duration
-  absl::optional<Duration> ShouldRetry(
+  std::optional<Duration> ShouldRetry(
       const ServerMetadata& md, bool committed,
       absl::FunctionRef<std::string()> lazy_attempt_debug_string);
   int num_attempts_completed() const { return num_attempts_completed_; }
@@ -90,7 +90,7 @@ class RetryInterceptor : public Interceptor {
     RetryInterceptor* interceptor() { return interceptor_.get(); }
     // if nullopt --> commit & don't retry
     // if duration --> retry after duration
-    absl::optional<Duration> ShouldRetry(
+    std::optional<Duration> ShouldRetry(
         const ServerMetadata& md,
         absl::FunctionRef<std::string()> lazy_attempt_debug_string) {
       return retry_state_.ShouldRetry(md, request_buffer_.committed(),

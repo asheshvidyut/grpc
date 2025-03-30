@@ -17,13 +17,14 @@
 
 #include <grpc/support/port_platform.h>
 
+#include <optional>
 #include <ostream>
 
 #include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
-#include "absl/types/optional.h"
+#include "absl/strings/str_join.h"
 #include "src/core/lib/promise/detail/status.h"
 
 namespace grpc_core {
@@ -232,7 +233,7 @@ class ValueOrFailure {
   ValueOrFailure(StatusFlag status) { CHECK(!status.ok()); }
 
   GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION static ValueOrFailure FromOptional(
-      absl::optional<T> value) {
+      std::optional<T> value) {
     return ValueOrFailure{std::move(value)};
   }
 
@@ -274,19 +275,8 @@ class ValueOrFailure {
     return value_ != other;
   }
 
-  template <typename Sink>
-  friend void AbslStringify(Sink& sink, const ValueOrFailure& value) {
-    if (value.ok()) {
-      sink.Append("Success(");
-      sink.Append(absl::StrCat(*value));
-      sink.Append(")");
-    } else {
-      sink.Append("Failure");
-    }
-  }
-
  private:
-  absl::optional<T> value_;
+  std::optional<T> value_;
 };
 
 template <typename T>
@@ -296,6 +286,28 @@ inline std::ostream& operator<<(std::ostream& os,
     return os << "Success(" << *value << ")";
   } else {
     return os << "Failure";
+  }
+}
+
+template <typename Sink, typename T>
+void AbslStringify(Sink& sink, const ValueOrFailure<T>& value) {
+  if (value.ok()) {
+    sink.Append("Success(");
+    sink.Append(absl::StrCat(*value));
+    sink.Append(")");
+  } else {
+    sink.Append("Failure");
+  }
+}
+
+template <typename Sink, typename... Ts>
+void AbslStringify(Sink& sink, const ValueOrFailure<std::tuple<Ts...>>& value) {
+  if (value.ok()) {
+    sink.Append("Success(");
+    sink.Append(absl::StrCat("(", absl::StrJoin(*value, ", "), ")"));
+    sink.Append(")");
+  } else {
+    sink.Append("Failure");
   }
 }
 
@@ -309,6 +321,12 @@ template <typename T>
 GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline T TakeValue(
     ValueOrFailure<T>&& value) {
   return std::move(value.value());
+}
+
+template <typename T>
+GPR_ATTRIBUTE_ALWAYS_INLINE_FUNCTION inline T TakeValue(
+    absl::StatusOr<T>&& value) {
+  return std::move(*value);
 }
 
 template <typename T>

@@ -53,11 +53,13 @@ grpc_cc_library(
         "absl/strings",
         "absl/strings:str_format",
         "absl/time",
-        "absl/types:optional",
         "absl/types:span",
         "otel/api",
     ],
-    language = "c++",
+    tags = [
+        # TODO(b/332369798): Remove after fixing bug
+        "grpc:otel-namespace-calamity",
+    ],
     visibility = ["@grpc:otel_plugin"],
     deps = [
         "//:call_tracer",
@@ -82,5 +84,6 @@ grpc_cc_library(
         "//src/core:metrics",
         "//src/core:slice",
         "//src/core:slice_buffer",
+        "//src/core:sync",
     ],
 )

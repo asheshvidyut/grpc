@@ -17,12 +17,13 @@
 
 #include <grpc/support/port_platform.h>
 
+#include <optional>
 #include <string>
 #include <utility>
 
 #include "absl/log/check.h"
 #include "absl/strings/str_format.h"
-#include "absl/types/optional.h"
+#include "absl/strings/str_join.h"
 #include "src/core/util/construct_destruct.h"
 
 namespace grpc_core {
@@ -135,8 +136,8 @@ class Poll {
   //
   // Why not optional<T>?
   //
-  // We have cases where we want to return absl::nullopt{} from a promise, and
-  // have that upgraded to a Poll<absl::nullopt_t> prior to a cast to some
+  // We have cases where we want to return std::nullopt{} from a promise, and
+  // have that upgraded to a Poll<std::nullopt_t> prior to a cast to some
   // Poll<optional<T>>.
   //
   // Since optional<nullopt_t> is not allowed, we'd not be allowed to make
@@ -151,6 +152,9 @@ class Poll {
     T value_;
   };
 };
+
+template <typename T>
+class Poll<T&&>;
 
 template <>
 class Poll<Empty> {
@@ -278,52 +282,53 @@ std::string PollToString(
 }
 
 template <typename Sink, typename T>
+void PollValueStringify(Sink& sink, const T& value) {
+  absl::Format(&sink, "%v", value);
+}
+
+template <typename Sink, typename... Ts>
+void PollValueStringify(Sink& sink, const std::tuple<Ts...>& values) {
+  absl::Format(&sink, "(%v)", absl::StrJoin(values, ", "));
+}
+
+template <typename Sink, typename T>
+void PollValueStringify(Sink& sink, const std::optional<T>& value) {
+  if (!value.has_value()) {
+    sink.Append("nullopt");
+    return;
+  }
+  PollValueStringify(sink, *value);
+}
+
+template <typename Sink, typename T>
+void PollValueStringify(Sink& sink, const absl::StatusOr<T>& value) {
+  if (!value.ok()) {
+    PollValueStringify(sink, value.status());
+    return;
+  }
+  PollValueStringify(sink, *value);
+}
+
+template <typename Sink, typename T>
 void AbslStringify(Sink& sink, const Poll<T>& poll) {
   if (poll.pending()) {
     absl::Format(&sink, "<<pending>>");
     return;
   }
-  absl::Format(&sink, "%v", poll.value());
-}
-
-template <typename Sink, typename T>
-void AbslStringify(Sink& sink, const Poll<absl::StatusOr<T>>& poll) {
-  if (poll.pending()) {
-    absl::Format(&sink, "<<pending>>");
-    return;
-  }
-  if (poll.value().ok()) {
-    absl::Format(&sink, "%v", *poll.value());
-  } else {
-    absl::Format(&sink, "%v", poll.value().status());
-  }
-}
-
-template <typename Sink, typename T>
-void AbslStringify(Sink& sink, const Poll<absl::optional<T>>& poll) {
-  if (poll.pending()) {
-    absl::Format(&sink, "<<pending>>");
-    return;
-  }
-  const auto& value = poll.value();
-  if (value.has_value()) {
-    absl::Format(&sink, "%v", value);
-  } else {
-    sink.append("nullopt");
-  }
+  PollValueStringify(sink, poll.value());
 }
 
 // Hack to get metadata printing
 template <typename Sink, typename T, typename Deleter>
 void AbslStringify(
-    Sink& sink, const Poll<absl::optional<std::unique_ptr<T, Deleter>>>& poll) {
+    Sink& sink, const Poll<std::optional<std::unique_ptr<T, Deleter>>>& poll) {
   if (poll.pending()) {
     absl::Format(&sink, "<<pending>>");
     return;
   }
   const auto& value = poll.value();
   if (value.has_value()) {
-    absl::Format(&sink, "%v", *value);
+    PollValueStringify(sink, *value);
   } else {
     sink.Append("nullopt");
   }

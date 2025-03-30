@@ -25,11 +25,12 @@
 #include <condition_variable>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
-#include "absl/types/optional.h"
+#include "absl/log/initialize.h"
 #include "examples/cpp/otel/util.h"
 #include "opentelemetry/exporters/prometheus/exporter_factory.h"
 #include "opentelemetry/exporters/prometheus/exporter_options.h"
@@ -64,6 +65,7 @@ absl::StatusOr<grpc::CsmObservability> InitializeObservability() {
 
 int main(int argc, char** argv) {
   absl::ParseCommandLine(argc, argv);
+  absl::InitializeLog();
   // Setup CSM observability
   auto observability = InitializeObservability();
   if (!observability.ok()) {

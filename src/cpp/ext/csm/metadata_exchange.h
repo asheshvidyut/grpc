@@ -29,8 +29,8 @@
 #include "absl/strings/string_view.h"
 #include "google/protobuf/struct.upb.h"
 #include "opentelemetry/sdk/common/attribute_utils.h"
+#include "src/core/call/metadata_batch.h"
 #include "src/core/lib/slice/slice.h"
-#include "src/core/lib/transport/metadata_batch.h"
 #include "src/cpp/ext/otel/otel_plugin.h"
 #include "upb/mem/arena.hpp"
 
@@ -93,7 +93,7 @@ class MeshLabelsIterable : public LabelsIterable {
           local_labels,
       grpc_core::Slice remote_metadata);
 
-  absl::optional<std::pair<absl::string_view, absl::string_view>> Next()
+  std::optional<std::pair<absl::string_view, absl::string_view>> Next()
       override;
 
   size_t Size() const override;

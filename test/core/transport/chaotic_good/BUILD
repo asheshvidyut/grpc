@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//bazel:grpc_build_system.bzl", "grpc_cc_library", "grpc_cc_test", "grpc_package")
-load("//test/core/call/yodel:grpc_yodel_test.bzl", "grpc_yodel_simple_test")
-load("//test/core/test_util:grpc_fuzzer.bzl", "grpc_fuzzer", "grpc_proto_fuzzer")
+load("//bazel:grpc_build_system.bzl", "grpc_cc_library", "grpc_cc_proto_library", "grpc_cc_test", "grpc_internal_proto_library", "grpc_package")
+load("//test/core/test_util:grpc_fuzzer.bzl", "grpc_fuzz_test")
 
 licenses(["notice"])
 
@@ -24,10 +23,10 @@ grpc_package(
 )
 
 grpc_cc_library(
-    name = "transport_test",
+    name = "transport_test_helper",
     testonly = 1,
-    srcs = ["transport_test.cc"],
-    hdrs = ["transport_test.h"],
+    srcs = ["transport_test_helper.cc"],
+    hdrs = ["transport_test_helper.h"],
     external_deps = ["gtest"],
     deps = [
         "//:iomgr_timer",
@@ -40,32 +39,51 @@ grpc_cc_library(
 )
 
 grpc_cc_test(
-    name = "frame_header_test",
-    srcs = ["frame_header_test.cc"],
+    name = "tcp_frame_header_test",
+    srcs = ["tcp_frame_header_test.cc"],
     external_deps = [
         "absl/status",
         "gtest",
     ],
-    deps = ["//src/core:chaotic_good_frame_header"],
+    deps = ["//src/core:chaotic_good_tcp_frame_transport"],
 )
 
-grpc_fuzzer(
-    name = "frame_header_fuzzer",
-    srcs = ["frame_header_fuzzer.cc"],
-    corpus = "frame_header_fuzzer_corpus",
+grpc_fuzz_test(
+    name = "tcp_frame_header_fuzzer",
+    srcs = ["tcp_frame_header_fuzzer.cc"],
     external_deps = [
         "absl/status:statusor",
         "absl/strings",
+        "gtest",
+        "fuzztest",
+        "fuzztest_main",
     ],
-    language = "C++",
     tags = ["no_windows"],
     deps = [
         "//:grpc",
-        "//src/core:chaotic_good_frame_header",
+        "//src/core:chaotic_good_tcp_frame_transport",
     ],
 )
 
-grpc_cc_test(
+grpc_fuzz_test(
+    name = "tcp_frame_transport_test",
+    srcs = ["tcp_frame_transport_test.cc"],
+    external_deps = [
+        "fuzztest",
+        "fuzztest_main",
+    ],
+    tags = ["no_windows"],
+    deps = [
+        ":test_frame",
+        "//src/core:chaotic_good_frame_transport",
+        "//src/core:chaotic_good_tcp_frame_transport",
+        "//src/core:inter_activity_latch",
+        "//test/core/event_engine/fuzzing_event_engine",
+        "//test/core/event_engine/fuzzing_event_engine:fuzzing_event_engine_cc_proto",
+    ],
+)
+
+grpc_fuzz_test(
     name = "frame_test",
     srcs = ["frame_test.cc"],
     external_deps = [
@@ -74,43 +92,35 @@ grpc_cc_test(
         "absl/status",
         "absl/status:statusor",
         "gtest",
+        "fuzztest",
+        "fuzztest_main",
     ],
     deps = [
+        ":test_frame",
         "//:channel_create",
         "//src/core:chaotic_good_frame",
     ],
 )
 
-grpc_proto_fuzzer(
-    name = "frame_fuzzer",
-    srcs = ["frame_fuzzer.cc"],
-    corpus = "frame_fuzzer_corpus",
-    external_deps = [
-        "absl/log:check",
-        "absl/log:log",
-        "absl/random:bit_gen_ref",
-        "absl/status:statusor",
+grpc_cc_library(
+    name = "mock_frame_transport",
+    testonly = 1,
+    srcs = [
+        "mock_frame_transport.cc",
     ],
-    language = "C++",
-    proto = "frame_fuzzer.proto",
-    tags = ["no_windows"],
-    uses_event_engine = False,
-    uses_polling = False,
+    hdrs = [
+        "mock_frame_transport.h",
+    ],
+    external_deps = [
+        "gtest",
+        "protobuf_headers",
+    ],
     deps = [
-        "//:exec_ctx",
-        "//:gpr",
-        "//:hpack_encoder",
-        "//:hpack_parser",
-        "//:ref_counted_ptr",
-        "//src/core:arena",
-        "//src/core:chaotic_good_frame",
-        "//src/core:chaotic_good_frame_header",
-        "//src/core:event_engine_memory_allocator",
-        "//src/core:memory_quota",
-        "//src/core:resource_quota",
-        "//src/core:slice",
-        "//src/core:slice_buffer",
-        "//test/core/promise:test_context",
+        "//src/core:chaotic_good_frame_transport",
+        "//src/core:inter_activity_latch",
+        "//src/core:loop",
+        "//src/core:try_seq",
+        "//test/core/promise:poll_matcher",
     ],
 )
 
@@ -121,14 +131,13 @@ grpc_cc_test(
         "absl/functional:any_invocable",
         "absl/status:statusor",
         "absl/strings:str_format",
-        "absl/types:optional",
         "gtest",
     ],
-    language = "C++",
     uses_event_engine = False,
     uses_polling = False,
     deps = [
-        "transport_test",
+        "mock_frame_transport",
+        "transport_test_helper",
         "//:grpc",
         "//:grpc_public_hdrs",
         "//src/core:arena",
@@ -138,44 +147,7 @@ grpc_cc_test(
         "//src/core:seq",
         "//src/core:slice_buffer",
         "//test/core/transport/util:mock_promise_endpoint",
-    ],
-)
-
-grpc_cc_test(
-    name = "client_transport_error_test",
-    srcs = ["client_transport_error_test.cc"],
-    external_deps = [
-        "absl/functional:any_invocable",
-        "absl/status",
-        "absl/status:statusor",
-        "absl/strings:str_format",
-        "absl/types:optional",
-        "gtest",
-    ],
-    language = "C++",
-    uses_event_engine = False,
-    uses_polling = False,
-    deps = [
-        "//:grpc_public_hdrs",
-        "//:grpc_unsecure",
-        "//:iomgr_timer",
-        "//:ref_counted_ptr",
-        "//src/core:activity",
-        "//src/core:arena",
-        "//src/core:chaotic_good_client_transport",
-        "//src/core:event_engine_wakeup_scheduler",
-        "//src/core:grpc_promise_endpoint",
-        "//src/core:if",
-        "//src/core:join",
-        "//src/core:loop",
-        "//src/core:memory_quota",
-        "//src/core:pipe",
-        "//src/core:resource_quota",
-        "//src/core:seq",
-        "//src/core:slice",
-        "//src/core:slice_buffer",
-        "//test/core/event_engine/fuzzing_event_engine",
-        "//test/core/event_engine/fuzzing_event_engine:fuzzing_event_engine_cc_proto",
+        "//test/core/transport/util:transport_test",
     ],
 )
 
@@ -187,21 +159,22 @@ grpc_cc_test(
         "absl/status",
         "absl/status:statusor",
         "absl/strings:str_format",
-        "absl/types:optional",
         "gtest",
     ],
-    language = "C++",
     uses_event_engine = False,
     uses_polling = False,
     deps = [
-        "transport_test",
+        "mock_frame_transport",
+        "transport_test_helper",
         "//:grpc",
         "//:grpc_public_hdrs",
         "//:iomgr_timer",
         "//:ref_counted_ptr",
         "//src/core:arena",
+        "//src/core:chaotic_good_frame_cc_proto",
         "//src/core:chaotic_good_server_transport",
         "//src/core:memory_quota",
+        "//src/core:metadata_batch",
         "//src/core:resource_quota",
         "//src/core:seq",
         "//src/core:slice",
@@ -209,6 +182,7 @@ grpc_cc_test(
         "//test/core/event_engine/fuzzing_event_engine",
         "//test/core/event_engine/fuzzing_event_engine:fuzzing_event_engine_cc_proto",
         "//test/core/transport/util:mock_promise_endpoint",
+        "//test/core/transport/util:transport_test",
     ],
 )
 
@@ -222,7 +196,6 @@ grpc_cc_test(
         "absl/time",
         "gtest",
     ],
-    language = "C++",
     tags = [
         "no_windows",
     ],
@@ -245,11 +218,14 @@ grpc_cc_test(
     ],
 )
 
-grpc_yodel_simple_test(
-    name = "control_endpoint",
+grpc_fuzz_test(
+    name = "control_endpoint_test",
     srcs = ["control_endpoint_test.cc"],
-    external_deps = ["gtest"],
-    language = "C++",
+    external_deps = [
+        "fuzztest",
+        "fuzztest_main",
+        "gtest",
+    ],
     tags = [
         "no_windows",
     ],
@@ -260,11 +236,14 @@ grpc_yodel_simple_test(
     ],
 )
 
-grpc_yodel_simple_test(
-    name = "data_endpoints",
+grpc_fuzz_test(
+    name = "data_endpoints_test",
     srcs = ["data_endpoints_test.cc"],
-    external_deps = ["gtest"],
-    language = "C++",
+    external_deps = [
+        "fuzztest",
+        "fuzztest_main",
+        "gtest",
+    ],
     tags = [
         "no_windows",
     ],
@@ -272,5 +251,64 @@ grpc_yodel_simple_test(
         "//src/core:chaotic_good_data_endpoints",
         "//test/core/call/yodel:yodel_test",
         "//test/core/transport/util:mock_promise_endpoint",
+    ],
+)
+
+grpc_fuzz_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    external_deps = [
+        "fuzztest",
+        "fuzztest_main",
+        "gtest",
+    ],
+    deps = [
+        "//src/core:chaotic_good_config",
+        "//src/core:chaotic_good_frame_cc_proto",
+    ],
+)
+
+grpc_fuzz_test(
+    name = "message_chunker_test",
+    srcs = ["message_chunker_test.cc"],
+    external_deps = [
+        "fuzztest",
+        "fuzztest_main",
+        "gtest",
+    ],
+    deps = [
+        "//src/core:chaotic_good_frame_cc_proto",
+        "//src/core:chaotic_good_message_chunker",
+        "//src/core:status_flag",
+        "//test/core/promise:poll_matcher",
+    ],
+)
+
+grpc_internal_proto_library(
+    name = "test_frame_proto",
+    srcs = ["test_frame.proto"],
+    deps = [
+        "//src/core:chaotic_good_frame_proto",
+    ],
+)
+
+grpc_cc_proto_library(
+    name = "test_frame_cc_proto",
+    deps = [
+        ":test_frame_proto",
+    ],
+)
+
+grpc_cc_library(
+    name = "test_frame",
+    testonly = 1,
+    srcs = ["test_frame.cc"],
+    hdrs = ["test_frame.h"],
+    external_deps = [
+        "fuzztest",
+    ],
+    deps = [
+        "test_frame_cc_proto",
+        "//src/core:chaotic_good_frame",
     ],
 )

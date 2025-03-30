@@ -454,15 +454,16 @@ def targets():
         # Python
         PythonDistribTest("linux", "x64", "bullseye", presubmit=True),
         PythonDistribTest("linux", "x86", "bullseye", presubmit=True),
-        PythonDistribTest("linux", "x64", "fedora39"),
+        PythonDistribTest("linux", "x64", "fedora40"),
         PythonDistribTest("linux", "x64", "arch"),
         PythonDistribTest("linux", "x64", "alpine"),
         PythonDistribTest("linux", "x64", "ubuntu2204"),
         PythonDistribTest(
-            "linux", "aarch64", "python38_buster", presubmit=True
+            "linux", "aarch64", "python39_buster", presubmit=True
         ),
+        PythonDistribTest("linux", "aarch64", "alpine"),
         PythonDistribTest(
-            "linux", "x64", "alpine3.7", source=True, presubmit=True
+            "linux", "x64", "alpine3.18", source=True, presubmit=True
         ),
         PythonDistribTest(
             "linux", "x64", "bullseye", source=True, presubmit=True
@@ -470,7 +471,7 @@ def targets():
         PythonDistribTest(
             "linux", "x86", "bullseye", source=True, presubmit=True
         ),
-        PythonDistribTest("linux", "x64", "fedora39", source=True),
+        PythonDistribTest("linux", "x64", "fedora40", source=True),
         PythonDistribTest("linux", "x64", "arch", source=True),
         PythonDistribTest("linux", "x64", "ubuntu2204", source=True),
         # Ruby
@@ -501,6 +502,9 @@ def targets():
             ruby_version="ruby_3_3",
             protobuf_version="3.25",
             presubmit=True,
+        ),
+        RubyDistribTest(
+            "linux", "x64", "debian11", ruby_version="ruby_3_4", presubmit=True
         ),
         RubyDistribTest("linux", "x64", "ubuntu2004"),
         RubyDistribTest("linux", "x64", "ubuntu2204", presubmit=True),

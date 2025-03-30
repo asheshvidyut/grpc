@@ -16,7 +16,6 @@
 //
 //
 
-#include <gmock/gmock.h>
 #include <grpc/byte_buffer.h>
 #include <grpc/credentials.h>
 #include <grpc/grpc.h>
@@ -31,6 +30,7 @@
 #include "absl/log/check.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
+#include "gmock/gmock.h"
 #include "src/core/config/config_vars.h"
 #include "src/core/config/core_configuration.h"
 #include "src/core/lib/channel/channel_args.h"
@@ -116,7 +116,7 @@ void DoNothing(void* /*arg*/, grpc_error_handle /*error*/) {}
 
 void ArgsFinish(ArgsStruct* args) {
   grpc_core::Notification notification;
-  args->lock->Run([&notification]() { notification.Notify(); }, DEBUG_LOCATION);
+  args->lock->Run([&notification]() { notification.Notify(); });
   args->lock.reset();
   notification.WaitForNotification();
   grpc_pollset_set_del_pollset(args->pollset_set, args->pollset);

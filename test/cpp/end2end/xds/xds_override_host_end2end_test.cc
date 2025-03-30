@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-
 #include <string>
 #include <vector>
 
@@ -24,6 +21,8 @@
 #include "absl/strings/str_split.h"
 #include "envoy/extensions/filters/http/stateful_session/v3/stateful_session.pb.h"
 #include "envoy/extensions/http/stateful_session/cookie/v3/cookie.pb.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "src/core/config/config_vars.h"
 #include "src/core/util/time.h"
 #include "test/core/test_util/scoped_env_var.h"
@@ -53,7 +52,7 @@ class OverrideHostTest : public XdsEnd2endTest {
     std::set<std::string> attributes;
 
     std::pair<std::string, std::string> Header() const {
-      return std::make_pair("cookie", absl::StrFormat("%s=%s", name, value));
+      return std::pair("cookie", absl::StrFormat("%s=%s", name, value));
     }
 
     template <typename Sink>
@@ -66,14 +65,19 @@ class OverrideHostTest : public XdsEnd2endTest {
 
   static Cookie ParseCookie(absl::string_view header) {
     Cookie cookie;
-    std::pair<absl::string_view, absl::string_view> name_value =
+    std::pair<absl::string_view, absl::string_view> string_pair =
         absl::StrSplit(header, absl::MaxSplits('=', 1));
-    cookie.name = std::string(name_value.first);
-    std::pair<absl::string_view, absl::string_view> value_attrs =
-        absl::StrSplit(name_value.second, absl::MaxSplits(';', 1));
-    cookie.value = std::string(value_attrs.first);
-    for (absl::string_view segment : absl::StrSplit(value_attrs.second, ';')) {
-      cookie.attributes.emplace(absl::StripAsciiWhitespace(segment));
+    auto [name, rest] = string_pair;
+    string_pair = absl::StrSplit(rest, absl::MaxSplits(';', 1));
+    auto& [value, attributes] = string_pair;
+    cookie.name = std::string(name);
+    cookie.value = std::string(value);
+    std::string decoded;
+    EXPECT_TRUE(absl::Base64Unescape(value, &decoded));
+    LOG(INFO) << "set-cookie header: " << header << " (decoded: " << decoded
+              << ")";
+    for (absl::string_view attribute : absl::StrSplit(attributes, ';')) {
+      cookie.attributes.emplace(absl::StripAsciiWhitespace(attribute));
     }
     return cookie;
   }
@@ -81,16 +85,8 @@ class OverrideHostTest : public XdsEnd2endTest {
   static std::vector<Cookie> GetCookies(
       const std::multimap<std::string, std::string>& server_initial_metadata) {
     std::vector<Cookie> values;
-    auto pair = server_initial_metadata.equal_range("set-cookie");
-    for (auto it = pair.first; it != pair.second; ++it) {
-      std::pair<absl::string_view, absl::string_view> key_value =
-          absl::StrSplit(it->second, '=');
-      std::pair<absl::string_view, absl::string_view> key_value2 =
-          absl::StrSplit(key_value.second, ';');
-      std::string decoded;
-      EXPECT_TRUE(absl::Base64Unescape(key_value2.first, &decoded));
-      LOG(INFO) << "set-cookie header: " << it->second
-                << " (decoded: " << decoded << ")";
+    auto [start, end] = server_initial_metadata.equal_range("set-cookie");
+    for (auto it = start; it != end; ++it) {
       values.emplace_back(ParseCookie(it->second));
       EXPECT_FALSE(values.back().value.empty());
       EXPECT_THAT(values.back().attributes, ::testing::Contains("HttpOnly"));
@@ -162,7 +158,7 @@ class OverrideHostTest : public XdsEnd2endTest {
   // For weighted clusters, more than one request per backend may be necessary
   // to obtain the cookie. max_requests_per_backend argument specifies
   // the number of requests per backend to send.
-  absl::optional<std::pair<std::string, std::string>>
+  std::optional<std::pair<std::string, std::string>>
   GetAffinityCookieHeaderForBackend(
       grpc_core::DebugLocation debug_location, size_t backend_index,
       size_t max_requests_per_backend = 1,
@@ -175,7 +171,7 @@ class OverrideHostTest : public XdsEnd2endTest {
         return cookie.Header();
       }
     }
-    return absl::nullopt;
+    return std::nullopt;
   }
 
   void SetClusterResource(absl::string_view cluster_name,
@@ -190,11 +186,11 @@ class OverrideHostTest : public XdsEnd2endTest {
       const std::map<absl::string_view, uint32_t>& clusters) {
     RouteConfiguration new_route_config = default_route_config_;
     auto* route1 = new_route_config.mutable_virtual_hosts(0)->mutable_routes(0);
-    for (const auto& cluster : clusters) {
+    for (const auto& [cluster, weight] : clusters) {
       auto* weighted_cluster =
           route1->mutable_route()->mutable_weighted_clusters()->add_clusters();
-      weighted_cluster->set_name(cluster.first);
-      weighted_cluster->mutable_weight()->set_value(cluster.second);
+      weighted_cluster->set_name(cluster);
+      weighted_cluster->mutable_weight()->set_value(weight);
     }
     return new_route_config;
   }
@@ -218,7 +214,7 @@ class OverrideHostTest : public XdsEnd2endTest {
 
   static Route BuildStatefulSessionRouteConfig(
       absl::string_view match_prefix, absl::string_view cookie_name,
-      absl::optional<grpc_core::Duration> opt_duration = absl::nullopt) {
+      std::optional<grpc_core::Duration> opt_duration = std::nullopt) {
     StatefulSessionPerRoute stateful_session_per_route;
     if (!cookie_name.empty()) {
       auto* session_state =

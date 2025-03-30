@@ -393,9 +393,9 @@
   endif()
 
   if (APPLE AND NOT DEFINED CMAKE_CXX_STANDARD)
-    # AppleClang defaults to C++98, so we bump it to C++14.
-    message("CMAKE_CXX_STANDARD was undefined, defaulting to C++14.")
-    set(CMAKE_CXX_STANDARD 14)
+    # AppleClang defaults to C++98, so we bump it to C++17.
+    message("CMAKE_CXX_STANDARD was undefined, defaulting to C++17.")
+    set(CMAKE_CXX_STANDARD 17)
   endif ()
 
   ## Some libraries are shared even with BUILD_SHARED_LIBRARIES=OFF
@@ -548,10 +548,10 @@
   )
 
   set(gRPC_ADDITIONAL_DLL_SRC
-    src/core/lib/security/credentials/tls/grpc_tls_certificate_distributor.cc
-    src/core/lib/security/credentials/tls/grpc_tls_certificate_provider.cc
-    src/core/lib/security/credentials/tls/grpc_tls_certificate_verifier.cc
-    src/core/lib/security/credentials/tls/grpc_tls_credentials_options.cc
+    src/core/credentials/transport/tls/grpc_tls_certificate_distributor.cc
+    src/core/credentials/transport/tls/grpc_tls_certificate_provider.cc
+    src/core/credentials/transport/tls/grpc_tls_certificate_verifier.cc
+    src/core/credentials/transport/tls/grpc_tls_credentials_options.cc
   )
 
   set(gRPC_ADDITIONAL_DLL_CXX_SRC
@@ -853,7 +853,7 @@
   % endif
   )
 
-  target_compile_features(${lib.name} PUBLIC cxx_std_14)
+  target_compile_features(${lib.name} PUBLIC cxx_std_17)
 
   set_target_properties(${lib.name} PROPERTIES
   % if lib.language == 'c++':
@@ -937,9 +937,9 @@
     )
   endif()
   % endif
-  % if lib.name in ["grpc", "grpc_cronet", "grpc_test_util", \
+  % if lib.name in ["grpc", "grpc_test_util", \
                     "grpc_test_util_unsecure", "grpc_unsecure", \
-                    "grpc++_cronet"]: # TODO(jtattermusch): remove special cases based on target names
+                   ]: # TODO(jtattermusch): remove special cases based on target names
   if(_gRPC_PLATFORM_IOS OR _gRPC_PLATFORM_MAC)
     target_link_libraries(${lib.name} "-framework CoreFoundation")
   endif()
@@ -996,7 +996,7 @@
     endif()
   endif()
   % endif
-  target_compile_features(${tgt.name} PUBLIC cxx_std_14)
+  target_compile_features(${tgt.name} PUBLIC cxx_std_17)
   target_include_directories(${tgt.name}
     PRIVATE
       <%text>${CMAKE_CURRENT_SOURCE_DIR}</%text>
