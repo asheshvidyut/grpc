@@ -96,6 +96,7 @@ class OpenTelemetryPlugin:
     target_attribute_filter: Callable[[str], bool]
     generic_method_attribute_filter: Callable[[str], bool]
     _plugins: List[_open_telemetry_observability._OpenTelemetryPlugin]
+    _is_registered: bool
 
     def __init__(
         self,
@@ -138,6 +139,7 @@ class OpenTelemetryPlugin:
         self._plugins = [
             _open_telemetry_observability._OpenTelemetryPlugin(self)
         ]
+        self._is_registered = False
 
     def register_global(self) -> None:
         """
@@ -149,6 +151,7 @@ class OpenTelemetryPlugin:
         _open_telemetry_observability.start_open_telemetry_observability(
             plugins=self._plugins
         )
+        self._is_registered = True
 
     def deregister_global(self) -> None:
         """
@@ -158,6 +161,7 @@ class OpenTelemetryPlugin:
             RuntimeError: If no global plugin was registered.
         """
         _open_telemetry_observability.end_open_telemetry_observability()
+        self._is_registered = False
 
     def __enter__(self) -> None:
         _open_telemetry_observability.start_open_telemetry_observability(
@@ -166,6 +170,11 @@ class OpenTelemetryPlugin:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         _open_telemetry_observability.end_open_telemetry_observability()
+        self.deregister_global()
+
+    def __del__(self) -> None:
+       if self._is_registered:
+           self.deregister_global()
 
     def _get_enabled_optional_labels(self) -> List[OptionalLabelType]:
         return []

@@ -18,6 +18,7 @@ import abc
 import contextlib
 import logging
 import threading
+import atexit
 from typing import Any, Generator, Generic, List, Optional, TypeVar
 
 from grpc._cython import cygrpc as _cygrpc
@@ -246,6 +247,8 @@ def observability_init(observability_plugin: ObservabilityPlugin) -> None:
     time of calling this method.
     """
     set_plugin(observability_plugin)
+    # Register cleanup handler
+    atexit.register(observability_deinit)
 
 
 def observability_deinit() -> None:
