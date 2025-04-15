@@ -15,10 +15,10 @@
 from __future__ import annotations
 
 import abc
+import atexit
 import contextlib
 import logging
 import threading
-import atexit
 from typing import Any, Generator, Generic, List, Optional, TypeVar
 
 from grpc._cython import cygrpc as _cygrpc

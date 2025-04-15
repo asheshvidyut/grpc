@@ -173,8 +173,8 @@ class OpenTelemetryPlugin:
         self.deregister_global()
 
     def __del__(self) -> None:
-       if self._is_registered:
-           self.deregister_global()
+        if self._is_registered:
+            self.deregister_global()
 
     def _get_enabled_optional_labels(self) -> List[OptionalLabelType]:
         return []
