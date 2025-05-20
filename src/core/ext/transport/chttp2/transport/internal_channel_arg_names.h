@@ -1,3 +1,5 @@
+//
+//
 // Copyright 2025 gRPC authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,23 +13,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+//
 
-#include "src/core/util/function_signature.h"
+#ifndef GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_INTERNAL_CHANNEL_ARG_NAMES_H
+#define GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_INTERNAL_CHANNEL_ARG_NAMES_H
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#define GRPC_ARG_PING_TIMEOUT_MS "grpc.http2.ping_timeout_ms"
 
-namespace grpc_core {
-
-namespace {
-class Foo {};
-}  // namespace
-
-TEST(FunctionSignatureTest, Works) {
-  EXPECT_EQ(TypeName<int>(), "int");
-  EXPECT_THAT(TypeName<Foo>(), ::testing::HasSubstr("Foo"));
-  auto x = []() {};
-  EXPECT_THAT(TypeName<decltype(x)>(), ::testing::HasSubstr("lambda"));
-}
-
-}  // namespace grpc_core
+#endif  // GRPC_SRC_CORE_EXT_TRANSPORT_CHTTP2_TRANSPORT_INTERNAL_CHANNEL_ARG_NAMES_H
