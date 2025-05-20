@@ -846,6 +846,8 @@ grpc_cc_library(
     deps = [
         "poll",
         "//:gpr_platform",
+        "//src/core:function_signature",
+        "//src/core:json",
     ],
 )
 
@@ -1044,12 +1046,14 @@ grpc_cc_library(
     ],
     deps = [
         "construct_destruct",
+        "json",
         "poll",
         "promise_factory",
         "promise_like",
         "//:debug_location",
         "//:gpr",
         "//:grpc_trace",
+        "//:promise",
     ],
 )
 
@@ -7292,10 +7296,14 @@ grpc_cc_library(
 
 grpc_cc_library(
     name = "tcp_tracer",
+    srcs = [
+        "//src/core:telemetry/tcp_tracer.cc",
+    ],
     hdrs = [
         "//src/core:telemetry/tcp_tracer.h",
     ],
     external_deps = [
+        "absl/strings",
         "absl/time",
     ],
     visibility = ["//bazel:tcp_tracer"],
@@ -9224,6 +9232,16 @@ grpc_cc_library(
 )
 
 grpc_cc_library(
+    name = "function_signature",
+    hdrs = [
+        "util/function_signature.h",
+    ],
+    external_deps = [
+        "absl/strings",
+    ],
+)
+
+grpc_cc_library(
     name = "call_finalization",
     hdrs = [
         "call/call_finalization.h",
@@ -9693,7 +9711,13 @@ grpc_cc_library(
         "libssl",
     ],
     deps = [
+        "json",
+        "json_args",
+        "json_object_loader",
+        "json_reader",
+        "load_file",
         "status_helper",
+        "//:tsi_ssl_credentials",
     ],
 )
 
