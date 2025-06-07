@@ -1221,7 +1221,7 @@ class _UnaryUnaryMultiCallable(grpc.UnaryUnaryMultiCallable):
                 None if credentials is None else credentials._credentials,
                 (operations,),
                 event_handler,
-                self._context
+                self._context,
             )
             return _MultiThreadedRendezvous(
                 state, call, self._response_deserializer, deadline
@@ -1408,7 +1408,7 @@ class _UnaryStreamMultiCallable(grpc.UnaryStreamMultiCallable):
                 None if credentials is None else credentials._credentials,
                 operations,
                 _event_handler(state, self._response_deserializer),
-                self._context
+                self._context,
             )
             return _MultiThreadedRendezvous(
                 state, call, self._response_deserializer, deadline
@@ -1572,7 +1572,7 @@ class _StreamUnaryMultiCallable(grpc.StreamUnaryMultiCallable):
                 metadata, initial_metadata_flags
             ),
             event_handler,
-            self._context
+            self._context,
         )
         _consume_request_iterator(
             request_iterator,
@@ -1662,7 +1662,7 @@ class _StreamStreamMultiCallable(grpc.StreamStreamMultiCallable):
             None if credentials is None else credentials._credentials,
             operations,
             event_handler,
-            self._context
+            self._context,
         )
         _consume_request_iterator(
             request_iterator,
@@ -2114,7 +2114,9 @@ class Channel(grpc.Channel):
             _registered_call_handle = self._get_registered_call_handle(method)
         return _UnaryUnaryMultiCallable(
             self._channel,
-            _channel_managed_call_management(self._call_state, _registered_call_handle),
+            _channel_managed_call_management(
+                self._call_state, _registered_call_handle
+            ),
             _common.encode(method),
             _common.encode(self._target),
             request_serializer,
@@ -2147,7 +2149,9 @@ class Channel(grpc.Channel):
         else:
             return _UnaryStreamMultiCallable(
                 self._channel,
-                _channel_managed_call_management(self._call_state, _registered_call_handle),
+                _channel_managed_call_management(
+                    self._call_state, _registered_call_handle
+                ),
                 _common.encode(method),
                 _common.encode(self._target),
                 request_serializer,
@@ -2167,7 +2171,9 @@ class Channel(grpc.Channel):
             _registered_call_handle = self._get_registered_call_handle(method)
         return _StreamUnaryMultiCallable(
             self._channel,
-            _channel_managed_call_management(self._call_state, _registered_call_handle),
+            _channel_managed_call_management(
+                self._call_state, _registered_call_handle
+            ),
             _common.encode(method),
             _common.encode(self._target),
             request_serializer,
@@ -2187,7 +2193,9 @@ class Channel(grpc.Channel):
             _registered_call_handle = self._get_registered_call_handle(method)
         return _StreamStreamMultiCallable(
             self._channel,
-            _channel_managed_call_management(self._call_state, _registered_call_handle),
+            _channel_managed_call_management(
+                self._call_state, _registered_call_handle
+            ),
             _common.encode(method),
             _common.encode(self._target),
             request_serializer,
