@@ -341,9 +341,9 @@ class ExperimentsCompiler(object):
                 % experiment_definition.name
             )
             return False
-        self._experiment_definitions[experiment_definition.name] = (
-            experiment_definition
-        )
+        self._experiment_definitions[
+            experiment_definition.name
+        ] = experiment_definition
         return True
 
     def AddRolloutSpecification(self, rollout_attributes):
