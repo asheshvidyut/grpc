@@ -21,19 +21,19 @@ import sys
 
 from grpc import _compression
 from grpc._cython import cygrpc as _cygrpc
+from grpc._cython.cygrpc import cygrpc_init
+from grpc._cython.cygrpc import cygrpc_shutdown
+from grpc._cython.cygrpc import end_client_rpc
+from grpc._cython.cygrpc import initialize_absl_logging
+from grpc._cython.cygrpc import insecure_channel
+from grpc._cython.cygrpc import secure_channel
+from grpc._cython.cygrpc import server
+from grpc._cython.cygrpc import shutdown_server
+from grpc._cython.cygrpc import start_client_rpc
+from grpc._cython.cygrpc import start_server
 from grpc._runtime_protos import protos
 from grpc._runtime_protos import protos_and_services
 from grpc._runtime_protos import services
-from grpc._cython.cygrpc import (cygrpc_init,
-                               cygrpc_shutdown,
-                               end_client_rpc,
-                               insecure_channel,
-                               secure_channel,
-                               server,
-                               shutdown_server,
-                               start_client_rpc,
-                               start_server,
-                               initialize_absl_logging)
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
