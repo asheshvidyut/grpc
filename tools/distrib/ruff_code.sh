@@ -1,5 +1,5 @@
-#! /bin/bash -ex
-# Copyright 2024 The gRPC Authors
+#!/bin/bash
+# Copyright 2023 The gRPC Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-JOBS=$(nproc) || JOBS=4
+set -ex
 
-VIRTUALENV=venv_check_pyright
+# change to root directory
+cd "$(dirname "$0")/../.."
+
+DIRS=(
+    'src/python/grpcio/grpc/_auth.py'
+    'src/python/grpcio/grpc/_channel.py'
+)
+
+VIRTUALENV=venv_ruff
 python3 -m virtualenv $VIRTUALENV
 source $VIRTUALENV/bin/activate
 
-# Install pyright using pip
-python3 -m pip install pyright
+python3 -m pip install --upgrade ruff==0.11.13
 
-# Run pyright with the configuration
-python3 -m pyright --project pyrightconfig.json
+EXIT=0
+ruff check --config ruff.toml "${DIRS[@]}" || EXIT=1
+
+exit $EXIT 
