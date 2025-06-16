@@ -22,7 +22,6 @@ DIRS=(
     'src/python/grpcio/grpc/_auth.py'
     'src/python/grpcio/grpc/_channel.py'
     'src/python/grpcio/grpc/_common.py'
-    'src/python/grpcio/grpc/_compression.py'
 )
 
 VIRTUALENV=venv_ruff

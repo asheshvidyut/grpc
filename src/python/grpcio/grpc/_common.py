@@ -103,14 +103,13 @@ def deserialize(
 
 
 def fully_qualified_method(group: str, method: str) -> str:
-    return "/{}/{}".format(group, method)
-
+    return f"/{group}/{method}"
 
 def _wait_once(
     wait_fn: Callable[..., bool],
     timeout: float,
     spin_cb: Optional[Callable[[], None]],
-):
+) -> None:
     wait_fn(timeout=timeout)
     if spin_cb is not None:
         spin_cb()
@@ -149,6 +148,7 @@ def wait(
     Returns:
       True if a timeout was supplied and it was reached. False otherwise.
     """
+
     if timeout is None:
         while not wait_complete_fn():
             _wait_once(wait_fn, MAXIMUM_WAIT_TIMEOUT, spin_cb)
@@ -163,7 +163,7 @@ def wait(
 
 
 def validate_port_binding_result(address: str, port: int) -> int:
-    """Validates if the port binding succeed.
+    """Validate if the port binding succeed.
 
     If the port returned by Core is 0, the binding is failed. However, in that
     case, the Core API doesn't return a detailed failing reason. The best we
@@ -173,9 +173,9 @@ def validate_port_binding_result(address: str, port: int) -> int:
         address: The address string to be bound.
         port: An int returned by core
     """
+
     if port == 0:
         # The Core API doesn't return a failure message. The best we can do
         # is raising an exception to prevent further confusion.
         raise RuntimeError(_ERROR_MESSAGE_PORT_BINDING_FAILED % address)
-    else:
-        return port
+    return port
