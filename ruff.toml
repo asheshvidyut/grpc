@@ -30,6 +30,10 @@ ignore = [
     # This conflicts with isort
 
     "TRY400", # Checks for uses of logging.error instead of logging.exception when logging an exception.
+
+    "UP007", # PEP 604 introduced a new syntax for union type annotations based on the | operator.
+    # This syntax is more concise and readable than the previous typing.Union and typing.Optional syntaxes.
+    # This rule is enabled when targeting Python 3.10 or later
 ]
 
 # Select all rules by default, and then ignore the ones we don't want.
