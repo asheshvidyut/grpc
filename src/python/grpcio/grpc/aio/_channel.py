@@ -15,6 +15,9 @@
 from __future__ import annotations
 
 import asyncio
+import types
+from collections.abc import Iterable
+from collections.abc import Sequence
 import sys
 from typing import Any, Iterable, Optional, Sequence, Union
 
@@ -365,13 +368,11 @@ class Channel(_base_channel.Channel):
                     self._stream_stream_interceptors.append(interceptor)
                 else:
                     raise ValueError(  # noqa: TRY004
-                        "Interceptor {} must be ".format(  # noqa: UP032
-                            interceptor,
-                        )
-                        + f"{UnaryUnaryClientInterceptor.__name__} or "
-                        + f"{UnaryStreamClientInterceptor.__name__} or "
-                        + f"{StreamUnaryClientInterceptor.__name__} or "
-                        + f"{StreamStreamClientInterceptor.__name__}. ",
+                        f"Interceptor {interceptor} must be "
+                        f"{UnaryUnaryClientInterceptor.__name__} or "
+                        f"{UnaryStreamClientInterceptor.__name__} or "
+                        f"{StreamUnaryClientInterceptor.__name__} or "
+                        f"{StreamStreamClientInterceptor.__name__}. ",
                     )
 
         self._loop = cygrpc.get_working_loop()
@@ -387,15 +388,15 @@ class Channel(_base_channel.Channel):
 
     async def __aexit__(
         self,
-        exc_type,  # noqa: ANN001
-        exc_val,  # noqa: ANN001
-        exc_tb,  # noqa: ANN001
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[object],
     ) -> None:
         await self._close(None)
 
     async def _close(  # pylint: disable=too-many-branches  # noqa: C901, PLR0912
         self,
-        grace,  # noqa: ANN001
+        grace: Optional[float],
     ) -> None:
         if self._channel.closed():
             return

@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 from concurrent.futures import Executor
+from typing import Optional
 from typing import Any, Optional, Sequence
 
 import grpc
@@ -43,7 +44,7 @@ class Server(_base_server.Server):
         self,
         thread_pool: Optional[Executor],
         generic_handlers: Optional[Sequence[grpc.GenericRpcHandler]],
-        interceptors: Optional[Sequence[Any]],
+        interceptors: Optional[Sequence[ServerInterceptor]],
         options: ChannelArgsType,
         maximum_concurrent_rpcs: Optional[int],
         compression: Optional[grpc.Compression],
@@ -216,7 +217,7 @@ class Server(_base_server.Server):
 def server(
     migration_thread_pool: Optional[Executor] = None,
     handlers: Optional[Sequence[grpc.GenericRpcHandler]] = None,
-    interceptors: Optional[Sequence[Any]] = None,
+    interceptors: Optional[Sequence[ServerInterceptor]] = None,
     options: Optional[ChannelArgsType] = None,
     maximum_concurrent_rpcs: Optional[int] = None,
     compression: Optional[grpc.Compression] = None,

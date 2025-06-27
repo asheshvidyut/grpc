@@ -14,7 +14,7 @@
 """Abstract base classes for Channel objects and Multicallable objects."""
 
 import abc
-from typing import Generic, Optional
+from typing import Generic, Optional, types
 
 import grpc
 
@@ -203,9 +203,9 @@ class Channel(abc.ABC):
     @abc.abstractmethod
     async def __aexit__(
         self,
-        exc_type,  # noqa: ANN001
-        exc_val,  # noqa: ANN001
-        exc_tb,  # noqa: ANN001
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[object],
     ) -> None:
         """Finishes the asynchronous context manager by closing the channel.
 
