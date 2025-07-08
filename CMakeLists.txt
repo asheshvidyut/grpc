@@ -25,11 +25,11 @@
 cmake_minimum_required(VERSION 3.16)
 
 set(PACKAGE_NAME          "grpc")
-set(PACKAGE_VERSION       "1.74.0-dev")
-set(gRPC_CORE_VERSION     "48.0.0")
-set(gRPC_CORE_SOVERSION   "48")
-set(gRPC_CPP_VERSION      "1.74.0-dev")
-set(gRPC_CPP_SOVERSION    "1.74")
+set(PACKAGE_VERSION       "1.75.0-dev")
+set(gRPC_CORE_VERSION     "49.0.0")
+set(gRPC_CORE_SOVERSION   "49")
+set(gRPC_CPP_VERSION      "1.75.0-dev")
+set(gRPC_CPP_SOVERSION    "1.75")
 set(PACKAGE_STRING        "${PACKAGE_NAME} ${PACKAGE_VERSION}")
 set(PACKAGE_TARNAME       "${PACKAGE_NAME}-${PACKAGE_VERSION}")
 set(PACKAGE_BUGREPORT     "https://github.com/grpc/grpc/issues/")
@@ -2659,6 +2659,7 @@ add_library(grpc
   src/core/filter/auth/client_auth_filter.cc
   src/core/filter/auth/server_auth_filter.cc
   src/core/filter/blackboard.cc
+  src/core/filter/fused_filters.cc
   src/core/handshaker/endpoint_info/endpoint_info_handshaker.cc
   src/core/handshaker/handshaker.cc
   src/core/handshaker/handshaker_registry.cc
@@ -2667,6 +2668,7 @@ add_library(grpc
   src/core/handshaker/http_connect/xds_http_proxy_mapper.cc
   src/core/handshaker/proxy_mapper_registry.cc
   src/core/handshaker/security/legacy_secure_endpoint.cc
+  src/core/handshaker/security/pipelined_secure_endpoint.cc
   src/core/handshaker/security/secure_endpoint.cc
   src/core/handshaker/security/security_handshaker.cc
   src/core/handshaker/tcp_connect/tcp_connect_handshaker.cc
@@ -2691,6 +2693,7 @@ add_library(grpc
   src/core/lib/event_engine/channel_args_endpoint_config.cc
   src/core/lib/event_engine/default_event_engine.cc
   src/core/lib/event_engine/default_event_engine_factory.cc
+  src/core/lib/event_engine/endpoint_channel_arg_wrapper.cc
   src/core/lib/event_engine/event_engine.cc
   src/core/lib/event_engine/posix_engine/ev_epoll1_linux.cc
   src/core/lib/event_engine/posix_engine/ev_poll_posix.cc
@@ -3104,6 +3107,7 @@ foreach(_hdr
   include/grpc/byte_buffer_reader.h
   include/grpc/census.h
   include/grpc/compression.h
+  include/grpc/create_channel_from_endpoint.h
   include/grpc/credentials.h
   include/grpc/event_engine/endpoint_config.h
   include/grpc/event_engine/event_engine.h
@@ -3460,6 +3464,7 @@ add_library(grpc_unsecure
   src/core/filter/auth/client_auth_filter.cc
   src/core/filter/auth/server_auth_filter.cc
   src/core/filter/blackboard.cc
+  src/core/filter/fused_filters.cc
   src/core/handshaker/endpoint_info/endpoint_info_handshaker.cc
   src/core/handshaker/handshaker.cc
   src/core/handshaker/handshaker_registry.cc
@@ -3467,6 +3472,7 @@ add_library(grpc_unsecure
   src/core/handshaker/http_connect/http_proxy_mapper.cc
   src/core/handshaker/proxy_mapper_registry.cc
   src/core/handshaker/security/legacy_secure_endpoint.cc
+  src/core/handshaker/security/pipelined_secure_endpoint.cc
   src/core/handshaker/security/secure_endpoint.cc
   src/core/handshaker/security/security_handshaker.cc
   src/core/handshaker/tcp_connect/tcp_connect_handshaker.cc
@@ -3491,6 +3497,7 @@ add_library(grpc_unsecure
   src/core/lib/event_engine/channel_args_endpoint_config.cc
   src/core/lib/event_engine/default_event_engine.cc
   src/core/lib/event_engine/default_event_engine_factory.cc
+  src/core/lib/event_engine/endpoint_channel_arg_wrapper.cc
   src/core/lib/event_engine/event_engine.cc
   src/core/lib/event_engine/posix_engine/ev_epoll1_linux.cc
   src/core/lib/event_engine/posix_engine/ev_poll_posix.cc
@@ -3821,6 +3828,7 @@ foreach(_hdr
   include/grpc/byte_buffer_reader.h
   include/grpc/census.h
   include/grpc/compression.h
+  include/grpc/create_channel_from_endpoint.h
   include/grpc/credentials.h
   include/grpc/event_engine/endpoint_config.h
   include/grpc/event_engine/event_engine.h
@@ -5845,6 +5853,7 @@ add_library(grpc_authorization_provider
   src/core/handshaker/handshaker_registry.cc
   src/core/handshaker/proxy_mapper_registry.cc
   src/core/handshaker/security/legacy_secure_endpoint.cc
+  src/core/handshaker/security/pipelined_secure_endpoint.cc
   src/core/handshaker/security/secure_endpoint.cc
   src/core/handshaker/security/security_handshaker.cc
   src/core/lib/address_utils/parse_address.cc
@@ -6139,6 +6148,7 @@ foreach(_hdr
   include/grpc/byte_buffer.h
   include/grpc/byte_buffer_reader.h
   include/grpc/compression.h
+  include/grpc/create_channel_from_endpoint.h
   include/grpc/credentials.h
   include/grpc/event_engine/endpoint_config.h
   include/grpc/event_engine/event_engine.h
@@ -9007,6 +9017,13 @@ endif()
 if(gRPC_BUILD_TESTS)
 
 add_executable(blackboard_test
+  src/core/channelz/property_list.cc
+  src/core/ext/upb-gen/google/protobuf/any.upb_minitable.c
+  src/core/ext/upb-gen/google/protobuf/duration.upb_minitable.c
+  src/core/ext/upb-gen/google/protobuf/empty.upb_minitable.c
+  src/core/ext/upb-gen/google/protobuf/timestamp.upb_minitable.c
+  src/core/ext/upb-gen/src/proto/grpc/channelz/v2/channelz.upb_minitable.c
+  src/core/ext/upb-gen/src/proto/grpc/channelz/v2/property_list.upb_minitable.c
   src/core/filter/blackboard.cc
   src/core/lib/address_utils/sockaddr_utils.cc
   src/core/lib/channel/channel_args.cc
@@ -9050,6 +9067,7 @@ target_include_directories(blackboard_test
 target_link_libraries(blackboard_test
   ${_gRPC_ALLTARGETS_LIBRARIES}
   gtest
+  upb_textformat_lib
   absl::config
   absl::flat_hash_map
   absl::function_ref
@@ -13307,6 +13325,7 @@ if(_gRPC_PLATFORM_LINUX OR _gRPC_PLATFORM_MAC OR _gRPC_PLATFORM_POSIX)
     test/core/test_util/fail_first_call_filter.cc
     test/core/test_util/fake_stats_plugin.cc
     test/core/test_util/fuzz_config_vars.cc
+    test/core/test_util/passthrough_endpoint.cc
     test/core/test_util/test_call_creds.cc
     test/core/test_util/test_lb_policies.cc
     third_party/googletest/googlemock/src/gmock_main.cc
@@ -13498,6 +13517,7 @@ if(_gRPC_PLATFORM_LINUX OR _gRPC_PLATFORM_MAC OR _gRPC_PLATFORM_POSIX)
     test/core/test_util/fail_first_call_filter.cc
     test/core/test_util/fake_stats_plugin.cc
     test/core/test_util/fuzz_config_vars.cc
+    test/core/test_util/passthrough_endpoint.cc
     test/core/test_util/test_call_creds.cc
     test/core/test_util/test_lb_policies.cc
     third_party/googletest/googlemock/src/gmock_main.cc
@@ -13600,6 +13620,7 @@ add_executable(end2end_http2_no_logging_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -13701,6 +13722,7 @@ add_executable(end2end_http2_security_no_logging_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -13890,6 +13912,7 @@ add_executable(end2end_http2_security_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -14079,6 +14102,7 @@ add_executable(end2end_http2_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -14180,6 +14204,7 @@ add_executable(end2end_inproc_no_logging_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -14369,6 +14394,7 @@ add_executable(end2end_inproc_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -14470,6 +14496,7 @@ add_executable(end2end_posix_no_logging_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -14659,6 +14686,7 @@ add_executable(end2end_posix_test
   test/core/test_util/fail_first_call_filter.cc
   test/core/test_util/fake_stats_plugin.cc
   test/core/test_util/fuzz_config_vars.cc
+  test/core/test_util/passthrough_endpoint.cc
   test/core/test_util/test_call_creds.cc
   test/core/test_util/test_lb_policies.cc
   third_party/googletest/googlemock/src/gmock_main.cc
@@ -14831,6 +14859,13 @@ endif()
 if(gRPC_BUILD_TESTS)
 
 add_executable(endpoint_config_test
+  src/core/channelz/property_list.cc
+  src/core/ext/upb-gen/google/protobuf/any.upb_minitable.c
+  src/core/ext/upb-gen/google/protobuf/duration.upb_minitable.c
+  src/core/ext/upb-gen/google/protobuf/empty.upb_minitable.c
+  src/core/ext/upb-gen/google/protobuf/timestamp.upb_minitable.c
+  src/core/ext/upb-gen/src/proto/grpc/channelz/v2/channelz.upb_minitable.c
+  src/core/ext/upb-gen/src/proto/grpc/channelz/v2/property_list.upb_minitable.c
   src/core/lib/channel/channel_args.cc
   src/core/lib/event_engine/channel_args_endpoint_config.cc
   src/core/lib/surface/channel_stack_type.cc
@@ -14869,7 +14904,9 @@ target_include_directories(endpoint_config_test
 target_link_libraries(endpoint_config_test
   ${_gRPC_ALLTARGETS_LIBRARIES}
   gtest
+  upb_textformat_lib
   absl::config
+  absl::flat_hash_map
   absl::hash
   absl::type_traits
   absl::statusor
