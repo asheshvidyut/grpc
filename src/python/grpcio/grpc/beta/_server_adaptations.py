@@ -279,7 +279,7 @@ def _simple_method_handler(
                 None,
                 None,
             )
-        elif implementation.cardinality is cardinality.Cardinality.UNARY_STREAM:
+        if implementation.cardinality is cardinality.Cardinality.UNARY_STREAM:
             return _SimpleMethodHandler(
                 False,
                 True,
@@ -290,7 +290,7 @@ def _simple_method_handler(
                 None,
                 None,
             )
-        elif implementation.cardinality is cardinality.Cardinality.STREAM_UNARY:
+        if implementation.cardinality is cardinality.Cardinality.STREAM_UNARY:
             return _SimpleMethodHandler(
                 True,
                 False,
@@ -303,7 +303,7 @@ def _simple_method_handler(
                 ),
                 None,
             )
-        elif (
+        if (
             implementation.cardinality is cardinality.Cardinality.STREAM_STREAM
         ):
             return _SimpleMethodHandler(
@@ -330,7 +330,7 @@ def _simple_method_handler(
                 None,
                 None,
             )
-        elif implementation.cardinality is cardinality.Cardinality.UNARY_STREAM:
+        if implementation.cardinality is cardinality.Cardinality.UNARY_STREAM:
             return _SimpleMethodHandler(
                 False,
                 True,
@@ -341,7 +341,7 @@ def _simple_method_handler(
                 None,
                 None,
             )
-        elif implementation.cardinality is cardinality.Cardinality.STREAM_UNARY:
+        if implementation.cardinality is cardinality.Cardinality.STREAM_UNARY:
             return _SimpleMethodHandler(
                 True,
                 False,
@@ -352,7 +352,7 @@ def _simple_method_handler(
                 _adapt_stream_unary_event(implementation.stream_unary_event),
                 None,
             )
-        elif (
+        if (
             implementation.cardinality is cardinality.Cardinality.STREAM_STREAM
         ):
             return _SimpleMethodHandler(
@@ -406,13 +406,12 @@ class _GenericRpcHandler(grpc.GenericRpcHandler):
                 self._request_deserializers.get(handler_call_details.method),
                 self._response_serializers.get(handler_call_details.method),
             )
-        elif self._multi_method_implementation is None:
+        if self._multi_method_implementation is None:
             return None
-        else:
-            try:
-                return None  # TODO(nathaniel): call the multimethod.
-            except face.NoSuchMethodError:
-                return None
+        try:
+            return None  # TODO(nathaniel): call the multimethod.
+        except face.NoSuchMethodError:
+            return None
 
 
 class _Server(interfaces.Server):

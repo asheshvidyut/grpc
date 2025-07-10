@@ -66,9 +66,7 @@ def _warn_experimental(api_name, stack_offset):
     if api_name not in _EXPERIMENTAL_APIS_USED:
         _EXPERIMENTAL_APIS_USED.add(api_name)
         msg = (
-            "'{}' is an experimental API. It is subject to change or ".format(
-                api_name
-            )
+            "'{}' is an experimental API. It is subject to change or ".format(api_name)
             + "removal between minor releases. Proceed with caution."
         )
         warnings.warn(msg, ExperimentalApiWarning, stacklevel=2 + stack_offset)
@@ -106,15 +104,10 @@ def wrap_server_method_handler(wrapper, handler):
             # NOTE(lidiz) _replace is a public API:
             #   https://docs.python.org/dev/library/collections.html
             return handler._replace(unary_unary=wrapper(handler.unary_unary))
-        else:
-            return handler._replace(unary_stream=wrapper(handler.unary_stream))
-    else:
-        if not handler.response_streaming:
-            return handler._replace(stream_unary=wrapper(handler.stream_unary))
-        else:
-            return handler._replace(
-                stream_stream=wrapper(handler.stream_stream)
-            )
+        return handler._replace(unary_stream=wrapper(handler.unary_stream))
+    if not handler.response_streaming:
+        return handler._replace(stream_unary=wrapper(handler.stream_unary))
+    return handler._replace(stream_stream=wrapper(handler.stream_stream))
 
 
 __all__ = (
