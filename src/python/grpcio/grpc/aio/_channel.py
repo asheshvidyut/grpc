@@ -64,9 +64,7 @@ else:
 def _augment_channel_arguments(
     base_options: ChannelArgumentType, compression: Optional[grpc.Compression]
 ):
-    compression_channel_argument = _compression.create_channel_option(
-        compression
-    )
+    compression_channel_argument = _compression.create_channel_option(compression)
     user_agent_channel_argument = (
         (
             cygrpc.ChannelArgKey.primary_user_agent_string,
@@ -74,9 +72,7 @@ def _augment_channel_arguments(
         ),
     )
     return (
-        tuple(base_options)
-        + compression_channel_argument
-        + user_agent_channel_argument
+        tuple(base_options) + compression_channel_argument + user_agent_channel_argument
     )
 
 
@@ -126,9 +122,7 @@ class _BaseMultiCallable:
         if not isinstance(metadata, Metadata) and isinstance(metadata, tuple):
             metadata = Metadata.from_tuple(metadata)
         if compression:
-            metadata = Metadata(
-                *_compression.augment_metadata(metadata, compression)
-            )
+            metadata = Metadata(*_compression.augment_metadata(metadata, compression))
         return metadata
 
 
@@ -422,24 +416,22 @@ class Channel(_base_channel.Channel):
             # Explicitly check for a non-null candidate instead of the more pythonic 'if candidate:'
             # because doing 'if candidate:' assumes that the coroutine implements '__bool__' which
             # might not always be the case.
-            if candidate is not None:
-                if isinstance(candidate, _base_call.Call):
-                    if hasattr(candidate, "_channel"):
-                        # For intercepted Call object
-                        if candidate._channel is not self._channel:
-                            continue
-                    elif hasattr(candidate, "_cython_call"):
-                        # For normal Call object
-                        if candidate._cython_call._channel is not self._channel:
-                            continue
-                    else:
-                        # Unidentified Call object
-                        raise cygrpc.InternalError(
-                            f"Unrecognized call object: {candidate}"
-                        )
+            if candidate is not None and isinstance(candidate, _base_call.Call):
+                if hasattr(candidate, "_channel"):
+                    # For intercepted Call object
+                    if candidate._channel is not self._channel:
+                        continue
+                elif hasattr(candidate, "_cython_call"):
+                    # For normal Call object
+                    if candidate._cython_call._channel is not self._channel:
+                        continue
+                else:
+                    # Unidentified Call object
+                    error_msg = f"Unrecognized call object: {candidate}"
+                    raise cygrpc.InternalError(error_msg)
 
-                    calls.append(candidate)
-                    call_tasks.append(task)
+                calls.append(candidate)
+                call_tasks.append(task)
 
         # If needed, try to wait for them to finish.
         # Call objects are not always awaitables.
@@ -457,13 +449,10 @@ class Channel(_base_channel.Channel):
         await self._close(grace)
 
     def __del__(self):
-        if hasattr(self, "_channel"):
-            if not self._channel.closed():
-                self._channel.close()
+        if hasattr(self, "_channel") and not self._channel.closed():
+            self._channel.close()
 
-    def get_state(
-        self, try_to_connect: bool = False
-    ) -> grpc.ChannelConnectivity:
+    def get_state(self, try_to_connect: bool = False) -> grpc.ChannelConnectivity:
         result = self._channel.check_connectivity_state(try_to_connect)
         return _common.CYGRPC_CONNECTIVITY_STATE_TO_CHANNEL_CONNECTIVITY[result]
 
