@@ -89,8 +89,11 @@ ignore = [
     "ISC003",  # Explicitly concatenated string should be implicitly concatenated
     "LOG015",  # {}() call on root logger
     "N802",    # Function name {name} should be lowercase
+<<<<<<< HEAD
     "N803",    # Argument name {name} should be lowercase
     "N806",    # Variable {name} in function should be lowercase
+=======
+>>>>>>> 7b7028345c (removed suppression for N806)
     "N818",    # Exception name {name} should be named with an Error suffix
     "PERF102", # When using only the {subset} of a dict use the {subset}() method
     "PERF203", # try-except within a loop incurs performance overhead
