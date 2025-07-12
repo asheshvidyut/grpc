@@ -870,7 +870,7 @@ class _MultiThreadedRendezvous(
             else:
                 if self._state.code is grpc.StatusCode.OK:
                     return self._state.response
-                elif self._state.cancelled:
+                if self._state.cancelled:
                     raise grpc.FutureCancelledError()
                 else:
                     raise self
@@ -889,7 +889,7 @@ class _MultiThreadedRendezvous(
             else:
                 if self._state.code is grpc.StatusCode.OK:
                     return None
-                elif self._state.cancelled:
+                if self._state.cancelled:
                     raise grpc.FutureCancelledError()
                 else:
                     return self
@@ -910,7 +910,7 @@ class _MultiThreadedRendezvous(
             else:
                 if self._state.code is grpc.StatusCode.OK:
                     return None
-                elif self._state.cancelled:
+                if self._state.cancelled:
                     raise grpc.FutureCancelledError()
                 else:
                     try:
