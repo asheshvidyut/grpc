@@ -736,9 +736,7 @@ class _SingleThreadedRendezvous(
                     response = self._state.response
                     self._state.response = None
                     return response
-                if (
-                    cygrpc.OperationType.receive_message not in self._state.due
-                ):
+                if cygrpc.OperationType.receive_message not in self._state.due:
                     if self._state.code is grpc.StatusCode.OK:
                         raise StopIteration()
                     elif self._state.code is not None:
