@@ -251,7 +251,12 @@ class _OpenTelemetryPlugin:
                     unit=metric.unit,
                     description=metric.description,
                 )
-            elif metric in (_open_telemetry_measures.CLIENT_ATTEMPT_DURATION, _open_telemetry_measures.CLIENT_RPC_DURATION, _open_telemetry_measures.CLIENT_ATTEMPT_SEND_BYTES, _open_telemetry_measures.CLIENT_ATTEMPT_RECEIVED_BYTES):
+            elif metric in (
+                _open_telemetry_measures.CLIENT_ATTEMPT_DURATION,
+                _open_telemetry_measures.CLIENT_RPC_DURATION,
+                _open_telemetry_measures.CLIENT_ATTEMPT_SEND_BYTES,
+                _open_telemetry_measures.CLIENT_ATTEMPT_RECEIVED_BYTES,
+            ):
                 recorder = meter.create_histogram(
                     name=metric.name,
                     unit=metric.unit,
@@ -263,7 +268,11 @@ class _OpenTelemetryPlugin:
                     unit=metric.unit,
                     description=metric.description,
                 )
-            elif metric in (_open_telemetry_measures.SERVER_RPC_DURATION, _open_telemetry_measures.SERVER_RPC_SEND_BYTES, _open_telemetry_measures.SERVER_RPC_RECEIVED_BYTES):
+            elif metric in (
+                _open_telemetry_measures.SERVER_RPC_DURATION,
+                _open_telemetry_measures.SERVER_RPC_SEND_BYTES,
+                _open_telemetry_measures.SERVER_RPC_RECEIVED_BYTES,
+            ):
                 recorder = meter.create_histogram(
                     name=metric.name,
                     unit=metric.unit,
