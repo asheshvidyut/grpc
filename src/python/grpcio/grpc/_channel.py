@@ -615,9 +615,7 @@ class _SingleThreadedRendezvous(
         del timeout
         with self._state.condition:
             if not self._is_complete():
-                error_msg = (
-                    "_SingleThreadedRendezvous only supports result() when the RPC is complete."
-                )
+                error_msg = "_SingleThreadedRendezvous only supports result() when the RPC is complete."
                 raise grpc.experimental.UsageError(error_msg)
             if self._state.code is grpc.StatusCode.OK:
                 return self._state.response
@@ -638,9 +636,7 @@ class _SingleThreadedRendezvous(
         del timeout
         with self._state.condition:
             if not self._is_complete():
-                error_msg = (
-                    "_SingleThreadedRendezvous only supports exception() when the RPC is complete."
-                )
+                error_msg = "_SingleThreadedRendezvous only supports exception() when the RPC is complete."
                 raise grpc.experimental.UsageError(error_msg)
             if self._state.code is grpc.StatusCode.OK:
                 return None
@@ -663,9 +659,7 @@ class _SingleThreadedRendezvous(
         del timeout
         with self._state.condition:
             if not self._is_complete():
-                msg = (
-                    "_SingleThreadedRendezvous only supports traceback() when the RPC is complete."
-                )
+                msg = "_SingleThreadedRendezvous only supports traceback() when the RPC is complete."
                 raise grpc.experimental.UsageError(msg)
             if self._state.code is grpc.StatusCode.OK:
                 return None
