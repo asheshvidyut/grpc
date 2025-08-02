@@ -17,7 +17,28 @@ from __future__ import annotations
 from typing import Optional
 
 import grpc
-from grpc._cython import cygrpc
+# Import feature flags for implementation selection
+import os
+
+# Select implementation based on environment variable
+_implementation = os.environ.get('GRPC_PYTHON_IMPLEMENTATION', 'auto').lower()
+
+if _implementation == 'rust':
+    try:
+        from grpc._rust import grpc_rust_bindings as cygrpc
+    except ImportError:
+        # Fallback to Cython if Rust is not available
+        from grpc._cython import cygrpc
+else:
+    try:
+        from grpc._cython import cygrpc
+    except ImportError:
+        # Fallback to Rust if Cython is not available
+        try:
+            from grpc._rust import grpc_rust_bindings as cygrpc
+        except ImportError:
+            raise ImportError("Neither Cython nor Rust implementation is available")
+
 from grpc._typing import MetadataType
 
 NoCompression = cygrpc.CompressionAlgorithm.none

@@ -538,6 +538,18 @@ def cython_extensions_and_necessity():
 
 CYTHON_EXTENSION_MODULES, need_cython = cython_extensions_and_necessity()
 
+# Import Rust extension builder
+try:
+    from grpc._rust.rust_builder import create_rust_extensions, should_build_rust, RustBuildExt
+    RUST_EXTENSION_MODULES = create_rust_extensions() if should_build_rust() else []
+    BUILD_WITH_RUST = should_build_rust()
+except ImportError:
+    RUST_EXTENSION_MODULES = []
+    BUILD_WITH_RUST = False
+
+# Combine Cython and Rust extensions
+ALL_EXTENSION_MODULES = list(CYTHON_EXTENSION_MODULES) + list(RUST_EXTENSION_MODULES)
+
 PACKAGE_DIRECTORIES = {
     "": PYTHON_STEM,
 }
@@ -576,6 +588,14 @@ COMMAND_CLASS = {
     "clean": commands.Clean,
 }
 
+# Add Rust build command if available
+if BUILD_WITH_RUST:
+    try:
+        from grpc._rust.rust_builder import RustBuildExt
+        COMMAND_CLASS["build_ext"] = RustBuildExt
+    except ImportError:
+        pass
+
 # Ensure that package data is copied over before any commands have been run:
 credentials_dir = os.path.join(PYTHON_STEM, "grpc", "_cython", "_credentials")
 try:
@@ -593,6 +613,11 @@ PACKAGE_DATA = {
         "_credentials/roots.pem",
         "_windows/grpc_c.32.python",
         "_windows/grpc_c.64.python",
+    ],
+    "grpc._rust": [
+        "*.so",
+        "*.dylib", 
+        "*.dll",
     ],
 }
 PACKAGES = setuptools.find_packages(PYTHON_STEM)
@@ -613,7 +638,7 @@ setuptools.setup(
     classifiers=CLASSIFIERS,
     long_description_content_type="text/x-rst",
     long_description=open(README).read(),
-    ext_modules=CYTHON_EXTENSION_MODULES,
+    ext_modules=ALL_EXTENSION_MODULES,
     packages=list(PACKAGES),
     package_dir=PACKAGE_DIRECTORIES,
     package_data=PACKAGE_DATA,

@@ -89,3 +89,17 @@ py_binary(
         "//src/python/grpcio_tests/tests/unit:test_common",
     ],
 )
+
+# Rust-based qps_worker using Rust implementation (via environment variable)
+py_binary(
+    name = "qps_worker_rust",
+    srcs = ["qps_worker_rust.py"],
+    imports = ["../.."],
+    srcs_version = "PY2AND3",
+    deps = [
+        ":worker_server",
+        "//src/proto/grpc/testing:worker_service_py_pb2_grpc",
+        "//src/python/grpcio/grpc:grpcio",
+        "//src/python/grpcio_tests/tests/unit:test_common",
+    ],
+)

@@ -322,6 +322,10 @@ class Clean(setuptools.Command):
         "src/python/grpcio/__pycache__/",
         "src/python/grpcio/grpc/_cython/cygrpc.cpp",
         "src/python/grpcio/grpc/_cython/*.so",
+        "src/python/grpcio/grpc/_rust/target/",
+        "src/python/grpcio/grpc/_rust/*.so",
+        "src/python/grpcio/grpc/_rust/*.dylib",
+        "src/python/grpcio/grpc/_rust/*.dll",
         "src/python/grpcio/grpcio.egg-info/",
     )
     _CURRENT_DIRECTORY = os.path.normpath(

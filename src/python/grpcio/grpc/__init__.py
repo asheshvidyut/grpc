@@ -20,7 +20,27 @@ import logging
 import sys
 
 from grpc import _compression
-from grpc._cython import cygrpc as _cygrpc
+# Import feature flags for implementation selection
+from grpc import _feature_flags
+
+# Select implementation based on feature flags
+_implementation = _feature_flags.get_active_implementation()
+
+if _implementation == 'rust':
+    try:
+        from grpc._rust import grpc_rust_bindings as _cygrpc
+    except ImportError:
+        # Fallback to Cython if Rust is not available
+        from grpc._cython import cygrpc as _cygrpc
+else:
+    try:
+        from grpc._cython import cygrpc as _cygrpc
+    except ImportError:
+        # Fallback to Rust if Cython is not available
+        try:
+            from grpc._rust import grpc_rust_bindings as _cygrpc
+        except ImportError:
+            raise ImportError("Neither Cython nor Rust implementation is available")
 from grpc._runtime_protos import protos
 from grpc._runtime_protos import protos_and_services
 from grpc._runtime_protos import services
