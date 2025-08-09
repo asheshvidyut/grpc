@@ -26,7 +26,8 @@ from typing import (
     Union,
 )
 
-from grpc._cython import cygrpc
+# Import from Rust implementation only
+from grpc._rust import _cygrpc as cygrpc
 
 if TYPE_CHECKING:
     from grpc import ServicerContext

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  grpc-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    volumes:
+      - .:/workspace
+      - bazel-cache:/root/.cache/bazel
+    environment:
+      - GRPC_PYTHON_IMPLEMENTATION=rust
+    command: bash -c "bazel test --cache_test_results=no '//src/python/...' --test_output=all"
+
+volumes:
+  bazel-cache:

@@ -122,7 +122,7 @@ py_library(
         ":plugin_wrapping",
         ":server",
         ":utilities",
-        "//src/python/grpcio/grpc/_cython:cygrpc",
+        "//src/python/grpcio/grpc/_rust:grpc_rust_bindings",
         "//src/python/grpcio/grpc/experimental",
         "//src/python/grpcio/grpc/framework",
     ],

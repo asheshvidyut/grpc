@@ -1,9 +1,4 @@
 use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
-use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use anyhow::Result;
 
 mod channel;
 mod server;
@@ -23,12 +18,47 @@ use metadata::*;
 use status::*;
 use aio::*;
 
+#[pyclass]
+pub struct BaseEvent {
+    event_type: String,
+}
+
+#[pymethods]
+impl BaseEvent {
+    #[new]
+    fn new(event_type: &str) -> PyResult<Self> {
+        Ok(BaseEvent {
+            event_type: event_type.to_string(),
+        })
+    }
+
+    fn get_type(&self) -> PyResult<String> {
+        Ok(self.event_type.clone())
+    }
+}
+
+#[pyclass]
+pub struct CompressionAlgorithm {
+    algorithm: String,
+}
+
+#[pymethods]
+impl CompressionAlgorithm {
+    #[new]
+    fn new(algorithm: &str) -> PyResult<Self> {
+        Ok(CompressionAlgorithm {
+            algorithm: algorithm.to_string(),
+        })
+    }
+
+    fn get_algorithm(&self) -> PyResult<String> {
+        Ok(self.algorithm.clone())
+    }
+}
+
 /// A Python module implemented in Rust.
 #[pymodule]
-fn grpc_rust_bindings(_py: Python, m: &PyModule) -> PyResult<()> {
-    // Initialize logging
-    env_logger::init();
-    
+fn grpc_rust_bindings(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Register classes
     m.add_class::<Channel>()?;
     m.add_class::<Server>()?;
@@ -37,31 +67,47 @@ fn grpc_rust_bindings(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<CallCredentials>()?;
     m.add_class::<Metadata>()?;
     m.add_class::<Status>()?;
-    
+    m.add_class::<BaseEvent>()?;
+    m.add_class::<CompressionAlgorithm>()?;
+
     // Async classes
     m.add_class::<AioChannel>()?;
     m.add_class::<AioServer>()?;
     m.add_class::<AioCall>()?;
-    
+
     // Constants
-    m.add("GRPC_STATUS_OK", GRPC_STATUS_OK)?;
-    m.add("GRPC_STATUS_CANCELLED", GRPC_STATUS_CANCELLED)?;
-    m.add("GRPC_STATUS_UNKNOWN", GRPC_STATUS_UNKNOWN)?;
-    m.add("GRPC_STATUS_INVALID_ARGUMENT", GRPC_STATUS_INVALID_ARGUMENT)?;
-    m.add("GRPC_STATUS_DEADLINE_EXCEEDED", GRPC_STATUS_DEADLINE_EXCEEDED)?;
-    m.add("GRPC_STATUS_NOT_FOUND", GRPC_STATUS_NOT_FOUND)?;
-    m.add("GRPC_STATUS_ALREADY_EXISTS", GRPC_STATUS_ALREADY_EXISTS)?;
-    m.add("GRPC_STATUS_PERMISSION_DENIED", GRPC_STATUS_PERMISSION_DENIED)?;
-    m.add("GRPC_STATUS_UNAUTHENTICATED", GRPC_STATUS_UNAUTHENTICATED)?;
-    m.add("GRPC_STATUS_RESOURCE_EXHAUSTED", GRPC_STATUS_RESOURCE_EXHAUSTED)?;
-    m.add("GRPC_STATUS_FAILED_PRECONDITION", GRPC_STATUS_FAILED_PRECONDITION)?;
-    m.add("GRPC_STATUS_ABORTED", GRPC_STATUS_ABORTED)?;
-    m.add("GRPC_STATUS_OUT_OF_RANGE", GRPC_STATUS_OUT_OF_RANGE)?;
-    m.add("GRPC_STATUS_UNIMPLEMENTED", GRPC_STATUS_UNIMPLEMENTED)?;
-    m.add("GRPC_STATUS_INTERNAL", GRPC_STATUS_INTERNAL)?;
-    m.add("GRPC_STATUS_UNAVAILABLE", GRPC_STATUS_UNAVAILABLE)?;
-    m.add("GRPC_STATUS_DATA_LOSS", GRPC_STATUS_DATA_LOSS)?;
-    
+    m.add("GRPC_STATUS_OK", 0)?;
+    m.add("GRPC_STATUS_CANCELLED", 1)?;
+    m.add("GRPC_STATUS_UNKNOWN", 2)?;
+    m.add("GRPC_STATUS_INVALID_ARGUMENT", 3)?;
+    m.add("GRPC_STATUS_DEADLINE_EXCEEDED", 4)?;
+    m.add("GRPC_STATUS_NOT_FOUND", 5)?;
+    m.add("GRPC_STATUS_ALREADY_EXISTS", 6)?;
+    m.add("GRPC_STATUS_PERMISSION_DENIED", 7)?;
+    m.add("GRPC_STATUS_UNAUTHENTICATED", 16)?;
+    m.add("GRPC_STATUS_RESOURCE_EXHAUSTED", 8)?;
+    m.add("GRPC_STATUS_FAILED_PRECONDITION", 9)?;
+    m.add("GRPC_STATUS_ABORTED", 10)?;
+    m.add("GRPC_STATUS_OUT_OF_RANGE", 11)?;
+    m.add("GRPC_STATUS_UNIMPLEMENTED", 12)?;
+    m.add("GRPC_STATUS_INTERNAL", 13)?;
+    m.add("GRPC_STATUS_UNAVAILABLE", 14)?;
+    m.add("GRPC_STATUS_DATA_LOSS", 15)?;
+
+    // Compression constants
+    m.add("GRPC_COMPRESSION_REQUEST_ALGORITHM_MD_KEY", "grpc-encoding")?;
+    m.add("GRPC_COMPRESSION_CHANNEL_DEFAULT_ALGORITHM", "grpc.default_compression_algorithm")?;
+
+    // Compression algorithm instances
+    let none_algorithm = CompressionAlgorithm::new("none")?;
+    let deflate_algorithm = CompressionAlgorithm::new("deflate")?;
+    let gzip_algorithm = CompressionAlgorithm::new("gzip")?;
+
+    m.add("CompressionAlgorithm", m.getattr("CompressionAlgorithm")?)?;
+    m.add("none", none_algorithm)?;
+    m.add("deflate", deflate_algorithm)?;
+    m.add("gzip", gzip_algorithm)?;
+
     Ok(())
 }
 
