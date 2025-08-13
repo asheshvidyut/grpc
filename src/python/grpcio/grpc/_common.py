@@ -15,6 +15,8 @@
 
 import logging
 import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AnyStr, Callable, Optional, Union
 
 import grpc
@@ -23,6 +25,9 @@ from grpc._typing import DeserializingFunction
 from grpc._typing import SerializingFunction
 
 _LOGGER = logging.getLogger(__name__)
+
+# Global thread pool for async serialization/deserialization
+_serialization_executor = ThreadPoolExecutor(max_workers=20, thread_name_prefix="grpc_serialization")
 
 CYGRPC_CONNECTIVITY_STATE_TO_CHANNEL_CONNECTIVITY = {
     cygrpc.ConnectivityState.idle: grpc.ChannelConnectivity.IDLE,
@@ -101,6 +106,38 @@ def deserialize(
 ) -> Any:
     return _transform(
         serialized_message, deserializer, "Exception deserializing message!"
+    )
+
+
+async def serialize_async(message: Any, serializer: Optional[SerializingFunction]) -> bytes:
+    """Async version of serialize that runs in a thread pool to prevent blocking."""
+    if serializer is None:
+        return message
+    
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _serialization_executor,
+        _transform,
+        message,
+        serializer,
+        "Exception serializing message!"
+    )
+
+
+async def deserialize_async(
+    serialized_message: bytes, deserializer: Optional[DeserializingFunction]
+) -> Any:
+    """Async version of deserialize that runs in a thread pool to prevent blocking."""
+    if deserializer is None:
+        return serialized_message
+    
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        _serialization_executor,
+        _transform,
+        serialized_message,
+        deserializer,
+        "Exception deserializing message!"
     )
 
 

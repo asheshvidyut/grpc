@@ -388,7 +388,7 @@ class _StreamResponseMixin(Call):
         if raw_response is cygrpc.EOF:
             return cygrpc.EOF
         else:
-            return _common.deserialize(
+            return await _common.deserialize_async(
                 raw_response, self._response_deserializer
             )
 
@@ -497,7 +497,7 @@ class _StreamRequestMixin(Call):
             if self.done():
                 await self._raise_for_status()
 
-        serialized_request = _common.serialize(
+        serialized_request = await _common.serialize_async(
             request, self._request_serializer
         )
         try:
@@ -578,7 +578,7 @@ class UnaryUnaryCall(_UnaryResponseMixin, Call, _base_call.UnaryUnaryCall):
         self._init_unary_response_mixin(self._invocation_task)
 
     async def _invoke(self) -> ResponseType:
-        serialized_request = _common.serialize(
+        serialized_request = await _common.serialize_async(
             self._request, self._request_serializer
         )
 
@@ -594,7 +594,7 @@ class UnaryUnaryCall(_UnaryResponseMixin, Call, _base_call.UnaryUnaryCall):
                 self.cancel()
 
         if self._cython_call.is_ok():
-            return _common.deserialize(
+            return await _common.deserialize_async(
                 serialized_response, self._response_deserializer
             )
         else:
@@ -644,7 +644,7 @@ class UnaryStreamCall(_StreamResponseMixin, Call, _base_call.UnaryStreamCall):
         self._init_stream_response_mixin(self._send_unary_request_task)
 
     async def _send_unary_request(self) -> ResponseType:
-        serialized_request = _common.serialize(
+        serialized_request = await _common.serialize_async(
             self._request, self._request_serializer
         )
         try:
@@ -708,7 +708,7 @@ class StreamUnaryCall(
             raise
 
         if self._cython_call.is_ok():
-            return _common.deserialize(
+            return await _common.deserialize_async(
                 serialized_response, self._response_deserializer
             )
         else:
