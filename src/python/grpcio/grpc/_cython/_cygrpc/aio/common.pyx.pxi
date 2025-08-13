@@ -56,6 +56,35 @@ cdef bytes serialize(object serializer, object message):
         return message
 
 
+# Async versions for non-blocking serialization/deserialization
+async def deserialize_async(object deserializer, bytes raw_message, object loop=None):
+    """Perform async deserialization on raw bytes using thread pool.
+    
+    This prevents blocking the event loop during protobuf deserialization.
+    """
+    if deserializer:
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, deserializer, raw_message)
+    else:
+        return raw_message
+
+
+async def serialize_async(object serializer, object message, object loop=None):
+    """Perform async serialization on a message using thread pool.
+    
+    This prevents blocking the event loop during protobuf serialization.
+    """
+    if isinstance(message, str):
+        message = message.encode('utf-8')
+    if serializer:
+        if loop is None:
+            loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, serializer, message)
+    else:
+        return message
+
+
 class _EOF:
 
     def __bool__(self):
