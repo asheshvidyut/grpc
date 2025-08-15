@@ -103,6 +103,7 @@ try:
 except AttributeError:
     # Fallback if the variable is not available
     import multiprocessing
+
     BUILD_EXT_COMPILER_JOBS = multiprocessing.cpu_count()
 _spawn_patch.monkeypatch_spawn()
 
@@ -605,56 +606,71 @@ PACKAGE_DATA = {
 }
 PACKAGES = setuptools.find_packages(PYTHON_STEM)
 
+
 def uv_build():
     """Use UV for faster builds with existing pyproject.toml."""
     import subprocess
     import sys
-    
+
     print("🚀 Using UV for faster build...")
-    
+
     # Set environment variables for UV
     env = os.environ.copy()
     env["GRPC_PYTHON_BUILD_WITH_CYTHON"] = "1"
     env["GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS"] = str(BUILD_EXT_COMPILER_JOBS)
     env["GRPC_PYTHON_USE_PREBUILT_GRPC_CORE"] = "1"
-    
+
     try:
         # Check if UV is available
-        result = subprocess.run([sys.executable, "-m", "uv", "--version"], 
-                              capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, "-m", "uv", "--version"],
+            capture_output=True,
+            text=True,
+        )
         if result.returncode != 0:
             print("⚠️  UV not found, using setuptools...")
             return False
-            
+
         # Install Cython first if needed
         try:
-            subprocess.run([sys.executable, "-m", "uv", "pip", "install", "cython==3.1.1"], 
-                          check=True, capture_output=True)
+            subprocess.run(
+                [sys.executable, "-m", "uv", "pip", "install", "cython==3.1.1"],
+                check=True,
+                capture_output=True,
+            )
         except subprocess.CalledProcessError:
             print("⚠️  Could not install Cython with UV, continuing...")
-        
+
         # Use UV's native build system for maximum speed
         # First build the wheel
         build_cmd = [sys.executable, "-m", "uv", "build", "--no-isolation"]
         build_result = subprocess.run(build_cmd, env=env)
-        
+
         if build_result.returncode == 0:
             # Then install the built wheel
-            install_cmd = [sys.executable, "-m", "uv", "pip", "install", "dist/*.whl"]
+            install_cmd = [
+                sys.executable,
+                "-m",
+                "uv",
+                "pip",
+                "install",
+                "dist/*.whl",
+            ]
             result = subprocess.run(install_cmd, env=env)
         else:
             result = build_result
-        
+
         if result.returncode == 0:
             print("✅ UV build completed successfully!")
             return True
         else:
             print("⚠️  UV build failed, falling back to setuptools...")
             return False
-            
+
     except (FileNotFoundError, subprocess.CalledProcessError) as e:
         print(f"⚠️  UV not available: {e}")
         return False
+
 
 # Try UV first, fallback to setuptools
 if not uv_build():
