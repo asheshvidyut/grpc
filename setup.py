@@ -597,29 +597,83 @@ PACKAGE_DATA = {
 }
 PACKAGES = setuptools.find_packages(PYTHON_STEM)
 
-setuptools.setup(
-    name="grpcio",
-    version=grpc_version.VERSION,
-    description="HTTP/2-based RPC framework",
-    author="The gRPC Authors",
-    author_email="grpc-io@googlegroups.com",
-    url="https://grpc.io",
-    project_urls={
-        "Source Code": "https://github.com/grpc/grpc",
-        "Bug Tracker": "https://github.com/grpc/grpc/issues",
-        "Documentation": "https://grpc.github.io/grpc/python",
-    },
-    license=LICENSE,
-    classifiers=CLASSIFIERS,
-    long_description_content_type="text/x-rst",
-    long_description=open(README).read(),
-    ext_modules=CYTHON_EXTENSION_MODULES,
-    packages=list(PACKAGES),
-    package_dir=PACKAGE_DIRECTORIES,
-    package_data=PACKAGE_DATA,
-    python_requires=f">={python_version.MIN_PYTHON_VERSION}",
-    install_requires=INSTALL_REQUIRES,
-    extras_require=EXTRAS_REQUIRES,
-    setup_requires=SETUP_REQUIRES,
-    cmdclass=COMMAND_CLASS,
-)
+def uv_build():
+    """Use UV for faster builds with existing pyproject.toml."""
+    import subprocess
+    import sys
+    
+    print("🚀 Using UV for faster build...")
+    
+    # Set environment variables for UV
+    env = os.environ.copy()
+    env["GRPC_PYTHON_BUILD_WITH_CYTHON"] = "1"
+    env["GRPC_PYTHON_BUILD_EXT_COMPILER_JOBS"] = str(BUILD_EXT_COMPILER_JOBS)
+    env["GRPC_PYTHON_USE_PREBUILT_GRPC_CORE"] = "1"
+    
+    try:
+        # Check if UV is available
+        result = subprocess.run([sys.executable, "-m", "uv", "--version"], 
+                              capture_output=True, text=True)
+        if result.returncode != 0:
+            print("⚠️  UV not found, using setuptools...")
+            return False
+            
+        # Install Cython first if needed
+        try:
+            subprocess.run([sys.executable, "-m", "uv", "pip", "install", "cython==3.1.1"], 
+                          check=True, capture_output=True)
+        except subprocess.CalledProcessError:
+            print("⚠️  Could not install Cython with UV, continuing...")
+        
+        # Use UV's native build system for maximum speed
+        # First build the wheel
+        build_cmd = [sys.executable, "-m", "uv", "build", "--no-isolation"]
+        build_result = subprocess.run(build_cmd, env=env)
+        
+        if build_result.returncode == 0:
+            # Then install the built wheel
+            install_cmd = [sys.executable, "-m", "uv", "pip", "install", "dist/*.whl"]
+            result = subprocess.run(install_cmd, env=env)
+        else:
+            result = build_result
+        
+        if result.returncode == 0:
+            print("✅ UV build completed successfully!")
+            return True
+        else:
+            print("⚠️  UV build failed, falling back to setuptools...")
+            return False
+            
+    except (FileNotFoundError, subprocess.CalledProcessError) as e:
+        print(f"⚠️  UV not available: {e}")
+        return False
+
+# Try UV first, fallback to setuptools
+if not uv_build():
+    print("🔄 Using setuptools...")
+    setuptools.setup(
+        name="grpcio",
+        version=grpc_version.VERSION,
+        description="HTTP/2-based RPC framework",
+        author="The gRPC Authors",
+        author_email="grpc-io@googlegroups.com",
+        url="https://grpc.io",
+        project_urls={
+            "Source Code": "https://github.com/grpc/grpc",
+            "Bug Tracker": "https://github.com/grpc/grpc/issues",
+            "Documentation": "https://grpc.github.io/grpc/python",
+        },
+        license=LICENSE,
+        classifiers=CLASSIFIERS,
+        long_description_content_type="text/x-rst",
+        long_description=open(README).read(),
+        ext_modules=CYTHON_EXTENSION_MODULES,
+        packages=list(PACKAGES),
+        package_dir=PACKAGE_DIRECTORIES,
+        package_data=PACKAGE_DATA,
+        python_requires=f">={python_version.MIN_PYTHON_VERSION}",
+        install_requires=INSTALL_REQUIRES,
+        extras_require=EXTRAS_REQUIRES,
+        setup_requires=SETUP_REQUIRES,
+        cmdclass=COMMAND_CLASS,
+    )
