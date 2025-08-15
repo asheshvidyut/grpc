@@ -96,6 +96,14 @@ import commands
 import grpc_version
 
 _parallel_compile_patch.monkeypatch_compile_maybe()
+
+# Import BUILD_EXT_COMPILER_JOBS from the parallel compile patch module
+try:
+    BUILD_EXT_COMPILER_JOBS = _parallel_compile_patch.BUILD_EXT_COMPILER_JOBS
+except AttributeError:
+    # Fallback if the variable is not available
+    import multiprocessing
+    BUILD_EXT_COMPILER_JOBS = multiprocessing.cpu_count()
 _spawn_patch.monkeypatch_spawn()
 
 
