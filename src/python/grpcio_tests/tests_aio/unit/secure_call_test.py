@@ -18,6 +18,7 @@ import unittest
 
 import grpc
 from grpc.experimental import aio
+from typeguard import suppress_type_checks
 
 from src.proto.grpc.testing import messages_pb2
 from src.proto.grpc.testing import test_pb2_grpc
