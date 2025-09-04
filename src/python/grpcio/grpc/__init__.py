@@ -33,6 +33,7 @@ try:
 except ImportError:
     __version__ = "dev0"
 
+
 def initialize_log():
     """Initializes Abseil logging.
 
@@ -40,6 +41,7 @@ def initialize_log():
     It is safe to call this function multiple times.
     """
     _cygrpc.initialize_log()
+
 
 ############################## Future Interface  ###############################
 
