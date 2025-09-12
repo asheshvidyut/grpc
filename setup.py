@@ -79,7 +79,7 @@ UPBDEFS_GRPC_GENERATED_INCLUDE = (
 UTF8_RANGE_INCLUDE = (os.path.join("third_party", "utf8_range"),)
 XXHASH_INCLUDE = (os.path.join("third_party", "xxhash"),)
 ZLIB_INCLUDE = (os.path.join("third_party", "zlib"),)
-# README path moved to pyproject.toml
+README = os.path.join(PYTHON_STEM, "README.rst")
 
 # Ensure we're in the proper directory whether or not we're being used by pip.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -94,6 +94,7 @@ import _metadata
 import _parallel_compile_patch
 import _spawn_patch
 import grpc_core_dependencies
+import python_version
 
 import commands
 import grpc_version
@@ -274,6 +275,15 @@ if EXTRA_ENV_COMPILE_ARGS is None:
             " -stdlib=libc++ -fvisibility=hidden -fno-wrapv -fno-exceptions"
             " -DHAVE_UNISTD_H"
         )
+
+# Filter out GCC-specific flags that clang++ doesn't recognize
+# This is needed because Python's sysconfig may provide CFLAGS with GCC-specific flags
+# that get passed to C++ compilation
+if "darwin" in sys.platform:
+    # Remove -fno-strict-overflow which is GCC-specific and not recognized by clang++
+    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace(" -fno-strict-overflow", "")
+    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace("-fno-strict-overflow ", "")
+    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace("-fno-strict-overflow", "")
 
 if EXTRA_ENV_LINK_ARGS is None:
     EXTRA_ENV_LINK_ARGS = ""
@@ -567,11 +577,8 @@ shutil.copyfile(
 # Package data moved to pyproject.toml
 
 setuptools.setup(
-    # Static metadata is now in pyproject.toml
-    license="Apache License 2.0",
-    extras_require={
-        "protobuf": "grpcio-tools>={version}".format(version=grpc_version.VERSION),
-    },
+    # All static metadata is now in pyproject.toml
+    # Only keep dynamic/extension-specific configuration here
     ext_modules=CYTHON_EXTENSION_MODULES,
     cmdclass=COMMAND_CLASS,
 )

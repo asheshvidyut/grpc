@@ -15,3 +15,9 @@
 # AUTO-GENERATED FROM `$REPO_ROOT/templates/src/python/grpcio/grpc_version.py.template`!!!
 
 VERSION = '1.75.0.dev0'
+
+def get_optional_dependencies():
+    """Return optional dependencies with dynamic version."""
+    return {
+        "protobuf": [f"grpcio-tools>={VERSION}"],
+    }
