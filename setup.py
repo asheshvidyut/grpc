@@ -281,9 +281,15 @@ if EXTRA_ENV_COMPILE_ARGS is None:
 # that get passed to C++ compilation
 if "darwin" in sys.platform:
     # Remove -fno-strict-overflow which is GCC-specific and not recognized by clang++
-    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace(" -fno-strict-overflow", "")
-    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace("-fno-strict-overflow ", "")
-    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace("-fno-strict-overflow", "")
+    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace(
+        " -fno-strict-overflow", ""
+    )
+    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace(
+        "-fno-strict-overflow ", ""
+    )
+    EXTRA_ENV_COMPILE_ARGS = EXTRA_ENV_COMPILE_ARGS.replace(
+        "-fno-strict-overflow", ""
+    )
 
 if EXTRA_ENV_LINK_ARGS is None:
     EXTRA_ENV_LINK_ARGS = ""
