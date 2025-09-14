@@ -34,6 +34,7 @@ except ImportError:
     class grpc_version:
         VERSION = "1.76.0.dev0"
 
+
 class _NoOpCommand(setuptools.Command):
     """No-op command."""
 
