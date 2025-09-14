@@ -33,6 +33,8 @@ except ImportError:
     # Fallback when grpc_version is not available in build environment
     class grpc_version:
         VERSION = "1.76.0.dev0"
+
+
 CLASSIFIERS = [
     "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python",

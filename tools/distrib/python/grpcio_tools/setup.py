@@ -47,6 +47,8 @@ except ImportError:
     # Fallback when grpc_version is not available in build environment
     class grpc_version:
         VERSION = "1.76.0.dev0"
+
+
 _EXT_INIT_SYMBOL = None
 if sys.version_info[0] == 2:
     _EXT_INIT_SYMBOL = "init_protoc_compiler"
