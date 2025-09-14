@@ -27,20 +27,24 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 # Break import-style to ensure we can actually find our local modules.
 try:
     import python_version
+
     # Check if it has the required attributes (local module vs PyPI package)
-    if not hasattr(python_version, 'MIN_PYTHON_VERSION'):
+    if not hasattr(python_version, "MIN_PYTHON_VERSION"):
         raise ImportError("python_version missing required attributes")
 except ImportError:
     # Fallback when python_version is not available or doesn't have required attributes
     class python_version:
         MIN_PYTHON_VERSION = 3.9
         MAX_PYTHON_VERSION = 3.14
+
+
 try:
     import grpc_version
 except ImportError:
     # Fallback when grpc_version is not available in build environment
     class grpc_version:
         VERSION = "1.76.0.dev0"
+
 
 class _NoOpCommand(setuptools.Command):
     """No-op command."""
