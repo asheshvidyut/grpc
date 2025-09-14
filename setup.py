@@ -104,6 +104,7 @@ except ImportError:
     class grpc_version:
         VERSION = "1.76.0.dev0"
 
+
 _parallel_compile_patch.monkeypatch_compile_maybe()
 _spawn_patch.monkeypatch_spawn()
 
@@ -582,7 +583,9 @@ setuptools.setup(
     # Static metadata is now in pyproject.toml
     license="Apache License 2.0",
     extras_require={
-        "protobuf": "grpcio-tools>={version}".format(version=grpc_version.VERSION),
+        "protobuf": "grpcio-tools>={version}".format(
+            version=grpc_version.VERSION
+        ),
     },
     ext_modules=CYTHON_EXTENSION_MODULES,
     cmdclass=COMMAND_CLASS,
