@@ -24,15 +24,26 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 try:
     import python_version
+
     # Check if it has the required attributes (local module vs PyPI package)
-    if not hasattr(python_version, 'MIN_PYTHON_VERSION') or not hasattr(python_version, 'SUPPORTED_PYTHON_VERSIONS'):
+    if not hasattr(python_version, "MIN_PYTHON_VERSION") or not hasattr(
+        python_version, "SUPPORTED_PYTHON_VERSIONS"
+    ):
         raise ImportError("python_version missing required attributes")
 except ImportError:
     # Fallback when python_version is not available or doesn't have required attributes
     class python_version:
-        SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+        SUPPORTED_PYTHON_VERSIONS = [
+            "3.9",
+            "3.10",
+            "3.11",
+            "3.12",
+            "3.13",
+            "3.14",
+        ]
         MIN_PYTHON_VERSION = 3.9
         MAX_PYTHON_VERSION = 3.14
+
 
 try:
     import grpc_version
@@ -40,6 +51,7 @@ except ImportError:
     # Fallback when grpc_version is not available in build environment
     class grpc_version:
         VERSION = "1.76.0.dev0"
+
 
 CLASSIFIERS = [
     "Development Status :: 5 - Production/Stable",
@@ -54,7 +66,7 @@ PACKAGE_DIRECTORIES = {
 
 INSTALL_REQUIRES = (
     "opentelemetry-sdk>=1.25.0",
-    "opentelemetry-resourcedetector-gcp>=1.6.0a0", 
+    "opentelemetry-resourcedetector-gcp>=1.6.0a0",
     "protobuf>=6.31.1,<7.0.0",
     # Note: grpcio dependency is handled by the build process
 )
