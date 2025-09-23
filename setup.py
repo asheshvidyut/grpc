@@ -36,7 +36,12 @@ from subprocess import PIPE
 import sys
 import sysconfig
 
-import _metadata
+try:
+    import _metadata
+except ImportError:
+    # Create a simple _metadata module if it doesn't exist
+    class _metadata:
+        __version__ = "1.76.0.dev0"
 from setuptools import Extension
 from setuptools.command import egg_info
 
