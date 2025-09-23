@@ -22,7 +22,7 @@ MetadataKey = Union[str, bytes]
 MetadataValue = Union[str, bytes]
 
 
-class Metadata(abc.Collection):
+class Metadata(abc.Collection):  # noqa: PLW1641
     """Metadata abstraction for the asynchronous calls and interceptors.
 
     The metadata is a mapping from str -> List[str]
