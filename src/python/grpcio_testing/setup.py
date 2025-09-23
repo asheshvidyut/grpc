@@ -25,12 +25,8 @@ _README_PATH = os.path.join(_PACKAGE_PATH, "README.rst")
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # Break import style to ensure that we can find same-directory modules.
-try:
-    import grpc_version
-except ImportError:
-    # Fallback when grpc_version is not available in build environment
-    class grpc_version:
-        VERSION = "1.76.0.dev0"
+import grpc_version
+
 
 class _NoOpCommand(setuptools.Command):
     """No-op command."""
@@ -54,7 +50,7 @@ PACKAGE_DIRECTORIES = {
 
 INSTALL_REQUIRES = (
     "protobuf>=6.31.1,<7.0.0",
-    # Note: grpcio dependency is handled by the build process
+    "grpcio>={version}".format(version=grpc_version.VERSION),
 )
 
 try:
