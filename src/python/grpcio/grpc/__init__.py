@@ -1844,7 +1844,7 @@ def ssl_server_credentials(
             "At least one private key-certificate chain pair is required!"
         )
         raise ValueError(error_msg)
-    elif require_client_auth and root_certificates is None:
+    if require_client_auth and root_certificates is None:
         error_msg = "Illegal to require client auth without providing root certificates!"
         raise ValueError(error_msg)
     return ServerCredentials(
