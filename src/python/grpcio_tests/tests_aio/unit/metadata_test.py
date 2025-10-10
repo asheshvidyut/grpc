@@ -26,8 +26,6 @@ from typeguard import suppress_type_checks
 from tests_aio.unit import _common
 from tests_aio.unit._test_base import AioTestBase
 
-from typeguard import suppress_type_checks
-
 _TEST_CLIENT_TO_SERVER = "/test/TestClientToServer"
 _TEST_SERVER_TO_CLIENT = "/test/TestServerToClient"
 _TEST_TRAILING_METADATA = "/test/TestTrailingMetadata"
