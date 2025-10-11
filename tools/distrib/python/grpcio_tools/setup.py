@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.abspath("."))
 import _parallel_compile_patch
 import _spawn_patch
 import protoc_lib_deps
+
 import grpc_version
 
 _EXT_INIT_SYMBOL = None
@@ -326,17 +327,25 @@ if __name__ == "__main__":
         # Fallback when grpc_version is not available in build environment
         class grpc_version:
             VERSION = "1.76.0.dev0"
-    
+
     try:
         import python_version
+
         # Check if it has the required attributes (local module vs PyPI package)
-        if not hasattr(python_version, 'MIN_PYTHON_VERSION'):
+        if not hasattr(python_version, "MIN_PYTHON_VERSION"):
             raise ImportError("python_version missing required attributes")
     except ImportError:
         # Fallback when python_version is not available or doesn't have required attributes
         class python_version:
             MIN_PYTHON_VERSION = 3.9
-            SUPPORTED_PYTHON_VERSIONS = ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+            SUPPORTED_PYTHON_VERSIONS = [
+                "3.9",
+                "3.10",
+                "3.11",
+                "3.12",
+                "3.13",
+                "3.14",
+            ]
             MAX_PYTHON_VERSION = 3.14
 
     CLASSIFIERS = [
