@@ -14,6 +14,7 @@
 """Shared implementation."""
 
 import logging
+import platform
 import time
 from typing import Any, AnyStr, Callable, Optional, Union
 
@@ -57,6 +58,8 @@ STATUS_CODE_TO_CYGRPC_STATUS_CODE = {
 }
 
 MAXIMUM_WAIT_TIMEOUT = 0.1
+# Windows needs even shorter timeouts for better signal responsiveness
+WINDOWS_WAIT_TIMEOUT = 0.01
 
 _ERROR_MESSAGE_PORT_BINDING_FAILED = (
     "Failed to bind to address %s; set "
@@ -149,13 +152,16 @@ def wait(
     Returns:
       True if a timeout was supplied and it was reached. False otherwise.
     """
+    # Use shorter timeout on Windows for better signal responsiveness
+    wait_timeout = WINDOWS_WAIT_TIMEOUT if platform.system() == "Windows" else MAXIMUM_WAIT_TIMEOUT
+    
     if timeout is None:
         while not wait_complete_fn():
-            _wait_once(wait_fn, MAXIMUM_WAIT_TIMEOUT, spin_cb)
+            _wait_once(wait_fn, wait_timeout, spin_cb)
     else:
         end = time.time() + timeout
         while not wait_complete_fn():
-            remaining = min(end - time.time(), MAXIMUM_WAIT_TIMEOUT)
+            remaining = min(end - time.time(), wait_timeout)
             if remaining < 0:
                 return True
             _wait_once(wait_fn, remaining, spin_cb)
