@@ -87,15 +87,9 @@ class ExecCtxState {
   }
 
   bool BlockExecCtx() {
-    // The original design was overly restrictive - it required exactly one ExecCtx.
-    // In reality, fork preparation just needs to:
-    // 1. Stop timer manager threading
-    // 2. Flush pending operations  
-    // 3. Wait for threads to complete
-    // 
-    // We can do this safely with any number of active ExecCtxs.
-    // The key insight: we don't need exactly one ExecCtx - we just need to
-    // prevent new ExecCtxs from being created during fork preparation.
+    // The original design was too restrictive - it required exactly one ExecCtx.
+    // But we can be more flexible: if there are active ExecCtxs, we can block them.
+    // If there are no active ExecCtxs, we don't need to block at all.
     
     gpr_mu_lock(&mu_);
     
@@ -108,15 +102,15 @@ class ExecCtxState {
     // Mark fork as starting
     fork_complete_ = false;
     
-    // Transition to blocked state to prevent new ExecCtxs
-    // We can handle any number of existing ExecCtxs
+    // Get current count and transition to blocked state
     gpr_atm count = gpr_atm_no_barrier_load(&count_);
+    
     if (count >= UNBLOCKED(1)) {
-      // Convert from UNBLOCKED to BLOCKED state
+      // There are active ExecCtxs - convert from UNBLOCKED to BLOCKED state
       gpr_atm_no_barrier_store(&count_, count - 2);
     } else {
-      // No active ExecCtxs, set to blocked state
-      gpr_atm_no_barrier_store(&count_, BLOCKED(0));
+      // No active ExecCtxs - don't change the count, just mark fork as starting
+      // This prevents the hang because we don't set count to BLOCKED(0)
     }
     
     gpr_mu_unlock(&mu_);
