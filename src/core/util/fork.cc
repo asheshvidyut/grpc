@@ -88,8 +88,8 @@ class ExecCtxState {
 
   bool BlockExecCtx() {
     // The original design was too restrictive - it required exactly one ExecCtx.
-    // But we can be more flexible: if there are active ExecCtxs, we can block them.
-    // If there are no active ExecCtxs, we don't need to block at all.
+    // The fix: use a more flexible approach that handles multiple ExecCtxs
+    // and prevents the race condition that caused fork handlers to be skipped.
     
     gpr_mu_lock(&mu_);
     
@@ -109,8 +109,9 @@ class ExecCtxState {
       // There are active ExecCtxs - convert from UNBLOCKED to BLOCKED state
       gpr_atm_no_barrier_store(&count_, count - 2);
     } else {
-      // No active ExecCtxs - don't change the count, just mark fork as starting
-      // This prevents the hang because we don't set count to BLOCKED(0)
+      // No active ExecCtxs - set to a special blocked state that won't cause hangs
+      // Use BLOCKED(1) instead of BLOCKED(0) to avoid the hang condition
+      gpr_atm_no_barrier_store(&count_, BLOCKED(1));
     }
     
     gpr_mu_unlock(&mu_);
