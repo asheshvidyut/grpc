@@ -87,33 +87,34 @@ class ExecCtxState {
   }
 
   bool BlockExecCtx() {
-    // The original design was too restrictive - it required exactly one ExecCtx.
-    // The fix: use a more flexible approach that handles multiple ExecCtxs
-    // and prevents the race condition that caused fork handlers to be skipped.
-    
+    // The original design was too restrictive - it required exactly one
+    // ExecCtx. The fix: use a more flexible approach that handles multiple
+    // ExecCtxs and prevents the race condition that caused fork handlers to be
+    // skipped.
+
     gpr_mu_lock(&mu_);
-    
+
     // Check if fork is already in progress
     if (!fork_complete_) {
       gpr_mu_unlock(&mu_);
-      return false; // Fork already in progress
+      return false;  // Fork already in progress
     }
-    
+
     // Mark fork as starting
     fork_complete_ = false;
-    
+
     // Get current count and transition to blocked state
     gpr_atm count = gpr_atm_no_barrier_load(&count_);
-    
+
     if (count >= UNBLOCKED(1)) {
       // There are active ExecCtxs - convert from UNBLOCKED to BLOCKED state
       gpr_atm_no_barrier_store(&count_, count - 2);
     } else {
-      // No active ExecCtxs - set to a special blocked state that won't cause hangs
-      // Use BLOCKED(1) instead of BLOCKED(0) to avoid the hang condition
+      // No active ExecCtxs - set to a special blocked state that won't cause
+      // hangs Use BLOCKED(1) instead of BLOCKED(0) to avoid the hang condition
       gpr_atm_no_barrier_store(&count_, BLOCKED(1));
     }
-    
+
     gpr_mu_unlock(&mu_);
     return true;
   }
