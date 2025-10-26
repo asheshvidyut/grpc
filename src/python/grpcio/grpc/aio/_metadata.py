@@ -21,6 +21,7 @@ from typing_extensions import Self
 MetadataKey = Union[str, bytes]
 MetadataValue = Union[str, bytes]
 
+
 class Metadata(abc.Collection):  # noqa: PLW1641
     """Metadata abstraction for the asynchronous calls and interceptors.
 
