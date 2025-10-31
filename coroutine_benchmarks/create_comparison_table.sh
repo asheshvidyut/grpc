@@ -13,16 +13,18 @@ else
   exit 1
 fi
 
-# Detect sed -i syntax (Linux vs macOS)
-# Linux: sed -i requires no backup extension
-# macOS: sed -i requires a backup extension (can be empty string)
-if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux"* ]]; then
-  SED_IN_PLACE="sed -i"  # Linux
-else
-  SED_IN_PLACE="sed -i ''"  # macOS/BSD
-fi
-
 cd "$GRPC_ROOT"
+
+# Function to do sed in-place edit (works on both Linux and macOS)
+sed_in_place() {
+  local file="$1"
+  local pattern="$2"
+  if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux"* ]]; then
+    sed -i "$pattern" "$file"
+  else
+    sed -i '' "$pattern" "$file"
+  fi
+}
 
 echo "======================================"
 echo "Performance Comparison Table"
@@ -35,8 +37,8 @@ echo "------------|---------------|------------|-------------|-----------------|
 # Run tests at different concurrency levels
 for concurrency in 1 10 50 100 200 500; do
   # Update concurrency in test file
-  $SED_IN_PLACE "s/set_outstanding_rpcs_per_channel([0-9]*);/set_outstanding_rpcs_per_channel($concurrency);/" "$TEST_FILE"
-  $SED_IN_PLACE "s/set_threads_per_cq([0-9]*);/set_threads_per_cq(10);/" "$TEST_FILE" 2>/dev/null || true
+  sed_in_place "$TEST_FILE" "s/set_outstanding_rpcs_per_channel([0-9]*);/set_outstanding_rpcs_per_channel($concurrency);/"
+  sed_in_place "$TEST_FILE" "s/set_threads_per_cq([0-9]*);/set_threads_per_cq(10);/" 2>/dev/null || true
   
   # Build
   bazel build --cxxopt='-std=c++20' --host_cxxopt='-std=c++20' -c opt --copt=-g //test/cpp/qps:inproc_sync_unary_ping_pong_test > /tmp/build.log 2>&1
