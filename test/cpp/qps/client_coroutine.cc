@@ -95,34 +95,32 @@ grpc::Status GrpcTask<grpc::Status>::get(grpc::CompletionQueue* cq) {
     throw std::runtime_error("Coroutine already destroyed");
   }
   
-  // If completion queue provided, poll it directly instead of using separate thread
-  // This eliminates thread overhead
+  // If completion queue provided, use blocking Next() for efficient waiting
+  // This is similar to async client's approach - block efficiently in the kernel
   if (cq) {
     // Resume coroutine to start async operation
     handle_.resume();
     
-    // Poll completion queue until coroutine completes
-    while (!handle_.promise().done_.load(std::memory_order_acquire)) {
-      void* tag;
-      bool ok;
-      // Use zero timeout for non-blocking check
-      auto status = cq->AsyncNext(&tag, &ok, gpr_time_0(GPR_CLOCK_REALTIME));
-      if (status == CompletionQueue::GOT_EVENT) {
-        auto* awaiter = static_cast<AsyncUnaryCallAwaiter<SimpleResponse>*>(tag);
-        if (awaiter) {
-          // Resume the coroutine when async operation completes
-          awaiter->ResumeWithCompletion(ok);
-        }
-      } else if (status == CompletionQueue::SHUTDOWN) {
-        // CQ has been shut down - cancel the ongoing operation and return error
-        // The coroutine frame will be cleaned up by the destructor
-        return grpc::Status(grpc::StatusCode::CANCELLED, 
-                           "Completion queue shut down during operation");
-      } else {
-        // TIMEOUT - use small sleep instead of yield for better CPU efficiency
-        // Yield can still consume CPU cycles, a small sleep allows OS to schedule
-        std::this_thread::sleep_for(std::chrono::microseconds(1));
+    // Use blocking Next() to wait for completion - this blocks efficiently
+    // unlike AsyncNext with zero timeout which wastes CPU cycles
+    void* tag;
+    bool ok;
+    // Block until completion or shutdown (like async client does)
+    if (cq->Next(&tag, &ok)) {
+      auto* awaiter = static_cast<AsyncUnaryCallAwaiter<SimpleResponse>*>(tag);
+      if (awaiter) {
+        // Resume the coroutine when async operation completes
+        awaiter->ResumeWithCompletion(ok);
       }
+    } else {
+      // CQ was shut down - return cancelled status
+      return grpc::Status(grpc::StatusCode::CANCELLED, 
+                         "Completion queue shut down during operation");
+    }
+    
+    // Wait for coroutine to finish (it should be done now)
+    while (!handle_.promise().done_.load(std::memory_order_acquire)) {
+      std::this_thread::yield();
     }
   } else {
     // Fallback: simple spin-wait if no CQ provided
