@@ -18,7 +18,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <mutex>
 #include <grpc/grpc.h>
 #include <grpc/support/time.h>
 #include <grpcpp/channel.h>
