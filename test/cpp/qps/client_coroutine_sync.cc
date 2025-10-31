@@ -170,11 +170,17 @@ class CoroutineUnaryClient final : public CoroutineClient {
 
  private:
   void DestroyMultithreading() final {
-    // Shutdown completion queues before ending threads
-    // This ensures all threads stop using the queues before they're shut down
+    // Wait a bit for threads to finish their current RPCs
+    // The threads check ThreadCompleted() at the start of each loop iteration
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // Shutdown completion queues
+    // This will cause any in-flight operations to get SHUTDOWN status
     for (auto& cq : cqs_) {
       cq->Shutdown();
     }
+    
+    // Wait for threads to finish (they should exit soon after CQ shutdown)
     EndThreads();
   }
 };
