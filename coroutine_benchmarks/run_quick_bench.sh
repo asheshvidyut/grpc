@@ -14,9 +14,10 @@ else
 fi
 
 # Detect sed -i syntax (Linux vs macOS)
-if sed -i 's/test/test/' /tmp/test_sed_$$ 2>/dev/null; then
+# Linux: sed -i requires no backup extension
+# macOS: sed -i requires a backup extension (can be empty string)
+if touch /tmp/test_sed_$$ && sed -i 's/test/test/' /tmp/test_sed_$$ 2>/dev/null && rm -f /tmp/test_sed_$$; then
   SED_IN_PLACE="sed -i"  # Linux
-  rm -f /tmp/test_sed_$$
 else
   SED_IN_PLACE="sed -i ''"  # macOS
 fi
