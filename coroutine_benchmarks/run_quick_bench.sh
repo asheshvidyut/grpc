@@ -16,10 +16,10 @@ fi
 # Detect sed -i syntax (Linux vs macOS)
 # Linux: sed -i requires no backup extension
 # macOS: sed -i requires a backup extension (can be empty string)
-if touch /tmp/test_sed_$$ && sed -i 's/test/test/' /tmp/test_sed_$$ 2>/dev/null && rm -f /tmp/test_sed_$$; then
+if [[ "$OSTYPE" == "linux-gnu"* ]] || [[ "$OSTYPE" == "linux"* ]]; then
   SED_IN_PLACE="sed -i"  # Linux
 else
-  SED_IN_PLACE="sed -i ''"  # macOS
+  SED_IN_PLACE="sed -i ''"  # macOS/BSD
 fi
 
 cd "$GRPC_ROOT"
