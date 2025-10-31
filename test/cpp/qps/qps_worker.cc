@@ -46,6 +46,9 @@
 namespace grpc {
 namespace testing {
 
+// Forward declaration for coroutine client factory
+std::unique_ptr<Client> CreateCoroutineClient(const ClientConfig& config);
+
 static std::unique_ptr<Client> CreateClient(const ClientConfig& config) {
   LOG(INFO) << "Starting client of type "
             << ClientType_Name(config.client_type()) << " "
