@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <grpc/grpc.h>
 #include <grpc/support/time.h>
 #include <grpcpp/channel.h>
@@ -60,10 +61,12 @@ class CoroutineClient
   
   explicit CoroutineClient(const ClientConfig& config)
       : ClientImpl<BenchmarkService::Stub, SimpleRequest>(
-            config, BenchmarkStubCreator) {
+            config, BenchmarkStubCreator),
+        shutdown_initiated_(false) {
     num_threads_ =
         config.outstanding_rpcs_per_channel() * config.client_channels();
     responses_.resize(num_threads_);
+    contexts_.resize(num_threads_);
     
     // Create completion queues (one per thread or shared)
     int threads_per_cq = std::max(1, config.threads_per_cq());
@@ -137,6 +140,13 @@ class CoroutineClient
   bool CoroutineThreadFuncImpl(HistogramEntry* entry, size_t thread_idx,
                                CompletionQueue* cq) {
     // Double-check we should still be running before starting new RPC
+    {
+      std::lock_guard<std::mutex> lock(shutdown_mutex_);
+      if (shutdown_initiated_) {
+        return false;
+      }
+    }
+    
     if (ThreadCompleted()) {
       return false;
     }
@@ -145,10 +155,11 @@ class CoroutineClient
     auto* stub = channels_[thread_idx % channels_.size()].get_stub();
     double start = UsageTimer::Now();
     
-    grpc::ClientContext context;
+    // Use thread-local context that can be cancelled on shutdown
+    contexts_[thread_idx].Clear();
     
     // Use coroutine-based async call - pass CQ for in-thread polling
-    auto task = CoroutineUnaryCall(stub, &context, request_,
+    auto task = CoroutineUnaryCall(stub, &contexts_[thread_idx], request_,
                                    &responses_[thread_idx], cq, nullptr);
     // Pass completion queue to get() so it can poll directly in this thread
     grpc::Status s = task.get(cq);
@@ -162,7 +173,10 @@ class CoroutineClient
 
   size_t num_threads_;
   std::vector<SimpleResponse> responses_;
+  std::vector<grpc::ClientContext> contexts_;
   std::vector<std::unique_ptr<CompletionQueue>> cqs_;
+  std::mutex shutdown_mutex_;
+  bool shutdown_initiated_;
 };
 
 class CoroutineUnaryClient final : public CoroutineClient {
@@ -175,18 +189,28 @@ class CoroutineUnaryClient final : public CoroutineClient {
 
  private:
   void DestroyMultithreading() final {
-    // Wait a bit for threads to finish their current RPC loop iterations
-    // This ensures they check ThreadCompleted() and exit before we shutdown CQs
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // Signal that shutdown has started - threads will check this before
+    // starting new RPCs
+    {
+      std::lock_guard<std::mutex> lock(shutdown_mutex_);
+      shutdown_initiated_ = true;
+    }
+    
+    // Cancel all in-flight contexts to stop pending operations
+    for (auto& ctx : contexts_) {
+      ctx.TryCancel();
+    }
+    
+    // Wait a bit for threads to finish their current operations and exit loops
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     // Shutdown completion queues
-    // Any in-flight operations will get SHUTDOWN status in their polling loops
+    // Any remaining operations will get SHUTDOWN status in their polling loops
     for (auto& cq : cqs_) {
       cq->Shutdown();
     }
     
     // Wait for threads to finish (they should exit soon after CQ shutdown)
-    // If any thread is still in CoroutineUnaryCall, it will fail but be caught
     EndThreads();
   }
 };
