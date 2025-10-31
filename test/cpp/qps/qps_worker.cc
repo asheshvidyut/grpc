@@ -54,6 +54,10 @@ static std::unique_ptr<Client> CreateClient(const ClientConfig& config) {
 
   switch (config.client_type()) {
     case ClientType::SYNC_CLIENT:
+      // Check if we should use coroutines instead (using environment variable as a flag)
+      if (getenv("USE_COROUTINES") != nullptr) {
+        return CreateCoroutineClient(config);
+      }
       return CreateSynchronousClient(config);
     case ClientType::ASYNC_CLIENT:
       return config.payload_config().has_bytebuf_params()

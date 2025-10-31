@@ -15,6 +15,7 @@
 load("//bazel:custom_exec_properties.bzl", "LARGE_MACHINE")
 load("//bazel:grpc_build_system.bzl", "grpc_cc_binary", "grpc_cc_library", "grpc_cc_test", "grpc_package", "grpc_py_binary")
 load("//test/cpp/qps:qps_benchmark_script.bzl", "json_run_localhost_batch", "qps_json_driver_batch")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 
 licenses(["notice"])
 
@@ -38,6 +39,108 @@ grpc_cc_library(
     ],
 )
 
+# Header-only library for server.h
+grpc_cc_library(
+    name = "server_headers",
+    hdrs = [
+        "server.h",
+    ],
+    external_deps = [
+        "absl/log:log",
+    ],
+    deps = [
+        ":usage_timer",
+        "//:grpc++",
+        "//src/core:chaotic_good",
+        "//src/core:endpoint_transport",
+        "//src/core:grpc_check",
+        "//src/proto/grpc/testing:control_cc_proto",
+        "//src/proto/grpc/testing:messages_cc_proto",
+        "//test/core/end2end:ssl_test_data",
+        "//test/cpp/util:test_util",
+    ],
+)
+
+# Header-only library for qps_worker.h
+grpc_cc_library(
+    name = "qps_worker_headers",
+    hdrs = [
+        "qps_worker.h",
+    ],
+    deps = [
+        ":server_headers",
+        "//:grpc++",
+        "//:grpcpp_latent_see_service",
+    ],
+)
+
+# Header-only library for client.h to break circular dependency
+grpc_cc_library(
+    name = "client_headers",
+    hdrs = [
+        "client.h",
+    ],
+    external_deps = [
+        "absl/log:check",
+        "absl/memory",
+        "absl/log:log",
+        "absl/strings",
+        "absl/strings:str_format",
+    ],
+    deps = [
+        ":histogram",
+        ":interarrival",
+        ":qps_worker_headers",
+        ":usage_timer",
+        "//:gpr",
+        "//:grpc++",
+        "//src/core:chaotic_good",
+        "//src/core:endpoint_transport",
+        "//src/core:env",
+        "//src/core:grpc_check",
+        "//src/proto/grpc/testing:benchmark_service_cc_grpc",
+        "//src/proto/grpc/testing:payloads_cc_proto",
+        "//test/cpp/util:test_util",
+    ],
+)
+
+# Separate cc_library for C++20 coroutines (grpc_cc_library doesn't support copts)
+cc_library(
+    name = "client_coroutine_impl",
+    srcs = [
+        "client_coroutine.cc",
+        "client_coroutine_sync.cc",
+    ],
+    hdrs = [
+        "client_coroutine.h",
+    ],
+    # Force C++20 - required for coroutines
+    copts = ["-std=c++20"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":client_headers",
+        ":histogram",
+        ":interarrival",
+        ":usage_timer",
+        "//:gpr",
+        "//:grpc",
+        "//:grpc++",
+        "//:grpc_base",
+        "//src/core:grpc_check",
+        "//src/proto/grpc/testing:benchmark_service_cc_grpc",
+        "//src/proto/grpc/testing:control_cc_proto",
+        "//src/proto/grpc/testing:messages_cc_proto",
+        "//test/cpp/util:test_config",
+        "//test/cpp/util:test_util",
+        "@com_google_absl//absl/log:check",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/log:log",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+    ],
+    linkopts = ["-pthread"],
+)
+
 grpc_cc_library(
     name = "qps_worker_impl",
     srcs = [
@@ -51,10 +154,7 @@ grpc_cc_library(
         "server_sync.cc",
     ],
     hdrs = [
-        "client.h",
         "qps_server_builder.h",
-        "qps_worker.h",
-        "server.h",
     ],
     external_deps = [
         "absl/log:check",
@@ -64,8 +164,12 @@ grpc_cc_library(
         "absl/strings:str_format",
     ],
     deps = [
+        ":client_coroutine_impl",
+        ":client_headers",
         ":histogram",
         ":interarrival",
+        ":qps_worker_headers",
+        ":server_headers",
         ":usage_timer",
         "//:gpr",
         "//:grpc",

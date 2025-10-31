@@ -40,8 +40,9 @@ static void RunSynchronousUnaryPingPong() {
 
   ClientConfig client_config;
   client_config.set_client_type(SYNC_CLIENT);
-  client_config.set_outstanding_rpcs_per_channel(1);
+  client_config.set_outstanding_rpcs_per_channel(500);  // Very high concurrency
   client_config.set_client_channels(1);
+  client_config.set_threads_per_cq(10);  // Share completion queues (10 threads per CQ)
   client_config.set_rpc_type(UNARY);
   client_config.mutable_load_params()->mutable_closed_loop();
 
