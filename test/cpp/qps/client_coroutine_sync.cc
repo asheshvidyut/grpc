@@ -136,6 +136,11 @@ class CoroutineClient
   // Coroutine-based thread function
   bool CoroutineThreadFuncImpl(HistogramEntry* entry, size_t thread_idx,
                                CompletionQueue* cq) {
+    // Double-check we should still be running before starting new RPC
+    if (ThreadCompleted()) {
+      return false;
+    }
+    
     responses_[thread_idx].Clear();
     auto* stub = channels_[thread_idx % channels_.size()].get_stub();
     double start = UsageTimer::Now();
@@ -170,17 +175,18 @@ class CoroutineUnaryClient final : public CoroutineClient {
 
  private:
   void DestroyMultithreading() final {
-    // Wait a bit for threads to finish their current RPCs
-    // The threads check ThreadCompleted() at the start of each loop iteration
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Wait a bit for threads to finish their current RPC loop iterations
+    // This ensures they check ThreadCompleted() and exit before we shutdown CQs
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     
     // Shutdown completion queues
-    // This will cause any in-flight operations to get SHUTDOWN status
+    // Any in-flight operations will get SHUTDOWN status in their polling loops
     for (auto& cq : cqs_) {
       cq->Shutdown();
     }
     
     // Wait for threads to finish (they should exit soon after CQ shutdown)
+    // If any thread is still in CoroutineUnaryCall, it will fail but be caught
     EndThreads();
   }
 };

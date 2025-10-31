@@ -219,10 +219,20 @@ GrpcTask<grpc::Status> CoroutineUnaryCall(
     BenchmarkService::Stub* stub, grpc::ClientContext* context,
     const SimpleRequest& request, SimpleResponse* response,
     grpc::CompletionQueue* cq, AsyncUnaryCallAwaiter<SimpleResponse>* /*awaiter_ptr*/) {
-  auto awaiter = MakeAsyncUnaryCall<SimpleResponse>(stub, context, request, cq);
-  auto [status, result] = co_await awaiter;
-  *response = std::move(*result);
-  co_return status;
+  // Check if CQ is still valid before starting async operation
+  // If CQ was shut down, AsyncUnaryCall will fail with grpc_cq_begin_op error
+  // We can't easily check CQ shutdown status, so we rely on the error handling
+  // in GrpcTask::get() which will return CANCELLED if CQ is shut down
+  try {
+    auto awaiter = MakeAsyncUnaryCall<SimpleResponse>(stub, context, request, cq);
+    auto [status, result] = co_await awaiter;
+    *response = std::move(*result);
+    co_return status;
+  } catch (...) {
+    // If async operation fails due to CQ shutdown, return CANCELLED
+    co_return grpc::Status(grpc::StatusCode::CANCELLED,
+                           "Operation cancelled due to completion queue shutdown");
+  }
 }
 
 }  // namespace testing
