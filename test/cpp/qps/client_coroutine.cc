@@ -114,9 +114,10 @@ grpc::Status GrpcTask<grpc::Status>::get(grpc::CompletionQueue* cq) {
           awaiter->ResumeWithCompletion(ok);
         }
       } else if (status == CompletionQueue::SHUTDOWN) {
-        // CQ has been shut down, exit polling loop
-        // The coroutine should complete naturally or we'll timeout waiting
-        break;
+        // CQ has been shut down - cancel the ongoing operation and return error
+        // The coroutine frame will be cleaned up by the destructor
+        return grpc::Status(grpc::StatusCode::CANCELLED, 
+                           "Completion queue shut down during operation");
       } else {
         // TIMEOUT - yield and try again
         std::this_thread::yield();

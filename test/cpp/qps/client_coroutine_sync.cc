@@ -17,6 +17,7 @@
 #include "test/cpp/qps/client_coroutine.h"
 
 #include <atomic>
+#include <chrono>
 #include <grpc/grpc.h>
 #include <grpc/support/time.h>
 #include <grpcpp/channel.h>
@@ -91,6 +92,11 @@ class CoroutineClient
     CompletionQueue* cq = cqs_[thread_idx % cqs_.size()].get();
     
     for (;;) {
+      // Check if we should stop BEFORE starting new RPCs
+      if (ThreadCompleted()) {
+        return;
+      }
+      
       if (!WaitToIssue(thread_idx)) {
         return;
       }
@@ -99,7 +105,7 @@ class CoroutineClient
       bool thread_still_ok = CoroutineThreadFuncImpl(&entry, thread_idx, cq);
       t->UpdateHistogram(&entry);
       
-      if (!thread_still_ok || ThreadCompleted()) {
+      if (!thread_still_ok) {
         return;
       }
     }
