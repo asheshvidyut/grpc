@@ -189,6 +189,13 @@ class CoroutineUnaryClient final : public CoroutineClient {
 
  private:
   void DestroyMultithreading() final {
+    // Cancel all in-flight contexts FIRST to stop pending operations
+    // This must happen before setting shutdown flag to ensure threads
+    // that are already past the check get cancelled
+    for (auto& ctx : contexts_) {
+      ctx.TryCancel();
+    }
+    
     // Signal that shutdown has started - threads will check this before
     // starting new RPCs
     {
@@ -196,16 +203,13 @@ class CoroutineUnaryClient final : public CoroutineClient {
       shutdown_initiated_ = true;
     }
     
-    // Cancel all in-flight contexts to stop pending operations
-    for (auto& ctx : contexts_) {
-      ctx.TryCancel();
-    }
-    
-    // Wait a bit for threads to finish their current operations and exit loops
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Wait for threads to finish their current operations and exit loops
+    // Give them time to see the cancellation and shutdown flag
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     
     // Shutdown completion queues
-    // Any remaining operations will get SHUTDOWN status in their polling loops
+    // By now, threads should have exited their loops or be in polling
+    // which will detect SHUTDOWN status gracefully
     for (auto& cq : cqs_) {
       cq->Shutdown();
     }
