@@ -119,8 +119,9 @@ grpc::Status GrpcTask<grpc::Status>::get(grpc::CompletionQueue* cq) {
         return grpc::Status(grpc::StatusCode::CANCELLED, 
                            "Completion queue shut down during operation");
       } else {
-        // TIMEOUT - yield and try again
-        std::this_thread::yield();
+        // TIMEOUT - use small sleep instead of yield for better CPU efficiency
+        // Yield can still consume CPU cycles, a small sleep allows OS to schedule
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
       }
     }
   } else {

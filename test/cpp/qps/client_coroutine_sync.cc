@@ -139,15 +139,9 @@ class CoroutineClient
   // Coroutine-based thread function
   bool CoroutineThreadFuncImpl(HistogramEntry* entry, size_t thread_idx,
                                CompletionQueue* cq) {
-    // Double-check we should still be running before starting new RPC
-    {
-      std::lock_guard<std::mutex> lock(shutdown_mutex_);
-      if (shutdown_initiated_) {
-        return false;
-      }
-    }
-    
-    if (ThreadCompleted()) {
+    // Check shutdown flag (atomic, no lock needed) and ThreadCompleted
+    // These are fast checks that don't block
+    if (shutdown_initiated_.load(std::memory_order_acquire) || ThreadCompleted()) {
       return false;
     }
     
@@ -175,8 +169,7 @@ class CoroutineClient
   std::vector<SimpleResponse> responses_;
   std::vector<grpc::ClientContext> contexts_;
   std::vector<std::unique_ptr<CompletionQueue>> cqs_;
-  std::mutex shutdown_mutex_;
-  bool shutdown_initiated_;
+  std::atomic<bool> shutdown_initiated_;
 };
 
 class CoroutineUnaryClient final : public CoroutineClient {
@@ -197,11 +190,8 @@ class CoroutineUnaryClient final : public CoroutineClient {
     }
     
     // Signal that shutdown has started - threads will check this before
-    // starting new RPCs
-    {
-      std::lock_guard<std::mutex> lock(shutdown_mutex_);
-      shutdown_initiated_ = true;
-    }
+    // starting new RPCs (atomic, no lock needed)
+    shutdown_initiated_.store(true, std::memory_order_release);
     
     // Wait for threads to finish their current operations and exit loops
     // Give them time to see the cancellation and shutdown flag
