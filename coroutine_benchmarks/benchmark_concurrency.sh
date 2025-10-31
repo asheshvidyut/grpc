@@ -1,5 +1,30 @@
 #!/bin/bash
 
+# Detect if we're in grpc root or not, and determine paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/../test/cpp/qps/inproc_sync_unary_ping_pong_test.cc" ]; then
+  # We're in grpc root (coroutine_benchmarks/ is inside grpc)
+  GRPC_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+  TEST_FILE="$GRPC_ROOT/test/cpp/qps/inproc_sync_unary_ping_pong_test.cc"
+elif [ -f "test/cpp/qps/inproc_sync_unary_ping_pong_test.cc" ]; then
+  # We're in grpc root already
+  GRPC_ROOT="$(pwd)"
+  TEST_FILE="$GRPC_ROOT/test/cpp/qps/inproc_sync_unary_ping_pong_test.cc"
+else
+  echo "Error: Cannot find test file. Run from grpc root or coroutine_benchmarks directory."
+  exit 1
+fi
+
+# Detect sed -i syntax (Linux vs macOS)
+if sed -i 's/test/test/' /tmp/test_sed_$$ 2>/dev/null; then
+  SED_IN_PLACE="sed -i"  # Linux
+  rm -f /tmp/test_sed_$$
+else
+  SED_IN_PLACE="sed -i ''"  # macOS
+fi
+
+cd "$GRPC_ROOT"
+
 echo "=== Benchmarking Coroutine vs Sync at Different Concurrency Levels ==="
 echo ""
 
@@ -8,10 +33,10 @@ for concurrency in 1 10 50 100 200 500 1000; do
   echo "Testing concurrency level: $concurrency"
   
   # Update the test file
-  sed -i '' "s/set_outstanding_rpcs_per_channel([0-9]*);/set_outstanding_rpcs_per_channel($concurrency);/" grpc/test/cpp/qps/inproc_sync_unary_ping_pong_test.cc
+  $SED_IN_PLACE "s/set_outstanding_rpcs_per_channel([0-9]*);/set_outstanding_rpcs_per_channel($concurrency);/" "$TEST_FILE"
   
   # Rebuild
-  cd grpc && bazel build --cxxopt='-std=c++20' --host_cxxopt='-std=c++20' -c opt --copt=-g //test/cpp/qps:inproc_sync_unary_ping_pong_test > /dev/null 2>&1 && cd ..
+  bazel build --cxxopt='-std=c++20' --host_cxxopt='-std=c++20' -c opt --copt=-g //test/cpp/qps:inproc_sync_unary_ping_pong_test > /dev/null 2>&1
   
   if [ $? -ne 0 ]; then
     echo "Build failed for concurrency $concurrency"
@@ -19,14 +44,12 @@ for concurrency in 1 10 50 100 200 500 1000; do
   fi
   
   # Run coroutine test
-  cd grpc
   export USE_COROUTINES=1
   COROUTINE_OUT=$(timeout 30 bazel-bin/test/cpp/qps/inproc_sync_unary_ping_pong_test 2>&1 | grep -E "QPS|Latencies")
   
   # Run sync test
   unset USE_COROUTINES
   SYNC_OUT=$(timeout 30 bazel-bin/test/cpp/qps/inproc_sync_unary_ping_pong_test 2>&1 | grep -E "QPS|Latencies")
-  cd ..
   
   # Extract QPS values
   COROUTINE_QPS=$(echo "$COROUTINE_OUT" | grep QPS | sed 's/.*QPS: \([0-9.]*\).*/\1/')
