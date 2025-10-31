@@ -66,7 +66,6 @@ class CoroutineClient
     num_threads_ =
         config.outstanding_rpcs_per_channel() * config.client_channels();
     responses_.resize(num_threads_);
-    contexts_.resize(num_threads_);
     
     // Create completion queues (one per thread or shared)
     int threads_per_cq = std::max(1, config.threads_per_cq());
@@ -149,11 +148,11 @@ class CoroutineClient
     auto* stub = channels_[thread_idx % channels_.size()].get_stub();
     double start = UsageTimer::Now();
     
-    // Use thread-local context that can be cancelled on shutdown
-    contexts_[thread_idx].Clear();
+    // Create a new context for each RPC (ClientContext doesn't have Clear())
+    grpc::ClientContext context;
     
     // Use coroutine-based async call - pass CQ for in-thread polling
-    auto task = CoroutineUnaryCall(stub, &contexts_[thread_idx], request_,
+    auto task = CoroutineUnaryCall(stub, &context, request_,
                                    &responses_[thread_idx], cq, nullptr);
     // Pass completion queue to get() so it can poll directly in this thread
     grpc::Status s = task.get(cq);
@@ -167,7 +166,6 @@ class CoroutineClient
 
   size_t num_threads_;
   std::vector<SimpleResponse> responses_;
-  std::vector<grpc::ClientContext> contexts_;
   std::vector<std::unique_ptr<CompletionQueue>> cqs_;
   std::atomic<bool> shutdown_initiated_;
 };
@@ -182,13 +180,6 @@ class CoroutineUnaryClient final : public CoroutineClient {
 
  private:
   void DestroyMultithreading() final {
-    // Cancel all in-flight contexts FIRST to stop pending operations
-    // This must happen before setting shutdown flag to ensure threads
-    // that are already past the check get cancelled
-    for (auto& ctx : contexts_) {
-      ctx.TryCancel();
-    }
-    
     // Signal that shutdown has started - threads will check this before
     // starting new RPCs (atomic, no lock needed)
     shutdown_initiated_.store(true, std::memory_order_release);
