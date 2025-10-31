@@ -75,11 +75,7 @@ class CoroutineClient
   }
 
   ~CoroutineClient() override {
-    // Shutdown completion queues
-    for (auto& cq : cqs_) {
-      cq->Shutdown();
-    }
-    // Drain completion queues
+    // Drain completion queues (they should already be shut down by DestroyMultithreading)
     for (auto& cq : cqs_) {
       void* tag;
       bool ok;
@@ -96,7 +92,6 @@ class CoroutineClient
     
     for (;;) {
       if (!WaitToIssue(thread_idx)) {
-        cq->Shutdown();
         return;
       }
       
@@ -105,7 +100,6 @@ class CoroutineClient
       t->UpdateHistogram(&entry);
       
       if (!thread_still_ok || ThreadCompleted()) {
-        cq->Shutdown();
         return;
       }
     }
@@ -169,7 +163,14 @@ class CoroutineUnaryClient final : public CoroutineClient {
   ~CoroutineUnaryClient() override {}
 
  private:
-  void DestroyMultithreading() final { EndThreads(); }
+  void DestroyMultithreading() final {
+    // Shutdown completion queues before ending threads
+    // This ensures all threads stop using the queues before they're shut down
+    for (auto& cq : cqs_) {
+      cq->Shutdown();
+    }
+    EndThreads();
+  }
 };
 
 std::unique_ptr<Client> CreateCoroutineClient(const ClientConfig& config) {
