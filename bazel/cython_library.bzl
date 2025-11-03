@@ -67,6 +67,12 @@ def pyx_library(name, deps = [], py_deps = [], srcs = [], **kwargs):
         )
 
     shared_objects = []
+    # On macOS, Python extensions use -undefined,dynamic_lookup to allow
+    # undefined Python symbols that will be resolved at runtime when Python loads the extension
+    linkopts = select({
+        "@platforms//os:macos": ["-Wl,-undefined,dynamic_lookup"],
+        "//conditions:default": [],
+    })
     defines = kwargs.pop("defines", [])
     for src in pyx_srcs:
         stem = src.split(".")[0]
@@ -77,6 +83,7 @@ def pyx_library(name, deps = [], py_deps = [], srcs = [], **kwargs):
             deps = deps + ["@local_config_python//:python_headers"],
             defines = defines,
             linkshared = 1,
+            linkopts = linkopts,
         )
         shared_objects.append(shared_object_name)
 
