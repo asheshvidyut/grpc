@@ -100,16 +100,20 @@ LICENSE = "Apache License 2.0"
 # Detect PyPy
 IS_PYPY = platform.python_implementation() == "PyPy"
 
-CLASSIFIERS = [
-    "Development Status :: 5 - Production/Stable",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-] + [
-    f"Programming Language :: Python :: {x}"
-    for x in python_version.SUPPORTED_PYTHON_VERSIONS
-] + [
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
+CLASSIFIERS = (
+    [
+        "Development Status :: 5 - Production/Stable",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+    ]
+    + [
+        f"Programming Language :: Python :: {x}"
+        for x in python_version.SUPPORTED_PYTHON_VERSIONS
+    ]
+    + [
+        "Programming Language :: Python :: Implementation :: PyPy",
+    ]
+)
 
 
 def _env_bool_value(env_name, default):
