@@ -52,6 +52,55 @@ import grpc.experimental  # pytype: disable=pyi-error
 
 _LOGGER = logging.getLogger(__name__)
 
+
+# Linux-specific memory release helper
+# On Linux, glibc malloc keeps memory in pools and only releases to OS when
+# malloc_trim(0) is called. This helps prevent memory leaks when channels are
+# created/closed in loops with concurrent file I/O operations (issue #40817).
+# Cache libc handle to avoid repeated CDLL calls
+_libc_handle = None
+
+def _linux_malloc_trim():
+    """Force Linux malloc to release memory to OS (Linux only, glibc only).
+    
+    This function calls malloc_trim(0) which is a glibc-specific function that
+    forces the allocator to release free memory at the top of the heap back to
+    the OS. This is only available on systems using glibc (most Linux distributions).
+    
+    On systems using musl libc (e.g., Alpine Linux) or other libc implementations,
+    this function will silently fail, which is acceptable since those allocators
+    release memory more aggressively anyway.
+    
+    Note: malloc_trim(0) only releases memory at the top of the heap. For best
+    results, this should be called multiple times or after significant memory
+    operations to release memory throughout the heap.
+    """
+    global _libc_handle
+    if sys.platform == 'linux':
+        try:
+            import ctypes
+            # Cache the libc handle to avoid repeated CDLL calls
+            if _libc_handle is None:
+                # Try to load libc.so.6 (glibc)
+                # Common locations: /lib/x86_64-linux-gnu/libc.so.6, /lib64/libc.so.6
+                # ctypes.CDLL will use the system's dynamic linker to find it
+                _libc_handle = ctypes.CDLL('libc.so.6', use_errno=True)
+            # malloc_trim(0) releases free memory at the top of the heap
+            # This is a glibc-specific function, not available in musl libc
+            if hasattr(_libc_handle, 'malloc_trim'):
+                # Set the return type to int (malloc_trim returns int)
+                _libc_handle.malloc_trim.argtypes = [ctypes.c_size_t]
+                _libc_handle.malloc_trim.restype = ctypes.c_int
+                result = _libc_handle.malloc_trim(0)
+                # Result: 1 if memory was released, 0 if not
+                # We don't check the result since 0 is also valid (no memory to release)
+        except (OSError, AttributeError):
+            # Not available or failed (e.g., musl libc, libc.so.6 not found, or
+            # malloc_trim not available). This is acceptable - musl and other
+            # allocators release memory more aggressively anyway.
+            pass
+
+
 _USER_AGENT = "grpc-python/{}".format(_grpcio_metadata.__version__)
 
 _EMPTY_FLAGS = 0
@@ -2189,11 +2238,39 @@ class Channel(grpc.Channel):
                 del state.callbacks_and_connectivities[:]
 
     def _close(self) -> None:
+        # Check if already closed to make this method idempotent
+        if getattr(self, "_channel", None) is None:
+            return
         self._unsubscribe_all()
-        self._channel.close(cygrpc.StatusCode.cancelled, "Channel closed!")
+        if self._call_state:
+            self._call_state.channel = None
+        if self._connectivity_state:
+            self._connectivity_state.channel = None
+
         cygrpc.fork_unregister_channel(self)
+
+        channel = self._channel
+        self._channel = None
+        self._call_state = None
+        self._connectivity_state = None
+
+        channel.close(cygrpc.StatusCode.cancelled, "Channel closed!")
+        
         if cygrpc.g_gevent_activated:
             cygrpc.gevent_decrement_channel_count()
+
+        # Linux-specific: Force malloc to release memory to OS after channel close.
+        # This helps prevent memory leaks when channels are created/closed in loops
+        # with concurrent file I/O operations (issue #40817). On Linux, glibc malloc
+        # keeps memory in pools and only releases when malloc_trim(0) is called.
+        # This is a no-op on non-Linux platforms.
+        # Note: We call it multiple times because malloc_trim(0) only releases memory
+        # at the top of the heap. Multiple calls help release memory throughout the heap.
+        _linux_malloc_trim()
+        # Small delay then trim again to catch any memory freed by async cleanup
+        import time
+        time.sleep(0.001)
+        _linux_malloc_trim()
 
     def _close_on_fork(self) -> None:
         self._unsubscribe_all()

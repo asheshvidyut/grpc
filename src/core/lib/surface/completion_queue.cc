@@ -1416,18 +1416,27 @@ static void cq_shutdown_callback(grpc_completion_queue* cq) {
 // Shutdown simply drops a ref that we reserved at creation time; if we drop
 // to zero here, then enter shutdown mode and wake up any waiters
 void grpc_completion_queue_shutdown(grpc_completion_queue* cq) {
-  grpc_core::ExecCtx exec_ctx;
-  GRPC_TRACE_LOG(api, INFO)
-      << "grpc_completion_queue_shutdown(cq=" << cq << ")";
-  cq->vtable->shutdown(cq);
+  if (grpc_core::ExecCtx::Get() == nullptr) {
+    grpc_core::ExecCtx exec_ctx;
+    GRPC_TRACE_LOG(api, INFO)
+        << "grpc_completion_queue_shutdown(cq=" << cq << ")";
+    cq->vtable->shutdown(cq);
+  } else {
+    GRPC_TRACE_LOG(api, INFO)
+        << "grpc_completion_queue_shutdown(cq=" << cq << ")";
+    cq->vtable->shutdown(cq);
+  }
 }
 
 void grpc_completion_queue_destroy(grpc_completion_queue* cq) {
   GRPC_TRACE_LOG(api, INFO) << "grpc_completion_queue_destroy(cq=" << cq << ")";
   grpc_completion_queue_shutdown(cq);
-
-  grpc_core::ExecCtx exec_ctx;
-  GRPC_CQ_INTERNAL_UNREF(cq, "destroy");
+  if (grpc_core::ExecCtx::Get() == nullptr) {
+    grpc_core::ExecCtx exec_ctx;
+    GRPC_CQ_INTERNAL_UNREF(cq, "destroy");
+  } else {
+    GRPC_CQ_INTERNAL_UNREF(cq, "destroy");
+  }
 }
 
 grpc_pollset* grpc_cq_pollset(grpc_completion_queue* cq) {

@@ -91,10 +91,16 @@ Channel::RegisteredCall* Channel::RegisterCall(const char* method,
 //
 
 void grpc_channel_destroy(grpc_channel* channel) {
-  grpc_core::ExecCtx exec_ctx;
-  GRPC_TRACE_LOG(api, INFO)
-      << "grpc_channel_destroy(channel=" << channel << ")";
-  grpc_channel_destroy_internal(channel);
+  if (grpc_core::ExecCtx::Get() == nullptr) {
+    grpc_core::ExecCtx exec_ctx;
+    GRPC_TRACE_LOG(api, INFO)
+        << "grpc_channel_destroy(channel=" << channel << ")";
+    grpc_channel_destroy_internal(channel);
+  } else {
+    GRPC_TRACE_LOG(api, INFO)
+        << "grpc_channel_destroy(channel=" << channel << ")";
+    grpc_channel_destroy_internal(channel);
+  }
 }
 
 grpc_call* grpc_channel_create_call(grpc_channel* channel,
