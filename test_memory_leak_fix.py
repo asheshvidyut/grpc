@@ -1,22 +1,3 @@
-#!/usr/bin/env python3
-"""Test script to verify the memory leak fix for issue #40817.
-
-This script reproduces the memory leak scenario described in:
-https://github.com/grpc/grpc/issues/40817
-
-The fix should prevent memory from accumulating when channels are created
-and closed in loops after file I/O operations in threads.
-
-Usage:
-    python test_memory_leak_fix.py
-
-Memory monitoring options:
-    1. Using psutil (recommended): pip install psutil
-    2. Using resource module (built-in, Unix only)
-    3. Using tracemalloc (built-in, detailed tracking)
-    4. System tools: top, htop, or ps in another terminal
-"""
-
 import contextlib
 import gc
 import os
