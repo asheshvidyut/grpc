@@ -254,6 +254,10 @@ if sys.platform == "darwin":
 # reasonable default.
 EXTRA_ENV_COMPILE_ARGS = os.environ.get("GRPC_PYTHON_CFLAGS", None)
 EXTRA_ENV_LINK_ARGS = os.environ.get("GRPC_PYTHON_LDFLAGS", None)
+
+# Check if we should enable debug flags for valgrind/memory leak detection
+ENABLE_DEBUG_FLAGS = os.environ.get("GRPC_PYTHON_BUILD_DEBUG", "0") == "1"
+
 if EXTRA_ENV_COMPILE_ARGS is None:
 
     # NOTE: Keep in sync with c- and cpp-specific arg filters!
@@ -269,12 +273,24 @@ if EXTRA_ENV_COMPILE_ARGS is None:
         # We need to statically link the C++ Runtime, only the C runtime is
         # available dynamically
         EXTRA_ENV_COMPILE_ARGS += " /MT"
+        if ENABLE_DEBUG_FLAGS:
+            # MSVC debug flags for valgrind/memory leak detection
+            EXTRA_ENV_COMPILE_ARGS += " /Zi /Od /MDd"
     elif "linux" in sys.platform:
         # GCC by defaults uses C17 so only C++17 needs to be specified.
         EXTRA_ENV_COMPILE_ARGS += " -std=c++17"
         EXTRA_ENV_COMPILE_ARGS += (
             " -fvisibility=hidden -fno-wrapv -fno-exceptions"
         )
+        if ENABLE_DEBUG_FLAGS:
+            # Debug flags for valgrind/memory leak detection:
+            # -g3: Maximum debug information (includes macros)
+            # -O0: Disable optimization for better debugging
+            # -fno-omit-frame-pointer: Keep frame pointers for better stack traces
+            # -fno-inline: Disable inlining to make debugging easier
+            EXTRA_ENV_COMPILE_ARGS += (
+                " -g3 -O0 -fno-omit-frame-pointer -fno-inline"
+            )
     elif "darwin" in sys.platform:
         # AppleClang by defaults uses C17 so only C++17 needs to be specified.
         EXTRA_ENV_COMPILE_ARGS += " -std=c++17"
@@ -282,6 +298,11 @@ if EXTRA_ENV_COMPILE_ARGS is None:
             " -stdlib=libc++ -fvisibility=hidden -fno-wrapv -fno-exceptions"
             " -DHAVE_UNISTD_H"
         )
+        if ENABLE_DEBUG_FLAGS:
+            # Debug flags for valgrind/memory leak detection (macOS uses lldb/Instruments)
+            EXTRA_ENV_COMPILE_ARGS += (
+                " -g3 -O0 -fno-omit-frame-pointer -fno-inline"
+            )
 
 if EXTRA_ENV_LINK_ARGS is None:
     EXTRA_ENV_LINK_ARGS = ""
@@ -291,6 +312,9 @@ if EXTRA_ENV_LINK_ARGS is None:
             EXTRA_ENV_LINK_ARGS += " -latomic"
     if "linux" in sys.platform:
         EXTRA_ENV_LINK_ARGS += " -static-libgcc"
+        if ENABLE_DEBUG_FLAGS:
+            # Add debug symbols to linker for valgrind
+            EXTRA_ENV_LINK_ARGS += " -g"
 
 # Explicitly link Core Foundation framework for MacOS to ensure no symbol is
 # missing when compiled using package managers like Conda.
