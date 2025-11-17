@@ -65,13 +65,24 @@ def profile_memory(label=""):
 # --- Leak Demonstration Functions ---
 
 def read_file(file_path: str):
-    """Reads a large chunk of data from the file."""
-    try:
-        with open(file_path, 'rb') as fp:
-            fp.read(READ_SIZE)
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.", file=sys.stderr)
-        sys.exit(1)
+  """Reads a large chunk of data from the file."""
+  try:
+    with open(file_path, 'rb') as fp:
+      fp.read(READ_SIZE)
+    # Call malloc_trim from this thread to release its arena
+    if sys.platform == 'linux':
+      try:
+        import ctypes
+        libc = ctypes.CDLL('libc.so.6')
+        if hasattr(libc, 'malloc_trim'):
+          libc.malloc_trim.argtypes = [ctypes.c_size_t]
+          libc.malloc_trim.restype = ctypes.c_int
+          libc.malloc_trim(0)
+      except:
+        pass
+  except FileNotFoundError:
+    print(f"Error: File '{file_path}' not found.", file=sys.stderr)
+    sys.exit(1)
 
 def trigger_memleak(file_path: str):
     """
