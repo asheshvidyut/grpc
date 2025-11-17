@@ -285,9 +285,14 @@ def main():
             print("   Each new map is likely a new arena")
         
         # Memory map analysis
-        if final_snapshot['total_heap_growth_mb'] > 5:
+        if 'total_heap_growth_mb' in final_growth and final_growth['total_heap_growth_mb'] > 5:
             print()
             print(f"⚠️  Heap size grew by {final_growth['total_heap_growth_mb']:.2f} MB")
+            print("   This is memory in arenas that's not released to OS")
+            print("   Even though Python objects are freed, memory stays in arenas")
+        elif final_growth.get('heap_growth_mb', 0) > 5:
+            print()
+            print(f"⚠️  Heap size grew by {final_growth['heap_growth_mb']:.2f} MB")
             print("   This is memory in arenas that's not released to OS")
             print("   Even though Python objects are freed, memory stays in arenas")
 
