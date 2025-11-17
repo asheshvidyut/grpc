@@ -2150,6 +2150,11 @@ def secure_channel(target, credentials, options=None, compression=None):
     )
 
 
+def trim_thread_memory():
+    from grpc import _channel  # pylint: disable=cyclic-import
+    _channel.trim_thread_memory()
+
+
 def intercept_channel(channel, *interceptors):
     """Intercepts a channel through a set of interceptors.
 
@@ -2312,6 +2317,7 @@ __all__ = (
     "ssl_server_credentials",
     "stream_stream_rpc_method_handler",
     "stream_unary_rpc_method_handler",
+    "trim_thread_memory",
     "unary_stream_rpc_method_handler",
     "unary_unary_rpc_method_handler",
     "xds_channel_credentials",

@@ -54,6 +54,45 @@ _LOGGER = logging.getLogger(__name__)
 
 _USER_AGENT = "grpc-python/{}".format(_grpcio_metadata.__version__)
 
+_libc_handle = None
+
+
+def _linux_malloc_trim():
+    global _libc_handle
+    if sys.platform == 'linux':
+        try:
+            import ctypes
+            if _libc_handle is None:
+                _libc_handle = ctypes.CDLL('libc.so.6', use_errno=True)
+            if hasattr(_libc_handle, 'malloc_trim'):
+                _libc_handle.malloc_trim.argtypes = [ctypes.c_size_t]
+                _libc_handle.malloc_trim.restype = ctypes.c_int
+                _libc_handle.malloc_trim(0)
+        except (OSError, AttributeError):
+            pass
+
+
+def trim_thread_memory():
+    _linux_malloc_trim()
+
+
+def _patch_threading_for_auto_trim():
+    if sys.platform != 'linux':
+        return
+    if hasattr(threading.Thread, '_grpc_auto_trim_patched'):
+        return
+    _original_thread_run = threading.Thread.run
+    def _patched_run(self):
+        try:
+            return _original_thread_run(self)
+        finally:
+            trim_thread_memory()
+    threading.Thread.run = _patched_run
+    threading.Thread._grpc_auto_trim_patched = True
+
+
+_patch_threading_for_auto_trim()
+
 _EMPTY_FLAGS = 0
 
 # NOTE(rbellevi): No guarantees are given about the maintenance of this
