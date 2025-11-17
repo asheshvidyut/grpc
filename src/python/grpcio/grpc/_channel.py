@@ -74,6 +74,13 @@ def _linux_malloc_trim():
     Note: malloc_trim(0) only releases memory at the top of the heap. For best
     results, this should be called multiple times or after significant memory
     operations to release memory throughout the heap.
+    
+    IMPORTANT LIMITATION: malloc_trim() only affects the calling thread's heap arena.
+    If memory is allocated in other threads (e.g., during concurrent file I/O),
+    those threads' arenas won't be trimmed. This can cause apparent memory leaks
+    when channels are closed after thread operations. To mitigate this, we call
+    malloc_trim multiple times with delays and force garbage collection to encourage
+    glibc to consolidate memory between arenas.
     """
     global _libc_handle
     if sys.platform == 'linux':
@@ -99,6 +106,71 @@ def _linux_malloc_trim():
             # malloc_trim not available). This is acceptable - musl and other
             # allocators release memory more aggressively anyway.
             pass
+
+
+def trim_thread_memory():
+    """Trim memory from the current thread's heap arena (Linux/glibc only).
+    
+    This is a public helper function that users can call from worker threads
+    to release memory back to the OS. This is particularly useful when threads
+    perform file I/O operations, as glibc allocates memory in thread-local arenas
+    that won't be trimmed by malloc_trim() calls from other threads.
+    
+    This function addresses issue #40817 where memory leaks occur when gRPC
+    channels are created/closed in loops with concurrent file I/O operations.
+    
+    Example usage:
+        def read_file(file_path: str):
+            with open(file_path, 'rb') as fp:
+                data = fp.read(READ_SIZE)
+            # Trim this thread's arena after I/O completes
+            grpc.trim_thread_memory()
+    
+    Note: This only works on Linux with glibc. On other platforms or with other
+    libc implementations, this is a no-op.
+    """
+    _linux_malloc_trim()
+
+
+def _linux_malloc_trim_aggressive():
+    """Aggressively trim memory to help with thread-local arena issues.
+    
+    This function attempts to mitigate memory leaks when channels are closed after
+    operations in other threads. The core issue is that malloc_trim() only affects
+    the calling thread's heap arena. When memory is allocated in other threads
+    (e.g., during file I/O), those threads' arenas won't be trimmed.
+    
+    Strategy:
+    1. Force garbage collection to free Python objects
+    2. Call malloc_trim multiple times with delays to catch:
+       - Memory freed by async cleanup operations
+       - Memory that might be consolidated between arenas over time
+       - Memory released after thread-local cleanup completes
+    
+    Note: This is a best-effort mitigation. The fundamental limitation is that
+    glibc's per-thread arenas are independent. For complete memory release when
+    using threads, users should call trim_thread_memory() from within the threads
+    that perform I/O operations (see issue #40817), or set MALLOC_ARENA_MAX=1
+    (system-wide) to force all threads to use the main arena.
+    """
+    if sys.platform != 'linux':
+        return
+    
+    # Force garbage collection first to free any Python objects
+    import gc
+    gc.collect()
+    
+    # Call malloc_trim multiple times with increasing delays to catch:
+    # 1. Immediate memory freed by channel cleanup
+    # 2. Memory freed by async operations after a short delay
+    # 3. Memory that might be consolidated from other arenas over time
+    _linux_malloc_trim()
+    time.sleep(0.001)  # Short delay for async cleanup
+    _linux_malloc_trim()
+    time.sleep(0.002)  # Longer delay for arena consolidation attempts
+    _linux_malloc_trim()
+    time.sleep(0.001)  # Final trim after consolidation delay
+    _linux_malloc_trim()  # One more time to catch any delayed releases
 
 
 _USER_AGENT = "grpc-python/{}".format(_grpcio_metadata.__version__)
@@ -2264,13 +2336,13 @@ class Channel(grpc.Channel):
         # with concurrent file I/O operations (issue #40817). On Linux, glibc malloc
         # keeps memory in pools and only releases when malloc_trim(0) is called.
         # This is a no-op on non-Linux platforms.
-        # Note: We call it multiple times because malloc_trim(0) only releases memory
-        # at the top of the heap. Multiple calls help release memory throughout the heap.
-        _linux_malloc_trim()
-        # Small delay then trim again to catch any memory freed by async cleanup
-        import time
-        time.sleep(0.001)
-        _linux_malloc_trim()
+        # 
+        # Note: malloc_trim(0) only releases memory at the top of the heap and only
+        # from the calling thread's arena. When operations happen in other threads
+        # (e.g., file I/O), those threads' arenas won't be trimmed. We use an
+        # aggressive trimming strategy that attempts to consolidate memory between
+        # arenas and trim multiple times to mitigate this limitation.
+        _linux_malloc_trim_aggressive()
 
     def _close_on_fork(self) -> None:
         self._unsubscribe_all()

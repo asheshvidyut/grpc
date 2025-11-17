@@ -69,17 +69,10 @@ def read_file(file_path: str):
   try:
     with open(file_path, 'rb') as fp:
       fp.read(READ_SIZE)
-    # Call malloc_trim from this thread to release its arena
-    if sys.platform == 'linux':
-      try:
-        import ctypes
-        libc = ctypes.CDLL('libc.so.6')
-        if hasattr(libc, 'malloc_trim'):
-          libc.malloc_trim.argtypes = [ctypes.c_size_t]
-          libc.malloc_trim.restype = ctypes.c_int
-          libc.malloc_trim(0)
-      except:
-        pass
+    # Fix for issue #40817: Trim this thread's memory arena after I/O
+    # This releases memory allocated in this thread's arena back to the OS.
+    # Using the new grpc.trim_thread_memory() helper function.
+    grpc.trim_thread_memory()
   except FileNotFoundError:
     print(f"Error: File '{file_path}' not found.", file=sys.stderr)
     sys.exit(1)

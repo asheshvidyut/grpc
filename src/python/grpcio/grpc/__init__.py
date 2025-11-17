@@ -2150,6 +2150,31 @@ def secure_channel(target, credentials, options=None, compression=None):
     )
 
 
+def trim_thread_memory():
+    """Trim memory from the current thread's heap arena (Linux/glibc only).
+    
+    This is a helper function that users can call from worker threads to release
+    memory back to the OS. This is particularly useful when threads perform file
+    I/O operations, as glibc allocates memory in thread-local arenas that won't
+    be trimmed by malloc_trim() calls from other threads.
+    
+    This function addresses issue #40817 where memory leaks occur when gRPC
+    channels are created/closed in loops with concurrent file I/O operations.
+    
+    Example usage:
+        def read_file(file_path: str):
+            with open(file_path, 'rb') as fp:
+                data = fp.read(READ_SIZE)
+            # Trim this thread's arena after I/O completes
+            grpc.trim_thread_memory()
+    
+    Note: This only works on Linux with glibc. On other platforms or with other
+    libc implementations, this is a no-op.
+    """
+    from grpc import _channel  # pylint: disable=cyclic-import
+    _channel.trim_thread_memory()
+
+
 def intercept_channel(channel, *interceptors):
     """Intercepts a channel through a set of interceptors.
 
@@ -2312,6 +2337,7 @@ __all__ = (
     "ssl_server_credentials",
     "stream_stream_rpc_method_handler",
     "stream_unary_rpc_method_handler",
+    "trim_thread_memory",
     "unary_stream_rpc_method_handler",
     "unary_unary_rpc_method_handler",
     "xds_channel_credentials",
