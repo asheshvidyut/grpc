@@ -173,7 +173,7 @@ def main():
         print()
         
         # Run iterations
-        num_iterations = 5
+        num_iterations = 50
         for i in range(num_iterations):
             print(f"--- Iteration {i + 1}/{num_iterations} ---")
             
@@ -203,10 +203,14 @@ def main():
             # Analyze
             leak_info = detector.find_leaking_objects(-2, -1)
             
-            print(f"  New objects created: {leak_info['total_new_objects']}")
-            print(f"  New gRPC objects: {len(leak_info['new_grpc_objects'])}")
+            # Only print detailed info every 10 iterations or if there's a leak
+            should_print_details = (i + 1) % 10 == 0 or leak_info['leaked_channels'] or len(leak_info['new_grpc_objects']) > 0
             
-            if leak_info['new_grpc_objects']:
+            if should_print_details:
+                print(f"  New objects created: {leak_info['total_new_objects']}")
+                print(f"  New gRPC objects: {len(leak_info['new_grpc_objects'])}")
+            
+            if leak_info['new_grpc_objects'] and should_print_details:
                 print(f"  New gRPC object types:")
                 by_type = defaultdict(list)
                 for obj in leak_info['new_grpc_objects']:
@@ -219,7 +223,7 @@ def main():
                         print(f"      - id={obj['id']}, refcount={obj['refcount']}, "
                               f"repr={obj['repr'][:80]}")
             
-            # Check if channel leaked
+            # Check if channel leaked (always print if leaked)
             if leak_info['leaked_channels']:
                 print(f"  ⚠️  LEAKED CHANNELS:")
                 for chan in leak_info['leaked_channels']:
@@ -235,14 +239,18 @@ def main():
                         for ref_type, count in sorted(ref_types.items(), key=lambda x: -x[1])[:5]:
                             print(f"        {ref_type}: {count}")
             
-            # Show top object growth
-            if leak_info['new_objects_by_type']:
+            # Show top object growth (only every 10 iterations)
+            if leak_info['new_objects_by_type'] and should_print_details:
                 print(f"  Top object type growth:")
                 for obj_type, obj_ids in sorted(leak_info['new_objects_by_type'].items(), 
                                                key=lambda x: -len(x[1]))[:5]:
                     print(f"    {obj_type}: +{len(obj_ids)}")
             
-            print()
+            if should_print_details:
+                print()
+            elif (i + 1) % 10 == 0:
+                print(f"  Progress: {i+1}/{num_iterations} iterations completed")
+                print()
         
         # Final analysis
         print("=" * 80)
