@@ -21,13 +21,14 @@
 #include <grpc/support/port_platform.h>
 #include <grpc/support/thd_id.h>
 
+#include <vector>
+
 #ifdef GPR_LINUX
 #ifdef __GLIBC__
 
 #include <malloc.h>
 #include <mutex>
 #include <set>
-#include <vector>
 
 namespace grpc_core {
 
@@ -81,6 +82,34 @@ inline void TrimCurrentThreadMemory() {
 #endif  // __GLIBC__
 #endif  // GPR_LINUX
 }
+
+}  // namespace grpc_core
+
+#else  // !GPR_LINUX || !__GLIBC__
+
+namespace grpc_core {
+
+// Stub implementations for non-Linux or non-glibc platforms
+class ThreadMemoryCleanup {
+ public:
+  static void MarkAsGrpcThread(gpr_thd_id thread_id) { (void)thread_id; }
+  static void MarkAsExternalThread(gpr_thd_id thread_id) { (void)thread_id; }
+  static bool IsGrpcThread(gpr_thd_id thread_id) {
+    (void)thread_id;
+    return false;
+  }
+  static bool CleanCurrentThreadIfExternal() { return false; }
+  static bool CleanThreadArena(gpr_thd_id thread_id) {
+    (void)thread_id;
+    return false;
+  }
+  static void GetExternalThreads(std::vector<gpr_thd_id>& external_threads) {
+    external_threads.clear();
+  }
+  static void AutoRegisterThreadCleanup() {}
+};
+
+inline void TrimCurrentThreadMemory() {}
 
 }  // namespace grpc_core
 
