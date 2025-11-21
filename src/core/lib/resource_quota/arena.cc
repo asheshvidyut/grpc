@@ -24,6 +24,12 @@
 #include <atomic>
 #include <new>
 
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
+
 #include "src/core/lib/resource_quota/resource_quota.h"
 #include "src/core/util/alloc.h"
 #include "absl/log/log.h"
@@ -63,6 +69,16 @@ Arena::~Arena() {
     gpr_free_aligned(z);
     z = prev_z;
   }
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+  // Release memory from this thread's malloc arena back to the OS.
+  // This is necessary because glibc keeps freed memory in arenas and doesn't
+  // release it to the OS unless malloc_trim() is called. Without this, memory
+  // allocated in the Arena (via gpr_malloc_aligned -> malloc) accumulates in
+  // glibc arenas and causes RSS to grow over time.
+  malloc_trim(0);
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 }
 
 RefCountedPtr<Arena> Arena::Create(size_t initial_size,
