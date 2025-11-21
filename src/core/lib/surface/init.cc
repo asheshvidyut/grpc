@@ -44,6 +44,11 @@
 #include "src/core/util/fork.h"
 #include "src/core/util/sync.h"
 #include "src/core/util/thd.h"
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+#include "src/core/util/thread_memory_cleanup.h"
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 #include "absl/base/thread_annotations.h"
 #include "absl/log/log.h"
 #include "absl/time/clock.h"
@@ -102,6 +107,14 @@ static void do_basic_init(void) {
   grpc_fork_handlers_auto_register();
   grpc_tracer_init();
   grpc_client_channel_global_init_backup_polling();
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+  // Register cleanup for the main thread when gRPC is initialized.
+  // This ensures the main thread (and any threads that interact with gRPC)
+  // get automatic memory cleanup on exit.
+  grpc_core::ThreadMemoryCleanup::AutoRegisterThreadCleanup();
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 }
 
 void grpc_init(void) {

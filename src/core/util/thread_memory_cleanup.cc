@@ -41,6 +41,10 @@ namespace grpc_core {
 static pthread_key_t cleanup_key;
 static gpr_once cleanup_key_once = GPR_ONCE_INIT;
 
+// Global flag to track if cleanup system is initialized
+// This allows us to initialize the key early, even before gRPC is fully initialized
+static std::atomic<bool> cleanup_system_initialized{false};
+
 namespace {
 
 // Destructor called automatically when thread exits
@@ -63,9 +67,38 @@ void thread_cleanup_destructor(void* value) {
 }  // namespace
 
 // Initialize the pthread key (called once)
+// This creates the key early so any thread can register for cleanup
 void init_cleanup_key(void) {
   pthread_key_create(&cleanup_key, thread_cleanup_destructor);
+  cleanup_system_initialized.store(true, std::memory_order_release);
+  
+  // Automatically register cleanup for the main thread (the thread that
+  // initializes gRPC). This ensures the main thread gets cleanup even if
+  // it doesn't create channels directly.
+  gpr_thd_id main_thread = gpr_thd_currentid();
+  if (!ThreadMemoryCleanup::IsGrpcThread(main_thread)) {
+    void* marker = malloc(1);
+    if (marker != nullptr) {
+      pthread_setspecific(cleanup_key, marker);
+    }
+  }
 }
+
+// Force initialization of cleanup key early (when library loads)
+// This ensures the key exists even before gRPC is fully initialized
+static void force_early_init() {
+  gpr_once_init(&cleanup_key_once, init_cleanup_key);
+}
+
+// Use a static initializer to force early initialization
+namespace {
+struct EarlyInit {
+  EarlyInit() {
+    force_early_init();
+  }
+};
+static EarlyInit g_early_init;
+}  // namespace
 
 // Initialize thread-local storage for this thread
 // This ensures the destructor is called when thread exits

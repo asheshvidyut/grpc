@@ -22,6 +22,7 @@
 #include <grpc/grpc.h>
 #include <grpc/impl/compression_types.h>
 #include <grpc/support/port_platform.h>
+#include <grpc/support/thd_id.h>
 #include <grpc/support/time.h>
 
 #include <map>
@@ -44,6 +45,12 @@
 #include "src/core/util/ref_counted_ptr.h"
 #include "src/core/util/sync.h"
 #include "src/core/util/time.h"
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+#include "src/core/util/thread_memory_cleanup.h"
+#include <malloc.h>
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 #include "absl/base/thread_annotations.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -163,6 +170,18 @@ class Channel : public UnstartedCallDestination,
 /// is safe to use from within core.
 inline void grpc_channel_destroy_internal(grpc_channel* channel) {
   grpc_core::Channel::FromC(channel)->Unref();
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+  // Clean memory from the current thread's arena after channel destruction.
+  // This helps when MALLOC_ARENA_MAX=1 is used (all threads share one arena),
+  // as it will clean memory from file I/O threads that don't interact with gRPC.
+  // For threads with separate arenas, this only cleans the current thread's arena.
+  gpr_thd_id current_thread = gpr_thd_currentid();
+  if (!grpc_core::ThreadMemoryCleanup::IsGrpcThread(current_thread)) {
+    malloc_trim(0);
+  }
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 }
 
 // Return the channel's compression options.
