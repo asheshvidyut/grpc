@@ -23,6 +23,7 @@
 #include <grpc/support/port_platform.h>
 #include <grpc/support/sync.h>
 #include <grpc/support/thd_id.h>
+#include <malloc.h>
 #include <pthread.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -58,11 +59,12 @@ void thread_cleanup_destructor(void* value) {
   free(value);
 }
 
+}  // namespace
+
+// Initialize the pthread key (called once)
 void init_cleanup_key(void) {
   pthread_key_create(&cleanup_key, thread_cleanup_destructor);
 }
-
-}  // namespace
 
 // Initialize thread-local storage for this thread
 // This ensures the destructor is called when thread exits
