@@ -22,6 +22,12 @@
 #include <grpc/support/alloc.h>
 #include <grpc/support/port_platform.h>
 
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+#include "src/core/util/thread_memory_cleanup.h"
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
+
 #include "src/core/channelz/channel_trace.h"
 #include "src/core/channelz/channelz.h"
 #include "src/core/lib/channel/channel_args.h"
@@ -68,7 +74,15 @@ Channel::Channel(std::string target, const ChannelArgs& channel_args)
               ->memory_quota()
               ->CreateMemoryOwner(),
           1024)),
-      memory_allocator_(&call_arena_allocator_->allocator()) {}
+      memory_allocator_(&call_arena_allocator_->allocator()) {
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+  // Automatically register cleanup for external threads that create channels.
+  // This ensures external threads get automatic memory cleanup on exit.
+  ThreadMemoryCleanup::AutoRegisterThreadCleanup();
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
+}
 
 Channel::RegisteredCall* Channel::RegisterCall(const char* method,
                                                const char* host) {

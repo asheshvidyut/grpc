@@ -39,6 +39,11 @@
 #include "src/core/util/strerror.h"
 #include "src/core/util/thd.h"
 #include "src/core/util/useful.h"
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+#include "src/core/util/thread_memory_cleanup.h"
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 #include "absl/log/check.h"
 #include "absl/log/log.h"
 
@@ -141,6 +146,16 @@ class ThreadInternalsPosix : public internal::ThreadInternalsInterface {
           if (!arg.joinable) {
             delete arg.thread;
           }
+
+          // Mark this thread as a gRPC internal thread.
+          // This prevents memory cleanup for gRPC threads, preserving
+          // memory caching benefits while allowing external threads to clean
+          // their memory separately.
+#ifdef GPR_LINUX
+#ifdef __GLIBC__
+          ThreadMemoryCleanup::MarkAsGrpcThread(gpr_thd_currentid());
+#endif  // __GLIBC__
+#endif  // GPR_LINUX
 
           (*arg.body)(arg.arg);
           if (arg.tracked) {
