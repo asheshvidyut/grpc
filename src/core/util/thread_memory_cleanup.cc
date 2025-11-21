@@ -32,6 +32,7 @@
 #include <set>
 #include <vector>
 
+#include "src/core/lib/debug/trace.h"
 #include "absl/log/log.h"
 
 namespace grpc_core {
