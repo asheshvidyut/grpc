@@ -35,11 +35,11 @@
 
 namespace grpc_core {
 
-namespace {
-
-// pthread key for automatic thread cleanup on exit
+// pthread key for automatic thread cleanup on exit (file-local)
 static pthread_key_t cleanup_key;
 static gpr_once cleanup_key_once = GPR_ONCE_INIT;
+
+namespace {
 
 // Destructor called automatically when thread exits
 void thread_cleanup_destructor(void* value) {
@@ -62,9 +62,12 @@ void init_cleanup_key(void) {
   pthread_key_create(&cleanup_key, thread_cleanup_destructor);
 }
 
+}  // namespace
+
 // Initialize thread-local storage for this thread
 // This ensures the destructor is called when thread exits
-void EnsureThreadCleanupRegistered() {
+// This function is accessible from ThreadMemoryCleanup methods
+static void EnsureThreadCleanupRegistered() {
   gpr_once_init(&cleanup_key_once, init_cleanup_key);
   
   // Check if already registered for this thread
@@ -78,19 +81,6 @@ void EnsureThreadCleanupRegistered() {
     pthread_setspecific(cleanup_key, marker);
   }
 }
-
-// Automatically register cleanup for current thread if it's external
-// This is called from gRPC entry points to ensure external threads get cleanup
-void AutoRegisterThreadCleanup() {
-  gpr_thd_id current_thread = gpr_thd_currentid();
-  
-  // Only register for non-gRPC threads
-  if (!ThreadMemoryCleanup::IsGrpcThread(current_thread)) {
-    EnsureThreadCleanupRegistered();
-  }
-}
-
-}  // namespace
 
 std::mutex ThreadMemoryCleanup::threads_mutex_;
 std::set<gpr_thd_id> ThreadMemoryCleanup::grpc_threads_;
