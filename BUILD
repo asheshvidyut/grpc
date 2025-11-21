@@ -797,6 +797,7 @@ grpc_cc_library(
         "//src/core:util/posix/string.cc",
         "//src/core:util/posix/thd.cc",
         "//src/core:util/posix/tmpfile.cc",
+        "//src/core:util/thread_memory_cleanup.cc",
         "//src/core:util/string.cc",
         "//src/core:util/windows/cpu.cc",
         "//src/core:util/windows/stat.cc",
@@ -815,6 +816,7 @@ grpc_cc_library(
         "//src/core:util/stat.h",
         "//src/core:util/string.h",
         "//src/core:util/thd.h",
+        "//src/core:util/thread_memory_cleanup.h",
         "//src/core:util/tmpfile.h",
         # TODO(ctiller): remove from gpr target entirely
         # All usage should be via gpr_platform
