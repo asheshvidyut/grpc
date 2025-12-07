@@ -494,7 +494,9 @@ def cython_extensions_and_necessity():
                 libgrpc_path = alt_path
             # Fallback to the hardcoded path (for backward compatibility)
             if not os.path.exists(libgrpc_path):
-                alt_path = os.path.join("/var/local/git/grpc", prefix, "libgrpc.a")
+                alt_path = os.path.join(
+                    "/var/local/git/grpc", prefix, "libgrpc.a"
+                )
                 if os.path.exists(alt_path):
                     libgrpc_path = alt_path
         extra_objects = [
