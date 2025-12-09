@@ -19,8 +19,8 @@ import enum
 import logging
 import sys
 import types
+from typing import Any, Optional
 
-from typing import Optional, Any
 from grpc import _compression
 from grpc._cython import cygrpc as _cygrpc
 from grpc._runtime_protos import protos
