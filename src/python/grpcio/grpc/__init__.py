@@ -20,14 +20,15 @@ import enum
 import logging
 import sys
 import types
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from typing import Optional, Any, Callable, TYPE_CHECKING
 from grpc import _compression
 from grpc._cython import cygrpc as _cygrpc
 from grpc._runtime_protos import protos
 from grpc._runtime_protos import protos_and_services
 from grpc._runtime_protos import services
-from grpc._typing import MetadataType, NullaryCallbackType
+from grpc._typing import MetadataType
+from grpc._typing import NullaryCallbackType
 
 if TYPE_CHECKING:
     import types
