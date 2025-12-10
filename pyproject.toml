@@ -20,6 +20,53 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+
+search-path = [
+    ".",
+    "src/python/grpcio",
+    "src/python/grpcio_admin",
+    "src/python/grpcio_channelz",
+    "src/python/grpcio_csds",
+    "src/python/grpcio_csm_observability",
+    "src/python/grpcio_health_checking",
+    "src/python/grpcio_observability",
+    "src/python/grpcio_reflection",
+    "src/python/grpcio_status",
+    "src/python/grpcio_testing",
+    "src/python/grpcio_tests",
+]
+
+project-excludes = [
+    "third_party/**",
+    "**/*_pb2.py",
+    "**/*_pb2_grpc.py",
+]
+
+[tool.pyrefly.errors]
+missing-import = false
+missing-attribute = false
+implicit-import = false
+bad-override = false
+missing-module-attribute = false
+bad-argument-type = false
+unbound-name = false
+no-matching-overload = false
+bad-assignment = false
+unsupported-operation = false
+bad-return = false
+bad-argument-count = false
+bad-param-name-override = false
+not-iterable = false
+not-callable = false
+invalid-inheritance = false
+unknown-name = false
+bad-unpacking = false
+bad-function-definition = false
 
 [project]
 name = "grpcio"
