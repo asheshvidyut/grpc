@@ -47,27 +47,6 @@ project-excludes = [
     "**/*_pb2_grpc.py",
 ]
 
-[tool.pyrefly.errors]
-missing-import = false
-missing-attribute = false
-implicit-import = false
-bad-override = false
-missing-module-attribute = false
-bad-argument-type = false
-unbound-name = false
-no-matching-overload = false
-bad-assignment = false
-unsupported-operation = false
-bad-return = false
-bad-argument-count = false
-bad-param-name-override = false
-not-iterable = false
-not-callable = false
-invalid-inheritance = false
-unknown-name = false
-bad-unpacking = false
-bad-function-definition = false
-
 [project]
 name = "grpcio"
 license = "Apache-2.0"
