@@ -85,7 +85,7 @@ def pyx_library(name, deps = [], py_deps = [], srcs = [], **kwargs):
             linkopts = select({
                 "@platforms//os:macos": ["-undefined", "dynamic_lookup"],
                 "//conditions:default": [],
-            })
+            }),
         )
         shared_objects.append(shared_object_name)
 
