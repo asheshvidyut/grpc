@@ -35,7 +35,7 @@ BAZEL_REMOTE_CACHE_ARGS=(
   # Enable uploading to remote cache. Requires the "roles/remotebuildexecution.actionCacheWriter" permission.
   --remote_upload_local_results=true
   # allow invalidating the old cache by setting to a new random key
-  --remote_default_exec_properties="grpc_cache_silo_key1=7fe4c329-63ef-4062-bb18-38b9a5e89719"
+  --remote_default_exec_properties="grpc_cache_silo_key1=99999999-63ef-4062-bb18-38b9a5e89719"
   # make sure we only get cache hits from binaries built on exact same macos image
   --remote_default_exec_properties="grpc_cache_silo_key2=${KOKORO_IMAGE_VERSION}"
 )
@@ -56,6 +56,22 @@ python3 -m pip install -r requirements.bazel.lock
 TEST_TARGETS="//src/python/..."
 BAZEL_FLAGS="--test_output=errors --config=python"
 
+echo "=== Debugging Python Version and Paths ==="
+echo "System Python Version:"
+python3 --version
+echo "Bazel Python Runtime Version:"
+python3 tools/run_tests/python_utils/bazel_report_helper.py --report_path python_bazel_python_version
+python_bazel_python_version/bazel_wrapper \
+  --output_base=.bazel_rbe \
+  --bazelrc=tools/remote_build/mac.bazelrc \
+  run \
+  --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
+  "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
+  ${BAZEL_FLAGS} \
+  -- \
+  @python_versions//3.14:python -- --version || true
+echo "=========================================="
+
 python3 tools/run_tests/python_utils/bazel_report_helper.py --report_path python_bazel_tests
 # Run standard Python Bazel tests
 python_bazel_tests/bazel_wrapper \
@@ -67,6 +83,10 @@ python_bazel_tests/bazel_wrapper \
   ${BAZEL_FLAGS} \
   -- \
   ${TEST_TARGETS}
+
+echo "=== Inspecting cygrpc.so linkages with otool ==="
+otool -L .bazel_rbe/execroot/_main/bazel-out/darwin_arm64-fastbuild/bin/src/python/grpcio/grpc/_cython/cygrpc.so || true
+echo "================================================"
 
 python3 tools/run_tests/python_utils/bazel_report_helper.py --report_path python_bazel_tests_single_threaded_unary_streams
 # Run single-threaded unary stream tests
