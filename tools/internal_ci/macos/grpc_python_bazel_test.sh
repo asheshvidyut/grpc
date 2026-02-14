@@ -43,7 +43,7 @@ BAZEL_REMOTE_CACHE_ARGS=(
   # Enable uploading to remote cache. Requires the "roles/remotebuildexecution.actionCacheWriter" permission.
   --remote_upload_local_results=true
   # allow invalidating the old cache by setting to a new random key
-  --remote_default_exec_properties="grpc_cache_silo_key1=83d8e488-1ca9-40fd-929e-d37d13529c99"
+  --remote_default_exec_properties="grpc_cache_silo_key1=7fe4c329-63ef-4062-bb18-38b9a5e89719"
   # make sure we only get cache hits from binaries built on exact same macos image
   --remote_default_exec_properties="grpc_cache_silo_key2=${KOKORO_IMAGE_VERSION}"
 )
