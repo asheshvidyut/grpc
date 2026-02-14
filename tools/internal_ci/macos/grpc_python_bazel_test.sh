@@ -22,7 +22,17 @@ source $(dirname $0)/../../../tools/internal_ci/helper_scripts/move_src_tree_and
 cd $(dirname $0)/../../..
 
 source tools/internal_ci/helper_scripts/prepare_build_macos_rc
-export PYTHON3_BIN_PATH=/usr/local/bin/python3.14
+
+# Find the highest available python3 version installed by prepare_build_macos_rc
+# to ensure Bazel uses the correct hermetic C-API headers when building Cython.
+for v in 15 14 13 12 11 10 9; do
+  if [ -x "/usr/local/bin/python3.$v" ]; then
+    export PYTHON3_BIN_PATH="python3.$v"
+    # Ensure /usr/local/bin is in PATH so repository_ctx.which can find it
+    export PATH="/usr/local/bin:$PATH"
+    break
+  fi
+done
 # make sure bazel is available
 tools/bazel version
 
