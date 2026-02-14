@@ -34,9 +34,7 @@ KOKORO_IMAGE_VERSION="$(cat /VERSION)"
 BAZEL_REMOTE_CACHE_ARGS=(
   # Enable uploading to remote cache. Requires the "roles/remotebuildexecution.actionCacheWriter" permission.
   --remote_upload_local_results=true
-  # allow invalidating the old cache by setting to a new random key
-  --remote_default_exec_properties="grpc_cache_silo_key1=99999999-63ef-4062-bb18-38b9a5e89719"
-  # make sure we only get cache hits from binaries built on exact same macos image
+  --remote_default_exec_properties="grpc_cache_silo_key1=${KOKORO_IMAGE_VERSION}"
   --remote_default_exec_properties="grpc_cache_silo_key2=${KOKORO_IMAGE_VERSION}"
 )
 
@@ -52,26 +50,28 @@ BAZEL_REMOTE_CACHE_ARGS=(
 # TODO(asheshvidyut): figure out proper fix instead of workaround below
 python3 -m pip install -r requirements.bazel.lock
 
-# Test targets mirrored from tools/internal_ci/linux/grpc_python_bazel_test_in_docker.sh
+# Test targets mirrored from tools/internal_ci/linux/grpc_python_bazel_t
+# Find the exact path of the python binary to use (macOS environment has different paths for intel/arm)
+# We prioritize pyenv paths first, then standard paths
+PYTHON3_BIN_PATH="$(command -v python3.14 || command -v python3.13 || command -v python3.12 || command -v python3.11 || command -v python3.10 || command -v python3.9 || pyenv which pythonA3 2> /dev/null || which python3)"
+
+# If Bazel is using python toolchains, we need to make sure the environment python
+# matches the highest required version (3.14) to avoid missing standard libraries.
+export PATH="$(dirname "$PYTHON3_BIN_PATH"):$PATH"
+
+# Install Python requirements
+python3 -m pip install -r requirements.bazel.lock || true
+
 TEST_TARGETS="//src/python/..."
 BAZEL_FLAGS="--test_output=errors --config=python"
 
-echo "=== Debugging Python Version and Paths ==="
-echo "System Python Version:"
+echo "=== System Python Version ==="
 python3 --version
-echo "Bazel Python Runtime Version:"
-python3 tools/run_tests/python_utils/bazel_report_helper.py --report_path python_bazel_python_version
-python_bazel_python_version/bazel_wrapper \
-  --output_base=.bazel_rbe \
-  --bazelrc=tools/remote_build/mac.bazelrc \
-  run \
-  --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
-  "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
-  ${BAZEL_FLAGS} \
-  -- \
-  @python_versions//3.14:python -- --version || true
-echo "=========================================="
+echo "=== Python Binary Path ==="
+echo "${PYTHON3_BIN_PATH}"
+echo "============================="
 
+# Test all the python tests.
 python3 tools/run_tests/python_utils/bazel_report_helper.py --report_path python_bazel_tests
 # Run standard Python Bazel tests
 python_bazel_tests/bazel_wrapper \
@@ -82,11 +82,7 @@ python_bazel_tests/bazel_wrapper \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   ${BAZEL_FLAGS} \
   -- \
-  ${TEST_TARGETS}
-
-echo "=== Inspecting cygrpc.so linkages with otool ==="
-otool -L .bazel_rbe/execroot/_main/bazel-out/darwin_arm64-fastbuild/bin/src/python/grpcio/grpc/_cython/cygrpc.so || true
-echo "================================================"
+  ${TEST_TARGETS} || FAILED="true"
 
 python3 tools/run_tests/python_utils/bazel_report_helper.py --report_path python_bazel_tests_single_threaded_unary_streams
 # Run single-threaded unary stream tests
@@ -128,3 +124,4 @@ python_bazel_tests_fork_support/bazel_wrapper \
   --runs_per_test=16 \
   ${BAZEL_FLAGS} \
   //src/python/grpcio_tests/tests/fork:fork_test
+
