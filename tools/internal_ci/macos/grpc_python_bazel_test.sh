@@ -22,7 +22,7 @@ source $(dirname $0)/../../../tools/internal_ci/helper_scripts/move_src_tree_and
 cd $(dirname $0)/../../..
 
 source tools/internal_ci/helper_scripts/prepare_build_macos_rc
-
+export PYTHON3_BIN_PATH=/usr/local/bin/python3.14
 # make sure bazel is available
 tools/bazel version
 
