@@ -23,7 +23,6 @@ cd $(dirname $0)/../../..
 
 source tools/internal_ci/helper_scripts/prepare_build_macos_rc
 
-
 # make sure bazel is available
 tools/bazel version
 
