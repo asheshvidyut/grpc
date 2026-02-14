@@ -26,10 +26,8 @@ source tools/internal_ci/helper_scripts/prepare_build_macos_rc
 # Find the highest available python3 version installed by prepare_build_macos_rc
 # to ensure Bazel uses the correct hermetic C-API headers when building Cython.
 for v in 15 14 13 12 11 10 9; do
-  if [ -x "/usr/local/bin/python3.$v" ]; then
+  if command -v "python3.$v" &> /dev/null; then
     export PYTHON3_BIN_PATH="python3.$v"
-    # Ensure /usr/local/bin is in PATH so repository_ctx.which can find it
-    export PATH="/usr/local/bin:$PATH"
     break
   fi
 done
