@@ -19,10 +19,13 @@ import functools
 import itertools
 import logging
 import os
-import unittest
 import sys
+import unittest
 
-print(f"\n\n---> BAZEL PYTHON EXECUTABLE: {sys.executable} <--- \n\n", file=sys.stderr)
+print(
+    f"\n\n---> BAZEL PYTHON EXECUTABLE: {sys.executable} <--- \n\n",
+    file=sys.stderr,
+)
 
 import grpc
 from grpc import _grpcio_metadata
