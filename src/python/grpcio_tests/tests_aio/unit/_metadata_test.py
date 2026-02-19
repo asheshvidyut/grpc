@@ -14,11 +14,11 @@
 """Tests for the metadata abstraction that's used in the asynchronous driver."""
 import logging
 import unittest
-import typeguard
 
 import grpc
 from grpc.experimental import aio
 from grpc.experimental.aio import Metadata
+import typeguard
 
 from tests_aio.unit import _common
 from tests_aio.unit._test_base import AioTestBase
@@ -207,13 +207,13 @@ class TestTypeMetadata(unittest.TestCase):
     @typeguard.suppress_type_checks
     def test_metadata_from_tuple_non_tuple(self):
         scenarios = (
-          (None, Metadata()),
-          (Metadata(), Metadata()),
-          (Metadata(*self._DEFAULT_DATA), Metadata(*self._DEFAULT_DATA)),
+            (None, Metadata()),
+            (Metadata(), Metadata()),
+            (Metadata(*self._DEFAULT_DATA), Metadata(*self._DEFAULT_DATA)),
         )
         for source, expected in scenarios:
-          with self.subTest(raw_metadata=source, expected=expected):
-            self.assertEqual(expected, Metadata.from_tuple(source))
+            with self.subTest(raw_metadata=source, expected=expected):
+                self.assertEqual(expected, Metadata.from_tuple(source))
 
     def test_create(self):
         # 1. raw_metadata is None
