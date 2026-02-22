@@ -76,30 +76,14 @@ def decode(b: AnyStr) -> str:
     return b
 
 
-def _transform(
-    message: Any,
-    transformer: Union[SerializingFunction, DeserializingFunction, None],
-    exception_message: str,
-) -> Any:
-    if transformer is None:
-        return message
-    try:
-        return transformer(message)
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception(exception_message)
-        return None
-
-
 def serialize(message: Any, serializer: Optional[SerializingFunction]) -> bytes:
-    return _transform(message, serializer, "Exception serializing message!")
+    return cygrpc.common_serialize(message, serializer)
 
 
 def deserialize(
     serialized_message: bytes, deserializer: Optional[DeserializingFunction]
 ) -> Any:
-    return _transform(
-        serialized_message, deserializer, "Exception deserializing message!"
-    )
+    return cygrpc.common_deserialize(serialized_message, deserializer)
 
 
 def fully_qualified_method(group: str, method: str) -> str:

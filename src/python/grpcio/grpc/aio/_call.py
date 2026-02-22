@@ -212,7 +212,10 @@ class Call:
     ) -> None:
         self._loop = loop
         self._cython_call = cython_call
-        self._metadata = tuple(metadata)
+        if metadata:
+            self._metadata = tuple(metadata)
+        else:
+            self._metadata = ()
         self._request_serializer = request_serializer
         self._response_deserializer = response_deserializer
 

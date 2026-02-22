@@ -271,3 +271,21 @@ def raise_if_not_valid_trailing_metadata(object metadata):
             raise TypeError(f'Invalid trailing metadata type, expected {TYPE_METADATA_STRING}: {metadata}')
         if not isinstance(item[1], str) and not isinstance(item[1], bytes):
             raise TypeError(f'Invalid trailing metadata type, expected {TYPE_METADATA_STRING}: {metadata}')
+
+def common_serialize(object message, object serializer):
+    if serializer is None:
+        return message
+    try:
+        return serializer(message)
+    except Exception:
+        _LOGGER.exception("Exception serializing message!")
+        return None
+
+def common_deserialize(object serialized_message, object deserializer):
+    if deserializer is None:
+        return serialized_message
+    try:
+        return deserializer(serialized_message)
+    except Exception:
+        _LOGGER.exception("Exception deserializing message!")
+        return None
