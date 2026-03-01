@@ -97,10 +97,10 @@ class ExecCtxState {
 
   bool BlockExecCtx() {
     // Assumes there is an active ExecCtx when this function is called.
-    // This is critical because the forking thread MUST have an ExecCtx count of 1
-    // (representing itself). The while loop waits until count_ > UNBLOCKED(1),
-    // ensuring all *other* background threads have drained their ExecCtxs before
-    // proceeding with the fork.
+    // This is critical because the forking thread MUST have an ExecCtx count of
+    // 1 (representing itself). The while loop waits until count_ >
+    // UNBLOCKED(1), ensuring all *other* background threads have drained their
+    // ExecCtxs before proceeding with the fork.
     gpr_mu_lock(&mu_);
     gpr_atm_no_barrier_store(&forking_, 1);
     fork_complete_ = false;
