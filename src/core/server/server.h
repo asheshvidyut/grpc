@@ -56,6 +56,7 @@
 #include "src/core/lib/surface/channel.h"
 #include "src/core/lib/surface/completion_queue.h"
 #include "src/core/lib/transport/transport.h"
+#include "src/core/server/method_lookup.h"
 #include "src/core/server/server_interface.h"
 #include "src/core/telemetry/call_tracer.h"
 #include "src/core/util/cpp_impl_of.h"
@@ -132,8 +133,28 @@ class Server : public ServerInterface,
   // Filter vtable.
   static const grpc_channel_filter kServerTopFilter;
 
-  // Opaque type used for registered methods.
-  struct RegisteredMethod;
+  // Registered methods.
+  struct RegisteredMethod {
+    RegisteredMethod(
+        const char* method_arg, const char* host_arg,
+        grpc_server_register_method_payload_handling payload_handling_arg,
+        uint32_t flags_arg)
+        : method(method_arg == nullptr ? "" : method_arg),
+          host(host_arg == nullptr ? "" : host_arg),
+          payload_handling(payload_handling_arg),
+          flags(flags_arg) {}
+
+    ~RegisteredMethod() = default;
+
+    const std::string method;
+    const std::string host;
+    const grpc_server_register_method_payload_handling payload_handling;
+    const uint32_t flags;
+    uint32_t path_hash = 0;
+    uint8_t path_fingerprint = 0;
+    // One request matcher per method.
+    std::unique_ptr<RequestMatcherInterface> matcher;
+  };
 
   // An object to represent the most relevant characteristics of a
   // newly-allocated call object when using an AllocatingRequestMatcherBatch.
@@ -693,6 +714,10 @@ class Server : public ServerInterface,
                       std::unique_ptr<RegisteredMethod>,
                       StringViewStringViewPairHash, StringViewStringViewPairEq>
       registered_methods_;
+
+  // Optimized method lookup table.
+  MethodLookupTable<RegisteredMethod> method_lookup_table_;
+  bool method_lookup_table_initialized_ = false;
 
   // Request matcher for unregistered methods.
   std::unique_ptr<RequestMatcherInterface> unregistered_request_matcher_;

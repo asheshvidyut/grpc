@@ -462,29 +462,6 @@ class Server::RequestMatcherInterface {
   virtual Server* server() const = 0;
 };
 
-//
-// Server::RegisteredMethod
-//
-
-struct Server::RegisteredMethod {
-  RegisteredMethod(
-      const char* method_arg, const char* host_arg,
-      grpc_server_register_method_payload_handling payload_handling_arg,
-      uint32_t flags_arg)
-      : method(method_arg == nullptr ? "" : method_arg),
-        host(host_arg == nullptr ? "" : host_arg),
-        payload_handling(payload_handling_arg),
-        flags(flags_arg) {}
-
-  ~RegisteredMethod() = default;
-
-  const std::string method;
-  const std::string host;
-  const grpc_server_register_method_payload_handling payload_handling;
-  const uint32_t flags;
-  // One request matcher per method.
-  std::unique_ptr<RequestMatcherInterface> matcher;
-};
 
 //
 // Server::RequestedCall
@@ -1286,7 +1263,9 @@ void Server::Start() {
     if (rm.second->matcher == nullptr) {
       rm.second->matcher = std::make_unique<RealRequestMatcher>(this);
     }
+    method_lookup_table_.Add(rm.second.get());
   }
+  method_lookup_table_initialized_ = true;
   {
     MutexLock lock(&mu_global_);
     starting_ = true;
@@ -1437,7 +1416,11 @@ Server::RegisteredMethod* Server::RegisterMethod(
   auto it = registered_methods_.emplace(
       key, std::make_unique<RegisteredMethod>(method, host, payload_handling,
                                               flags));
-  return it.first->second.get();
+  auto* rm = it.first->second.get();
+  uint64_t h = MethodLookupTable<RegisteredMethod>::FastHash(rm->method);
+  rm->path_hash = static_cast<uint32_t>(h & 0xFFFFFFFF);
+  rm->path_fingerprint = static_cast<uint8_t>((h >> 8) & 0xFF);
+  return rm;
 }
 
 void Server::DoneRequestEvent(void* req, grpc_cq_completion* /*c*/) {
@@ -1773,6 +1756,10 @@ void Server::ChannelData::InitTransport(RefCountedPtr<Server> server,
 Server::RegisteredMethod* Server::GetRegisteredMethod(
     const absl::string_view& host, const absl::string_view& path) {
   if (registered_methods_.empty()) return nullptr;
+  if (method_lookup_table_initialized_) {
+    return const_cast<RegisteredMethod*>(
+        method_lookup_table_.Find(host, path));
+  }
   // check for an exact match with host
   auto it = registered_methods_.find(std::pair(host, path));
   if (it != registered_methods_.end()) {
