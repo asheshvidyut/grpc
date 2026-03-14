@@ -257,7 +257,7 @@ def try_cythonize(extensions, linetracing=False, mandatory=True):
         cython_compiler_directives["linetrace"] = True
     return Cython.Build.cythonize(
         extensions,
-        nthreads= nthreads,
+        nthreads=nthreads,
         include_path=[
             include_dir
             for extension in extensions
