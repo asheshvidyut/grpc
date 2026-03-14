@@ -27,10 +27,10 @@ import sysconfig
 import tempfile
 import traceback
 
+import _parallel_compile_patch
 from setuptools.command import build_ext
 from setuptools.command import build_py
 import support
-import _parallel_compile_patch
 
 PYTHON_STEM = os.path.dirname(os.path.abspath(__file__))
 GRPC_STEM = os.path.abspath(PYTHON_STEM + "../../../../")
@@ -258,7 +258,7 @@ def try_cythonize(extensions, linetracing=False, mandatory=True):
         cython_compiler_directives["linetrace"] = True
     return Cython.Build.cythonize(
         extensions,
-        nthreads= nthreads,
+        nthreads=nthreads,
         include_path=[
             include_dir
             for extension in extensions
