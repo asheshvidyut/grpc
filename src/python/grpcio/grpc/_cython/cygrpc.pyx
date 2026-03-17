@@ -14,8 +14,8 @@
 # distutils: language=c++
 
 cimport cpython
-
-from cpython.bytes cimport PyBytes_FromStringAndSize, PyBytes_AS_STRING
+from cpython.bytes cimport PyBytes_AS_STRING
+from cpython.bytes cimport PyBytes_FromStringAndSize
 from libc.string cimport memcpy
 
 import logging
