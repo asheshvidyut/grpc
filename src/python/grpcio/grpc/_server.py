@@ -1416,7 +1416,8 @@ def _start(state: _ServerState) -> None:
             _request_registered_call(state, method)
         # Also request a call for non-registered method.
         _request_call(state)
-        thread = threading.Thread(target=_serve, args=(state,))
+        ctx = contextvars.copy_context()
+        thread = threading.Thread(target=ctx.run, args=(_serve, state,))
         thread.daemon = True
         thread.start()
 
