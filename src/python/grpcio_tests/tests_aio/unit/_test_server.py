@@ -141,6 +141,13 @@ class TestServiceServicer(test_pb2_grpc.TestServiceServicer):
                     )
                 else:
                     yield messages_pb2.StreamingOutputCallResponse()
+    async def FullDuplexCallWithDelayedExit(self, request_async_iterator, context):
+        self._append_to_log()
+        await _maybe_echo_metadata(context)
+        async for _ in request_async_iterator:
+            pass  # consume it quickly
+        await asyncio.sleep(5)  # simulate slow return delayed handler exit
+        yield messages_pb2.StreamingOutputCallResponse()
 
 
 def _create_extra_generic_handler(servicer: TestServiceServicer):
@@ -151,6 +158,11 @@ def _create_extra_generic_handler(servicer: TestServiceServicer):
             servicer.UnaryCallWithSleep,
             request_deserializer=messages_pb2.SimpleRequest.FromString,
             response_serializer=messages_pb2.SimpleResponse.SerializeToString,
+        ),
+        "FullDuplexCallWithDelayedExit": grpc.stream_stream_rpc_method_handler(
+            servicer.FullDuplexCallWithDelayedExit,
+            request_deserializer=messages_pb2.StreamingOutputCallRequest.FromString,
+            response_serializer=messages_pb2.StreamingOutputCallResponse.SerializeToString,
         )
     }
     return grpc.method_handlers_generic_handler(

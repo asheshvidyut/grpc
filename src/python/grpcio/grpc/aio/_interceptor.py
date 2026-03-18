@@ -361,12 +361,12 @@ class InterceptedCall:
             return self._interceptors_task.cancel()
 
         try:
-            call = self._interceptors_task.result()
-        except AioRpcError:
-            return False
+            if self._interceptors_task.exception() is not None:
+                return False
         except asyncio.CancelledError:
             return False
 
+        call = self._interceptors_task.result()
         return call.cancel()
 
     def cancelled(self) -> bool:
@@ -374,12 +374,15 @@ class InterceptedCall:
             return False
 
         try:
-            call = self._interceptors_task.result()
-        except AioRpcError as err:
-            return err.code() == grpc.StatusCode.CANCELLED
+            exc = self._interceptors_task.exception()
+            if exc is not None:
+                if isinstance(exc, AioRpcError):
+                    return exc.code() == grpc.StatusCode.CANCELLED
+                return False
         except asyncio.CancelledError:
             return True
 
+        call = self._interceptors_task.result()
         return call.cancelled()
 
     def done(self) -> bool:
@@ -387,10 +390,12 @@ class InterceptedCall:
             return False
 
         try:
-            call = self._interceptors_task.result()
-        except (AioRpcError, asyncio.CancelledError):
+            if self._interceptors_task.exception() is not None:
+                return True
+        except asyncio.CancelledError:
             return True
 
+        call = self._interceptors_task.result()
         return call.done()
 
     def add_done_callback(self, callback: DoneCallbackType) -> None:
@@ -399,11 +404,14 @@ class InterceptedCall:
             return
 
         try:
-            call = self._interceptors_task.result()
-        except (AioRpcError, asyncio.CancelledError):
+            if self._interceptors_task.exception() is not None:
+                callback(self)
+                return
+        except asyncio.CancelledError:
             callback(self)
             return
 
+        call = self._interceptors_task.result()
         if call.done():
             callback(self)
         else:

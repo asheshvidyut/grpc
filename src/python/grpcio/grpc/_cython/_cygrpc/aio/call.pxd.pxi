@@ -19,6 +19,7 @@ cdef class _AioCall(GrpcCallWrapper):
         list _references
         object _deadline
         list _done_callbacks
+        object _status_task
 
         # Caches the picked event loop, so we can avoid the 30ns overhead each
         # time we need access to the event loop.

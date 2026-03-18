@@ -61,6 +61,7 @@ cdef class _AioCall(GrpcCallWrapper):
         self._deadline = deadline
         self._send_initial_metadata_flags = _get_send_initial_metadata_flags(wait_for_ready)
         self._call_tracer_capsule = None
+        self._status_task = None
         self._create_grpc_call(deadline, method, call_credentials)
 
     def __dealloc__(self):
@@ -206,6 +207,8 @@ cdef class _AioCall(GrpcCallWrapper):
         proper state.
         """
         self._is_locally_cancelled = True
+        if self._status_task is not None:
+            self._status_task.cancel()
 
         cdef object details_bytes
         cdef char *c_details
@@ -419,7 +422,7 @@ cdef class _AioCall(GrpcCallWrapper):
         """Implementation of the start of a unary-stream call."""
         # Peer may prematurely end this RPC at any point. We need a coroutine
         # that watches if the server sends the final status.
-        status_task = self._loop.create_task(self._handle_status_once_received())
+        self._status_task = self._loop.create_task(self._handle_status_once_received())
 
         cdef tuple outbound_ops
         cdef Operation initial_metadata_op = SendInitialMetadataOperation(
@@ -452,7 +455,7 @@ cdef class _AioCall(GrpcCallWrapper):
             )
         except ExecuteBatchError as batch_error:
             # Core should explain why this batch failed
-            await status_task
+            await self._status_task
 
     async def stream_unary(self,
                            tuple outbound_initial_metadata,
@@ -525,7 +528,7 @@ cdef class _AioCall(GrpcCallWrapper):
         """
         # Peer may prematurely end this RPC at any point. We need a coroutine
         # that watches if the server sends the final status.
-        status_task = self._loop.create_task(self._handle_status_once_received())
+        self._status_task = self._loop.create_task(self._handle_status_once_received())
 
         if context is not None:
             set_instrumentation_context_on_call_aio(self, context)
@@ -545,7 +548,7 @@ cdef class _AioCall(GrpcCallWrapper):
             )
         except ExecuteBatchError as batch_error:
             # Core should explain why this batch failed
-            await status_task
+            await self._status_task
 
             # Allow upper layer to proceed only if the status is set
             metadata_sent_observer()
