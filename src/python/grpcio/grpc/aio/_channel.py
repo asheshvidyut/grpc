@@ -15,8 +15,8 @@
 
 import asyncio
 import sys
-import weakref
 from typing import Any, Iterable, List, Optional, Sequence
+import weakref
 
 import grpc
 from grpc import _common
