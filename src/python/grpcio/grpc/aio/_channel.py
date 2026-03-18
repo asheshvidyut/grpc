@@ -15,6 +15,7 @@
 
 import asyncio
 import sys
+import weakref
 from typing import Any, Iterable, List, Optional, Sequence
 
 import grpc
@@ -176,6 +177,9 @@ class UnaryUnaryMultiCallable(
                 self._loop,
             )
 
+        if self._references and hasattr(self._references[0], "_register_call"):
+            self._references[0]._register_call(call)
+
         return call
 
 
@@ -222,6 +226,9 @@ class UnaryStreamMultiCallable(
                 self._loop,
             )
 
+        if self._references and hasattr(self._references[0], "_register_call"):
+            self._references[0]._register_call(call)
+
         return call
 
 
@@ -266,6 +273,9 @@ class StreamUnaryMultiCallable(
                 self._response_deserializer,
                 self._loop,
             )
+
+        if self._references and hasattr(self._references[0], "_register_call"):
+            self._references[0]._register_call(call)
 
         return call
 
@@ -312,6 +322,9 @@ class StreamStreamMultiCallable(
                 self._loop,
             )
 
+        if self._references and hasattr(self._references[0], "_register_call"):
+            self._references[0]._register_call(call)
+
         return call
 
 
@@ -322,6 +335,7 @@ class Channel(_base_channel.Channel):
     _unary_stream_interceptors: List[UnaryStreamClientInterceptor]
     _stream_unary_interceptors: List[StreamUnaryClientInterceptor]
     _stream_stream_interceptors: List[StreamStreamClientInterceptor]
+    _calls: weakref.WeakSet
 
     def __init__(
         self,
@@ -346,6 +360,7 @@ class Channel(_base_channel.Channel):
         self._unary_stream_interceptors = []
         self._stream_unary_interceptors = []
         self._stream_stream_interceptors = []
+        self._calls = weakref.WeakSet()
 
         if interceptors is not None:
             for interceptor in interceptors:
@@ -376,6 +391,9 @@ class Channel(_base_channel.Channel):
 
     async def __aenter__(self):
         return self
+
+    def _register_call(self, call: _base_call.Call) -> None:
+        self._calls.add(call)
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._close(None)
@@ -439,6 +457,11 @@ class Channel(_base_channel.Channel):
 
                 calls.append(candidate)
                 call_tasks.append(task)
+
+        # Gather any remaining tracked calls that are not associated with a task
+        for call in list(self._calls):
+            if not call.done() and call not in calls:
+                calls.append(call)
 
         # If needed, try to wait for them to finish.
         # Call objects are not always awaitables.
