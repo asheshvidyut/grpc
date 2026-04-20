@@ -82,7 +82,10 @@ def _commandfile_spawn(self, command, **kwargs):
             elif arg.startswith("/Fo") and source_file:
                 real_fo_path = arg[3:]
                 predictable_fo_path = os.path.abspath(
-                    os.path.join(".ccache_temp", os.path.splitext(source_file)[0] + ".obj")
+                    os.path.join(
+                        ".ccache_temp",
+                        os.path.splitext(source_file)[0] + ".obj",
+                    )
                 )
                 new_command.append("/Fo" + predictable_fo_path)
             else:
