@@ -265,7 +265,10 @@ def _get_initial_metadata_operation(
 
 
 def _abort(
-    state: _RPCState, call: cygrpc.Call, code: cygrpc.StatusCodeType, details: bytes
+    state: _RPCState,
+    call: cygrpc.Call,
+    code: cygrpc.StatusCodeType,
+    details: bytes,
 ) -> None:
     if state.client is not _CANCELLED:
         effective_code = _abortion_code(state, code)
