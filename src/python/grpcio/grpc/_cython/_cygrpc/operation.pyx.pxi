@@ -179,48 +179,14 @@ cdef class ReceiveMessageOperation(Operation):
     if self._c_message_byte_buffer != NULL:
       message_reader_status = grpc_byte_buffer_reader_init(
           &message_reader, self._c_message_byte_buffer)
+
       if message_reader_status:
-        # Peek-ahead pattern: read the first slice, then check if there's a
-        # second. Most gRPC messages fit in a single slice, so this avoids
-        # list.append() / len() / indexing overhead on the hot path by
-        # assigning the memoryview directly to self._message.
-        has_next = grpc_byte_buffer_reader_next(&message_reader, &message_slice)
-        if has_next:
-          first_slice = message_slice
-          has_next = grpc_byte_buffer_reader_next(&message_reader, &message_slice)
-          if not has_next:
-            message_slice_length = grpc_slice_length(first_slice)
-            if message_slice_length > 0:
-              view = GrpcSliceView()
-              view.set_slice(first_slice)
-              self._message = memoryview(view)
-            else:
-              self._message = b''
-            grpc_slice_unref(first_slice)
-          else:
-            view = GrpcSliceView()
-            view.set_slice(first_slice)
-            chunks.append(memoryview(view))
-            grpc_slice_unref(first_slice)
-            
-            view = GrpcSliceView()
-            view.set_slice(message_slice)
-            chunks.append(memoryview(view))
-            grpc_slice_unref(message_slice)
-            
-            while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
-              view = GrpcSliceView()
-              view.set_slice(message_slice)
-              chunks.append(memoryview(view))
-              grpc_slice_unref(message_slice)
-            
-            self._message = chunks
-        else:
-          self._message = b''
-        
-        grpc_byte_buffer_reader_destroy(&message_reader)
-      else:
-        self._message = None
+        while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
+          view = GrpcSliceView()
+          view.set_slice(message_slice)
+          chunks.append(memoryview(view))
+          grpc_slice_unref(message_slice)
+        self._message = chunks
       grpc_byte_buffer_destroy(self._c_message_byte_buffer)
     else:
       self._message = None

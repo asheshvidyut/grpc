@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module external.system.id="Blaze" type="BLAZE_CPP_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$/../../..">
+      <sourceFolder url="file://$MODULE_DIR$/../../.." isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../../.bazel_rbe/execroot/com_github_grpc_grpc/src/python/grpcio" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../../.bazel_rbe/execroot/com_github_grpc_grpc/src/python/grpcio_tests" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../../py_xds_protos/envoy/extensions/load_balancing_policies" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/../.." />
+      <excludeFolder url="file://$MODULE_DIR$/../../../bazel-bin" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../bazel-genfiles" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../bazel-grpc" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../bazel-out" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../bazel-testlogs" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../bins" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../libs" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../objs" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../src/python/grpcio_observability/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../src/python/grpcio_observability/grpc_root" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../src/python/grpcio_observability/third_party" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../src/python/grpcio_tests/src" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../test/bzlmod" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../test/distrib/bazel/cpp" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../test/distrib/bazel/python" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../test/distrib/bazel/python_second_test_repo" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/abseil-cpp" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/benchmark" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/bloaty" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/boringssl" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/boringssl-with-bazel" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/envoy-api" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/googleapis" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/googletest" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/opencensus-proto" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/opentelemetry-cpp" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/protobuf" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/protoc-gen-validate" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/re2" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/upb" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/utf8_range" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../third_party/xds" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../tools/artifact_gen" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../tools/distrib/python/grpcio_tools/build" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../tools/distrib/python/grpcio_tools/grpc_plugin" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../tools/distrib/python/grpcio_tools/grpc_root" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../tools/distrib/python/grpcio_tools/protobuf" />
+      <excludeFolder url="file://$MODULE_DIR$/../../../tools/distrib/python/grpcio_tools/third_party" />
+      <excludePattern pattern="bazel-bin" />
+      <excludePattern pattern="bazel-genfiles" />
+      <excludePattern pattern="bazel-out" />
+      <excludePattern pattern="bazel-testlogs" />
+      <excludePattern pattern="bazel-grpc" />
+      <excludePattern pattern=".clwb" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
