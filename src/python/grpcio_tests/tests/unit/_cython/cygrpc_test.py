@@ -417,6 +417,7 @@ class ServerClientMixin:
         del client_call
         del server_call
 
+
 class InsecureServerInsecureClient(unittest.TestCase, ServerClientMixin):
     def setUp(self):
         self.setUpMixin(None, None, None)
