@@ -99,8 +99,6 @@ def deserialize(
 ) -> Any:
     if isinstance(serialized_message, list):
         serialized_message = b"".join(serialized_message)
-    elif isinstance(serialized_message, memoryview):
-        serialized_message = bytes(serialized_message)
     return _transform(
         serialized_message, deserializer, "Exception deserializing message!"
     )
