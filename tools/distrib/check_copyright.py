@@ -313,13 +313,19 @@ def check_file(filename):
         text = load(filename)
     except:
         return True, messages
-    
+
     ok = True
     m = re.search(re_license, text)
     if m:
         pass
     elif enforce_cpp_style_comment:
-        messages.append((1, "copyright missing or does not use cpp-style copyright header", filename))
+        messages.append(
+            (
+                1,
+                "copyright missing or does not use cpp-style copyright header",
+                filename,
+            )
+        )
         if args.fix:
             # Attempt fix: search for c-style copyright header and replace it
             # with cpp-style copyright header. If that doesn't work
@@ -336,7 +342,8 @@ def check_file(filename):
         ok = False
     return ok, messages
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # scan files, validate the text
     ok = True
     filename_list = []
