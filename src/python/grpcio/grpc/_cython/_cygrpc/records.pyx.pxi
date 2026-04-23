@@ -59,27 +59,46 @@ class WriteFlag:
   buffer_hint = GRPC_WRITE_BUFFER_HINT
   no_compress = GRPC_WRITE_NO_COMPRESS
 
-StatusCodeType: TypeAlias = int
+
+StatusCodeType = Literal[
+    GRPC_STATUS_OK,
+    GRPC_STATUS_CANCELLED,
+    GRPC_STATUS_UNKNOWN,
+    GRPC_STATUS_INVALID_ARGUMENT,
+    GRPC_STATUS_DEADLINE_EXCEEDED,
+    GRPC_STATUS_NOT_FOUND,
+    GRPC_STATUS_ALREADY_EXISTS,
+    GRPC_STATUS_PERMISSION_DENIED,
+    GRPC_STATUS_UNAUTHENTICATED,
+    GRPC_STATUS_RESOURCE_EXHAUSTED,
+    GRPC_STATUS_FAILED_PRECONDITION,
+    GRPC_STATUS_ABORTED,
+    GRPC_STATUS_OUT_OF_RANGE,
+    GRPC_STATUS_UNIMPLEMENTED,
+    GRPC_STATUS_INTERNAL,
+    GRPC_STATUS_UNAVAILABLE,
+    GRPC_STATUS_DATA_LOSS,
+]
+
 
 class StatusCode:
-  ok: StatusCodeType = GRPC_STATUS_OK
-  cancelled: StatusCodeType = GRPC_STATUS_CANCELLED
-  unknown: StatusCodeType = GRPC_STATUS_UNKNOWN
-  invalid_argument: StatusCodeType = GRPC_STATUS_INVALID_ARGUMENT
-  deadline_exceeded: StatusCodeType = GRPC_STATUS_DEADLINE_EXCEEDED
-  not_found: StatusCodeType = GRPC_STATUS_NOT_FOUND
-  already_exists: StatusCodeType = GRPC_STATUS_ALREADY_EXISTS
-  permission_denied: StatusCodeType = GRPC_STATUS_PERMISSION_DENIED
-  unauthenticated: StatusCodeType = GRPC_STATUS_UNAUTHENTICATED
-  resource_exhausted: StatusCodeType = GRPC_STATUS_RESOURCE_EXHAUSTED
-  failed_precondition: StatusCodeType = GRPC_STATUS_FAILED_PRECONDITION
-  aborted: StatusCodeType = GRPC_STATUS_ABORTED
-  out_of_range: StatusCodeType = GRPC_STATUS_OUT_OF_RANGE
-  unimplemented: StatusCodeType = GRPC_STATUS_UNIMPLEMENTED
-  internal: StatusCodeType = GRPC_STATUS_INTERNAL
-  unavailable: StatusCodeType = GRPC_STATUS_UNAVAILABLE
-  data_loss: StatusCodeType = GRPC_STATUS_DATA_LOSS
-
+  ok = GRPC_STATUS_OK
+  cancelled = GRPC_STATUS_CANCELLED
+  unknown = GRPC_STATUS_UNKNOWN
+  invalid_argument = GRPC_STATUS_INVALID_ARGUMENT
+  deadline_exceeded = GRPC_STATUS_DEADLINE_EXCEEDED
+  not_found = GRPC_STATUS_NOT_FOUND
+  already_exists = GRPC_STATUS_ALREADY_EXISTS
+  permission_denied = GRPC_STATUS_PERMISSION_DENIED
+  unauthenticated = GRPC_STATUS_UNAUTHENTICATED
+  resource_exhausted = GRPC_STATUS_RESOURCE_EXHAUSTED
+  failed_precondition = GRPC_STATUS_FAILED_PRECONDITION
+  aborted = GRPC_STATUS_ABORTED
+  out_of_range = GRPC_STATUS_OUT_OF_RANGE
+  unimplemented = GRPC_STATUS_UNIMPLEMENTED
+  internal = GRPC_STATUS_INTERNAL
+  unavailable = GRPC_STATUS_UNAVAILABLE
+  data_loss = GRPC_STATUS_DATA_LOSS
 
 class CallError:
   ok = GRPC_CALL_OK
