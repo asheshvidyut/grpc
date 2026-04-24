@@ -48,11 +48,12 @@ py_binary(
 
 py_binary(
     name = "benchmark_script_simple",
-    srcs = ["benchmark_script_simple.py"],
+    srcs = ["benchmark_script_simple.py", "helloworld_pb2.py"],
     imports = ["../../../"],
     python_version = "PY3",
     deps = [
         "//src/python/grpcio/grpc:grpcio",
+        "@com_google_protobuf//:protobuf_python",
     ],
 )
 
