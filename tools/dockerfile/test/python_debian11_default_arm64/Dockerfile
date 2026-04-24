@@ -75,9 +75,6 @@ RUN apt-get update && apt-get install -y libsqlite3-dev
 RUN python3 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
 
 
-# TODO(sergiitk):  Should we updating gcp_api_libraries.include instead?
-RUN python3.10 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
-
 #=================
 # Install cmake
 # Note that this step should be only used for distributions that have new enough cmake to satisfy gRPC's cmake version requirement.
