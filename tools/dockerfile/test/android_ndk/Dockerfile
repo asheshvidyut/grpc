@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:11
+FROM python:3.10-bullseye
 
 #=================
 # Basic C core dependencies
@@ -62,28 +62,6 @@ RUN git config --global --add safe.directory '*'
 RUN git config --global protocol.file.allow always
 
 
-#=================
-# Compile CPython 3.10.3 from source
-
-RUN apt-get update && apt-get install -y zlib1g-dev libssl-dev libsqlite3-dev && apt-get clean
-RUN apt-get update && apt-get install -y jq build-essential libffi-dev && apt-get clean
-
-RUN cd /tmp && \
-    wget -q https://www.python.org/ftp/python/3.10.3/Python-3.10.3.tgz && \
-    tar xzvf Python-3.10.3.tgz && \
-    cd Python-3.10.3 && \
-    ./configure && \
-    make -j4 && \
-    make install
-
-RUN cd /tmp && \
-    echo "f276ffcd05bccafe46da023d0a5bb04a Python-3.10.3.tgz" > checksum.md5 && \
-    md5sum -c checksum.md5
-
-RUN python3.10 -m ensurepip && \
-    python3.10 -m pip install coverage
-
-ENV PATH="/usr/local/bin:${PATH}"
 #====================
 # run_tests.py python dependencies
 
@@ -104,9 +82,10 @@ RUN python3 -m pip install --upgrade pip==19.3.1
 # but since our python2 usage is deprecated, we should get rid of it.
 RUN python3 -m pip install six==1.16.0
 
+
 # Google Cloud Platform API libraries
 # These are needed for uploading test results to BigQuery (e.g. by tools/run_tests scripts)
-RUN python3.10 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
+RUN python3 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
 
 
 #=================

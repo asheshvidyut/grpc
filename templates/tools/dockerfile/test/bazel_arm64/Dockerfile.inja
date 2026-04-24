@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM arm64v8/debian:11
+FROM arm64v8/python:3.10-bullseye
 
 {% include "../../apt_get_basic.include" %}
-{% include "../../compile_python_310.include" %}
-ENV PATH="/usr/local/bin:${PATH}"
 {% include "../../run_tests_python_deps.include" %}
 {% include "../../cxx_deps.include" %}
 

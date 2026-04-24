@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:11
+FROM python:3.10-bullseye
 
 {% include "../../apt_get_basic.include" %}
-{% include "../../compile_python_310.include" %}
-ENV PATH="/usr/local/bin:${PATH}"
 {% include "../../run_tests_python_deps.include" %}
 {% include "../../cmake.include" %}
 {% include "../../run_tests_addons.include" %}
