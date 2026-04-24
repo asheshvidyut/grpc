@@ -17,6 +17,7 @@ import sys
 import time
 
 import grpc
+
 from tests.unit._cython import helloworld_pb2 as helloworld__pb2
 
 _METHOD = "/test.Benchmark/PingPong"
@@ -71,7 +72,7 @@ async def run_benchmark(port, payload_size, iterations):
         response_deserializer=lambda x: x,
     )
 
-    message = helloworld__pb2.HelloRequest(name='x' * payload_size)
+    message = helloworld__pb2.HelloRequest(name="x" * payload_size)
     payload = message.SerializeToString()
 
     print(f"Payload size: {payload_size / 1024:.2f} KB")
@@ -100,7 +101,9 @@ async def main():
     port = 50052
     server = await run_server(port)
     try:
-        await run_benchmark(port, payload_size=100 * 1024 * 1024, iterations=100)
+        await run_benchmark(
+            port, payload_size=100 * 1024 * 1024, iterations=100
+        )
     finally:
         await server.stop(0)
 

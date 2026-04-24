@@ -48,7 +48,10 @@ py_binary(
 
 py_binary(
     name = "benchmark_script_simple",
-    srcs = ["benchmark_script_simple.py", "helloworld_pb2.py"],
+    srcs = [
+        "benchmark_script_simple.py",
+        "helloworld_pb2.py",
+    ],
     imports = ["../../../"],
     python_version = "PY3",
     deps = [
