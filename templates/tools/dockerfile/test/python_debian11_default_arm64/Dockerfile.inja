@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM arm64v8/debian:11
+FROM arm64v8/python:3.10-bullseye
 
 {% include "../../apt_get_basic.include" %}
 {% include "../../run_tests_addons.include" %}
@@ -20,9 +20,6 @@ FROM arm64v8/debian:11
 # Python test coverage requires libsqlite3, and it have
 # to be installed before Python.
 RUN apt-get update && apt-get install -y libsqlite3-dev
-
-{% include "../../compile_python_310.include" %}
-ENV PATH="/usr/local/bin:${PATH}"
 
 # TODO(sergiitk):  Should we updating gcp_api_libraries.include instead?
 RUN python3.10 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
