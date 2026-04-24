@@ -21,5 +21,4 @@ RUN python3 -m pip install --break-system-packages --upgrade pip==19.3.1
 # but since our python2 usage is deprecated, we should get rid of it.
 RUN python3 -m pip install six==1.16.0
 
-
 {% include "./gcp_api_libraries.include" %}
