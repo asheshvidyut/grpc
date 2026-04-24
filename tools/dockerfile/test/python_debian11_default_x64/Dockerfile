@@ -180,6 +180,9 @@ RUN python3.14 -m ensurepip && \
 # to be installed before Python.
 RUN apt-get update && apt-get install -y libsqlite3-dev
 
+# Create python3 symlink pointing to python3.10
+RUN ln -sf /usr/local/bin/python3.10 /usr/local/bin/python3
+
 # for Python test coverage reporting
 RUN python3.10 -m pip install coverage
 
