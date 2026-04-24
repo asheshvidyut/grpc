@@ -50,7 +50,6 @@ RUN python3 -m pip install --break-system-packages --upgrade pip==19.3.1
 # but since our python2 usage is deprecated, we should get rid of it.
 RUN python3 -m pip install six==1.16.0
 
-
 # Google Cloud Platform API libraries
 # These are needed for uploading test results to BigQuery (e.g. by tools/run_tests scripts)
 RUN python3 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
