@@ -38,10 +38,7 @@ cdef object deserialize(object deserializer, object raw_message):
 
     Failure to deserialize is a fatal error.
     """
-    if isinstance(raw_message, list):
-        raw_message = b"".join(raw_message)
-    elif isinstance(raw_message, memoryview):
-        raw_message = bytes(raw_message)
+    raw_message = b"".join(raw_message)
 
     if deserializer:
         return deserializer(raw_message)
