@@ -12,23 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from concurrent import futures
+import asyncio
 import sys
 import time
 
 import grpc
 
+from tests.unit._cython import helloworld_pb2 as helloworld__pb2
+
 _METHOD = "/test.Benchmark/PingPong"
 
 
-def run_server(port):
+async def run_server(port):
     options = [
-        ("grpc.max_send_message_length", 60 * 1024 * 1024),
-        ("grpc.max_receive_message_length", 60 * 1024 * 1024),
+        ("grpc.max_send_message_length", 160 * 1024 * 1024),
+        ("grpc.max_receive_message_length", 160 * 1024 * 1024),
     ]
-    server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=1), options=options
-    )
+    server = grpc.aio.server(options=options)
 
     class GenericHandler(grpc.GenericRpcHandler):
         def __init__(self):
@@ -37,7 +37,7 @@ def run_server(port):
         def service(self, handler_call_details):
             if handler_call_details.method == _METHOD:
 
-                def handler(req, ctx):
+                async def handler(req, ctx):
                     if not self.printed:
                         print(f"Server received type: {type(req)}")
                         if isinstance(req, list):
@@ -49,40 +49,43 @@ def run_server(port):
 
                 return grpc.unary_unary_rpc_method_handler(
                     handler,
+                    request_deserializer=helloworld__pb2.HelloRequest.FromString,
+                    response_serializer=lambda x: x,
                 )
             return None
 
     server.add_generic_rpc_handlers((GenericHandler(),))
     server.add_insecure_port(f"[::]:{port}")
-    server.start()
+    await server.start()
     return server
 
 
-def run_benchmark(port, payload_size, iterations):
+async def run_benchmark(port, payload_size, iterations):
     options = [
-        ("grpc.max_send_message_length", 60 * 1024 * 1024),
-        ("grpc.max_receive_message_length", 60 * 1024 * 1024),
+        ("grpc.max_send_message_length", 160 * 1024 * 1024),
+        ("grpc.max_receive_message_length", 160 * 1024 * 1024),
     ]
-    channel = grpc.insecure_channel(f"localhost:{port}", options=options)
+    channel = grpc.aio.insecure_channel(f"localhost:{port}", options=options)
     stub = channel.unary_unary(
         _METHOD,
+        request_serializer=lambda x: x,
+        response_deserializer=lambda x: x,
     )
 
-    payload = b"x" * payload_size
+    message = helloworld__pb2.HelloRequest(name="x" * payload_size)
+    payload = message.SerializeToString()
 
     print(f"Payload size: {payload_size / 1024:.2f} KB")
     print(f"Iterations: {iterations}")
 
     # Warmup
     for _ in range(5):
-        stub(payload)
+        await stub(payload)
 
     start_time = time.time()
     for _ in range(iterations):
-        response = stub(payload)
+        response = await stub(payload)
         assert response == b"OK", f"Expected b'OK', got {response}"
-        if _ == 0:
-            print(f"Response type: {type(response)}")
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -91,13 +94,19 @@ def run_benchmark(port, payload_size, iterations):
         f"Throughput: {payload_size * iterations / (1024*1024) / total_time:.2f} MB/s"
     )
 
-    channel.close()
+    await channel.close()
+
+
+async def main():
+    port = 50052
+    server = await run_server(port)
+    try:
+        await run_benchmark(
+            port, payload_size=100 * 1024 * 1024, iterations=100
+        )
+    finally:
+        await server.stop(0)
 
 
 if __name__ == "__main__":
-    port = 50052  # Use a different port to avoid conflicts
-    server = run_server(port)
-    try:
-        run_benchmark(port, payload_size=10 * 1024 * 1024, iterations=100)
-    finally:
-        server.stop(0)
+    asyncio.run(main())
