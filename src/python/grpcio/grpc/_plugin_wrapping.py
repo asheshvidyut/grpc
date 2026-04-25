@@ -54,7 +54,9 @@ class _AuthMetadataPluginCallback(grpc.AuthMetadataPluginCallback):
         self._state = state
         self._callback = callback
 
-    def __call__(self, metadata: MetadataType, error: Optional[BaseException]) -> None:
+    def __call__(
+        self, metadata: MetadataType, error: Optional[BaseException]
+    ) -> None:
         with self._state.lock:
             if self._state.exception is None:
                 if self._state.called:
