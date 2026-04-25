@@ -175,19 +175,17 @@ RUN cd /tmp && \
 RUN python3.14 -m ensurepip && \
     python3.14 -m pip install coverage
 
+ENV PATH="/usr/local/bin:${PATH}"
 
 # Python test coverage requires libsqlite3, and it have
 # to be installed before Python.
 RUN apt-get update && apt-get install -y libsqlite3-dev
 
-# 3.9 is the default python3 version on debian11
-RUN apt-get update && apt-get install -y python3.9 python3.9-dev python3-pip
-
 # for Python test coverage reporting
-RUN python3.9 -m pip install coverage
+RUN python3.10 -m pip install coverage
 
 # six is required by the run_tests.py test harness
-RUN python3.9 -m pip install six
+RUN python3.10 -m pip install six
 
 # Google Cloud Platform API libraries
 # These are needed for uploading test results to BigQuery (e.g. by tools/run_tests scripts)
