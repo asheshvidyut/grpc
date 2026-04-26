@@ -30,16 +30,15 @@ cdef grpc_slice _slice_from_bytes(bytes value) noexcept:
   cdef object value_obj
   cdef grpc_slice s
   
-  with gil:
-    value_obj = value
-    value_ptr = <const char *>value
-    length = len(value)
-    if length > 0:
-      Py_INCREF(value_obj)
-      s = grpc_slice_new_with_user_data(
-          <void*>value_ptr, length, py_decref_destroy, <void*>value_obj)
-    else:
-      s = grpc_empty_slice()
+  value_obj = value
+  value_ptr = <const char *>value
+  length = len(value)
+  if length > 0:
+    Py_INCREF(value_obj)
+    s = grpc_slice_new_with_user_data(
+        <void*>value_ptr, length, py_decref_destroy, <void*>value_obj)
+  else:
+    s = grpc_empty_slice()
   return s
 
 
