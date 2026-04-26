@@ -27,10 +27,11 @@ cdef grpc_slice _copy_slice(grpc_slice slice) noexcept nogil:
 cdef grpc_slice _slice_from_bytes(bytes value) noexcept nogil:
   cdef const char *value_ptr
   cdef size_t length
-  cdef object value_obj = value
+  cdef object value_obj
   cdef grpc_slice s
   
   with gil:
+    value_obj = value
     value_ptr = <const char *>value
     length = len(value)
     if length > 0:
