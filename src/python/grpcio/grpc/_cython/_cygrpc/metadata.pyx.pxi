@@ -24,23 +24,6 @@ class InitialMetadataFlags:
 _Metadatum = collections.namedtuple('_Metadatum', ('key', 'value',))
 
 
-cdef void py_decref_destroy_metadata(void* user_data) noexcept with gil:
-    Py_DECREF(<object>user_data)
-
-cdef grpc_slice _slice_from_bytes_zero_copy(bytes value) noexcept:
-  cdef const char *value_ptr
-  cdef size_t length
-  cdef object value_obj = value
-  
-  value_ptr = <const char *>value
-  length = len(value)
-  
-  if length > 0:
-    Py_INCREF(value_obj)
-    return grpc_slice_new_with_user_data(
-        <void*>value_ptr, length, py_decref_destroy_metadata, <void*>value_obj)
-  else:
-    return grpc_empty_slice()
 
 cdef void _store_c_metadata(
     metadata, grpc_metadata **c_metadata, size_t *c_count) except *:
@@ -64,8 +47,8 @@ cdef void _store_c_metadata(
             key,
             type(encoded_value)
           ))
-        c_metadata[0][index].key = _slice_from_bytes_zero_copy(encoded_key)
-        c_metadata[0][index].value = _slice_from_bytes_zero_copy(encoded_value)
+        c_metadata[0][index].key = _slice_from_bytes(encoded_key)
+        c_metadata[0][index].value = _slice_from_bytes(encoded_value)
 
 
 cdef void _release_c_metadata(grpc_metadata *c_metadata, int count) except *:

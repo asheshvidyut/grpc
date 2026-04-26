@@ -27,10 +27,19 @@ cdef grpc_slice _copy_slice(grpc_slice slice) noexcept nogil:
 cdef grpc_slice _slice_from_bytes(bytes value) noexcept nogil:
   cdef const char *value_ptr
   cdef size_t length
+  cdef object value_obj = value
+  cdef grpc_slice s
+  
   with gil:
     value_ptr = <const char *>value
     length = len(value)
-  return grpc_slice_from_copied_buffer(value_ptr, length)
+    if length > 0:
+      Py_INCREF(value_obj)
+      s = grpc_slice_new_with_user_data(
+          <void*>value_ptr, length, py_decref_destroy, <void*>value_obj)
+    else:
+      s = grpc_empty_slice()
+  return s
 
 
 class ConnectivityState:

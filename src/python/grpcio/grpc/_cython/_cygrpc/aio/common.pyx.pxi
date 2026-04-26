@@ -40,8 +40,6 @@ cdef object deserialize(object deserializer, object raw_message):
     """
     if isinstance(raw_message, list):
         raw_message = b"".join(raw_message)
-    elif isinstance(raw_message, memoryview):
-        raw_message = bytes(raw_message)
 
     if deserializer:
         return deserializer(raw_message)
