@@ -24,7 +24,7 @@ cdef grpc_slice _copy_slice(grpc_slice slice) noexcept nogil:
   cdef size_t length = grpc_slice_length(slice)
   return grpc_slice_from_copied_buffer(<const char *>start, length)
 
-cdef grpc_slice _slice_from_bytes(bytes value) noexcept nogil:
+cdef grpc_slice _slice_from_bytes(bytes value) noexcept:
   cdef const char *value_ptr
   cdef size_t length
   cdef object value_obj

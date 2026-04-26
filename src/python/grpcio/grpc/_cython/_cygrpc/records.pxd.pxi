@@ -15,7 +15,7 @@
 
 cdef bytes _slice_bytes(grpc_slice slice)
 cdef grpc_slice _copy_slice(grpc_slice slice) noexcept nogil
-cdef grpc_slice _slice_from_bytes(bytes value) noexcept nogil
+cdef grpc_slice _slice_from_bytes(bytes value) noexcept
 
 
 cdef class CallDetails:
