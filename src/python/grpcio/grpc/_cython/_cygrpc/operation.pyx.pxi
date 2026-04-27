@@ -67,22 +67,51 @@ cdef class SendMessageOperation(Operation):
     self.c_op.type = GRPC_OP_SEND_MESSAGE
     self.c_op.flags = self._flags
     
-    if isinstance(self._message, list):
-      self._message = b''.join(self._message)
-
-    cdef const unsigned char[::1] view = self._message
+    cdef grpc_slice *message_slices
+    cdef size_t slice_count
+    cdef size_t i
+    cdef object chunk
+    cdef const unsigned char[::1] view
     cdef grpc_slice message_slice
-    cdef object message_obj = self._message
-    if view.shape[0] > 0:
-      Py_INCREF(message_obj)
-      message_slice = grpc_slice_new_with_user_data(
-          <void*>&view[0], view.shape[0], py_decref_destroy, <void*>message_obj)
+    cdef object message_obj
+    
+    if isinstance(self._message, list):
+      slice_count = len(self._message)
+      if slice_count == 0:
+        message_slice = grpc_empty_slice()
+        self._c_message_byte_buffer = grpc_raw_byte_buffer_create(
+            &message_slice, 1)
+      else:
+        message_slices = <grpc_slice *>gpr_malloc(slice_count * sizeof(grpc_slice))
+        for i, chunk in enumerate(self._message):
+          view = chunk
+          if view.shape[0] > 0:
+            Py_INCREF(chunk)
+            message_slices[i] = grpc_slice_new_with_user_data(
+                <void*>&view[0], view.shape[0], py_decref_destroy, <void*>chunk)
+          else:
+            message_slices[i] = grpc_empty_slice()
+            
+        self._c_message_byte_buffer = grpc_raw_byte_buffer_create(
+            message_slices, slice_count)
+            
+        for i in range(slice_count):
+          grpc_slice_unref(message_slices[i])
+        gpr_free(message_slices)
     else:
-      message_slice = grpc_empty_slice()
+      message_obj = self._message
+      view = self._message
+      if view.shape[0] > 0:
+        Py_INCREF(message_obj)
+        message_slice = grpc_slice_new_with_user_data(
+            <void*>&view[0], view.shape[0], py_decref_destroy, <void*>message_obj)
+      else:
+        message_slice = grpc_empty_slice()
+        
+      self._c_message_byte_buffer = grpc_raw_byte_buffer_create(
+          &message_slice, 1)
+      grpc_slice_unref(message_slice)
       
-    self._c_message_byte_buffer = grpc_raw_byte_buffer_create(
-        &message_slice, 1)
-    grpc_slice_unref(message_slice)
     self.c_op.data.send_message.send_message = self._c_message_byte_buffer
 
   cdef void un_c(self) except *:

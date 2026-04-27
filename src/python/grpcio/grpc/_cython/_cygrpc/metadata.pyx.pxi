@@ -26,6 +26,14 @@ _Metadatum = collections.namedtuple('_Metadatum', ('key', 'value',))
 
 cdef void _store_c_metadata(
     metadata, grpc_metadata **c_metadata, size_t *c_count) except *:
+  cdef size_t metadatum_count
+  cdef size_t index
+  cdef object key
+  cdef object value
+  cdef bytes encoded_key
+  cdef object encoded_value
+  cdef const unsigned char[::1] view
+
   if metadata is None:
     c_count[0] = 0
     c_metadata[0] = NULL
@@ -47,7 +55,14 @@ cdef void _store_c_metadata(
             type(encoded_value)
           ))
         c_metadata[0][index].key = _slice_from_bytes(encoded_key)
-        c_metadata[0][index].value = _slice_from_bytes(encoded_value)
+        
+        view = encoded_value
+        if view.shape[0] > 0:
+          Py_INCREF(encoded_value)
+          c_metadata[0][index].value = grpc_slice_new_with_user_data(
+              <void*>&view[0], view.shape[0], py_decref_destroy, <void*>encoded_value)
+        else:
+          c_metadata[0][index].value = grpc_empty_slice()
 
 
 cdef void _release_c_metadata(grpc_metadata *c_metadata, int count) except *:
