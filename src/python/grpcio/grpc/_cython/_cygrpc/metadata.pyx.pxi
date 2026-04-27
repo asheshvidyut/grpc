@@ -75,9 +75,13 @@ cdef void _release_c_metadata(grpc_metadata *c_metadata, int count) except *:
 
 cdef tuple _metadatum(grpc_slice key_slice, grpc_slice value_slice):
   cdef bytes key = _slice_bytes(key_slice)
-  cdef bytes value = _slice_bytes(value_slice)
-  return <tuple>_Metadatum(
-      _decode(key), value if key[-4:] == b'-bin' else _decode(value))
+  cdef GrpcSliceView view
+  if key[-4:] == b'-bin':
+    view = GrpcSliceView()
+    view.set_slice(value_slice)
+    return <tuple>_Metadatum(_decode(key), memoryview(view))
+  else:
+    return <tuple>_Metadatum(_decode(key), _decode(_slice_bytes(value_slice)))
 
 
 cdef tuple _metadata(grpc_metadata_array *c_metadata_array):

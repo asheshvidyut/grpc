@@ -215,6 +215,37 @@ cdef _next_call_event(
       channel_state.condition.notify_all()
     return event
 
+cdef class _SliceWrapper:
+  cdef grpc_slice slice
+  cdef bint _initialized
+
+  def __cinit__(self):
+    self._initialized = False
+
+  cdef void set_slice(self, grpc_slice s) except *:
+    self.slice = grpc_slice_ref(s)
+    self._initialized = True
+
+  def __dealloc__(self):
+    if self._initialized:
+      grpc_slice_unref(self.slice)
+
+_METHOD_SLICE_CACHE = {}
+
+cdef grpc_slice _get_method_slice(bytes method) except *:
+  global _METHOD_SLICE_CACHE
+  cdef _SliceWrapper wrapper
+  cdef grpc_slice slice
+  if method in _METHOD_SLICE_CACHE:
+    wrapper = _METHOD_SLICE_CACHE[method]
+    return grpc_slice_ref(wrapper.slice)
+  else:
+    slice = _slice_from_bytes(method)
+    wrapper = _SliceWrapper()
+    wrapper.set_slice(slice)
+    _METHOD_SLICE_CACHE[method] = wrapper
+    return grpc_slice_ref(slice)
+
 
 # TODO(https://github.com/grpc/grpc/issues/14569): This could be a lot simpler.
 cdef void _call(
@@ -261,7 +292,7 @@ cdef void _call(
   cdef _BatchOperationTag wrapper_tag
   with channel_state.condition:
     if channel_state.open:
-      method_slice = _slice_from_bytes(method)
+      method_slice = _get_method_slice(method)
       if host is None:
         host_slice_ptr = NULL
       else:
