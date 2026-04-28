@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <absl/log/log.h>
 #include "src/core/ext/transport/chttp2/transport/hpack_encoder_table.h"
 
+#include <absl/log/log.h>
 #include <grpc/support/port_platform.h>
 
 #include <algorithm>
@@ -43,11 +43,11 @@ uint32_t HPackEncoderTable::AllocateIndex(size_t element_size) {
     EvictOne();
   }
   GRPC_CHECK(table_elems_ < elem_size_.size());
-    if (elem_size_.empty()) {
-      LOG(ERROR) << "HPackEncoderTable::AllocateIndex: elem_size_ is empty!";
-      return 0;
-    }
-    elem_size_[new_index % elem_size_.size()] =
+  if (elem_size_.empty()) {
+    LOG(ERROR) << "HPackEncoderTable::AllocateIndex: elem_size_ is empty!";
+    return 0;
+  }
+  elem_size_[new_index % elem_size_.size()] =
       static_cast<uint16_t>(element_size);
   table_size_ += element_size;
   table_elems_++;
@@ -77,11 +77,11 @@ void HPackEncoderTable::EvictOne() {
   tail_remote_index_++;
   GRPC_CHECK_GT(tail_remote_index_, 0u);
   GRPC_CHECK_GT(table_elems_, 0u);
-    if (elem_size_.empty()) {
-      LOG(ERROR) << "HPackEncoderTable::EvictOne: elem_size_ is empty!";
-      return;
-    }
-    auto removing_size = elem_size_[tail_remote_index_ % elem_size_.size()];
+  if (elem_size_.empty()) {
+    LOG(ERROR) << "HPackEncoderTable::EvictOne: elem_size_ is empty!";
+    return;
+  }
+  auto removing_size = elem_size_[tail_remote_index_ % elem_size_.size()];
   GRPC_CHECK(table_size_ >= removing_size);
   table_size_ -= removing_size;
   table_elems_--;
@@ -92,7 +92,8 @@ void HPackEncoderTable::Rebuild(uint32_t capacity) {
   GRPC_CHECK_LE(table_elems_, capacity);
   for (uint32_t i = 0; i < table_elems_; i++) {
     uint32_t ofs = tail_remote_index_ + i + 1;
-    new_elem_size[ofs % capacity] = elem_size_[ofs % std::max<size_t>(1, elem_size_.size())];
+    new_elem_size[ofs % capacity] =
+        elem_size_[ofs % std::max<size_t>(1, elem_size_.size())];
   }
   elem_size_.swap(new_elem_size);
 }
