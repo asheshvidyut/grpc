@@ -581,6 +581,9 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
       : server_(server), requests_per_cq_(server->cqs_.size()) {
     LOG(ERROR) << "RealRequestMatcher constructor: server->cqs_.size()=" << server->cqs_.size()
                << ", requests_per_cq_.size()=" << requests_per_cq_.size();
+    for (size_t i = 0; i < requests_per_cq_.size(); i++) {
+      LOG(ERROR) << "  Queue " << i << " initialized.";
+    }
   }
 
   ~RealRequestMatcher() override {
@@ -691,6 +694,7 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
       return;
     }
     for (size_t i = 0; i < requests_per_cq_.size(); i++) {
+      LOG(ERROR) << "MatchOrQueue loop: i=" << i;
       size_t cq_idx = (start_request_queue_index + i) % requests_per_cq_.size();
       RequestedCall* rc =
           reinterpret_cast<RequestedCall*>(requests_per_cq_[cq_idx].TryPop());
@@ -736,6 +740,7 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
       return Immediate(absl::InternalError("Server closed"));
     }
     for (size_t i = 0; i < requests_per_cq_.size(); i++) {
+      LOG(ERROR) << "MatchRequest loop: i=" << i;
       size_t cq_idx = (start_request_queue_index + i) % requests_per_cq_.size();
       RequestedCall* rc =
           reinterpret_cast<RequestedCall*>(requests_per_cq_[cq_idx].TryPop());
