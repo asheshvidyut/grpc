@@ -571,6 +571,9 @@ grpc_completion_queue* grpc_completion_queue_create_internal(
     grpc_completion_queue_functor* shutdown_callback) {
   grpc_completion_queue* cq;
 
+  LOG(ERROR) << "grpc_completion_queue_create_internal: completion_type="
+             << completion_type << ", polling_type=" << polling_type;
+
   GRPC_TRACE_LOG(api, INFO)
       << "grpc_completion_queue_create_internal(completion_type="
       << completion_type << ", polling_type=" << polling_type << ")";

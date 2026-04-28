@@ -170,6 +170,7 @@ thread_local WorkQueue* g_local_queue = nullptr;
 
 WorkStealingThreadPool::WorkStealingThreadPool(size_t reserve_threads)
     : pool_{std::make_shared<WorkStealingThreadPoolImpl>(reserve_threads)} {
+  LOG(ERROR) << "WorkStealingThreadPool constructor: reserve_threads=" << reserve_threads;
   if (g_log_verbose_failures) {
     GRPC_TRACE_LOG(event_engine, INFO)
         << "WorkStealingThreadPool verbose failures are enabled";

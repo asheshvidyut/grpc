@@ -46,7 +46,11 @@ void HPackTable::MementoRingBuffer::Put(Memento m) {
     ++num_entries_;
     return entries_.push_back(std::move(m));
   }
-  size_t index = (first_entry_ + num_entries_) % max_entries_;
+    if (max_entries_ == 0) {
+      LOG(ERROR) << "MementoRingBuffer::Put: max_entries_ is zero!";
+      return;
+    }
+    size_t index = (first_entry_ + num_entries_) % max_entries_;
   if (timestamp_index_ == kNoTimestamp) {
     timestamp_index_ = index;
     timestamp_ = Timestamp::Now();
@@ -57,7 +61,11 @@ void HPackTable::MementoRingBuffer::Put(Memento m) {
 
 auto HPackTable::MementoRingBuffer::PopOne() -> Memento {
   GRPC_CHECK_GT(num_entries_, 0u);
-  size_t index = first_entry_ % max_entries_;
+    if (max_entries_ == 0) {
+      LOG(ERROR) << "MementoRingBuffer::PopOne: max_entries_ is zero!";
+      abort();
+    }
+    size_t index = first_entry_ % max_entries_;
   if (index == timestamp_index_) {
     http2_stats_collector_->IncrementHttp2HpackEntryLifetime(
         (Timestamp::Now() - timestamp_).millis());
@@ -74,7 +82,11 @@ auto HPackTable::MementoRingBuffer::PopOne() -> Memento {
 
 auto HPackTable::MementoRingBuffer::Lookup(uint32_t index) -> const Memento* {
   if (index >= num_entries_) return nullptr;
-  uint32_t offset = (num_entries_ - 1u - index + first_entry_) % max_entries_;
+    if (max_entries_ == 0) {
+      LOG(ERROR) << "MementoRingBuffer::Lookup: max_entries_ is zero!";
+      return nullptr;
+    }
+    uint32_t offset = (num_entries_ - 1u - index + first_entry_) % max_entries_;
   auto& entry = entries_[offset];
   const bool was_used = entry.parse_status.TestBit(Memento::kUsedBit);
   entry.parse_status.SetBit(Memento::kUsedBit);
@@ -85,7 +97,11 @@ auto HPackTable::MementoRingBuffer::Lookup(uint32_t index) -> const Memento* {
 auto HPackTable::MementoRingBuffer::Peek(uint32_t index) const
     -> const Memento* {
   if (index >= num_entries_) return nullptr;
-  uint32_t offset = (num_entries_ - 1u - index + first_entry_) % max_entries_;
+    if (max_entries_ == 0) {
+      LOG(ERROR) << "MementoRingBuffer::Peek: max_entries_ is zero!";
+      return nullptr;
+    }
+    uint32_t offset = (num_entries_ - 1u - index + first_entry_) % max_entries_;
   return &entries_[offset];
 }
 
@@ -96,7 +112,7 @@ void HPackTable::MementoRingBuffer::Rebuild(uint32_t max_entries) {
   entries.reserve(num_entries_);
   for (size_t i = 0; i < num_entries_; i++) {
     entries.push_back(
-        std::move(entries_[(first_entry_ + i) % entries_.size()]));
+        std::move(entries_[(first_entry_ + i) % std::max<size_t>(1, entries_.size())]));
   }
   first_entry_ = 0;
   entries_.swap(entries);
