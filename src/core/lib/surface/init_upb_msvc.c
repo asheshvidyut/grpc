@@ -54,7 +54,7 @@ void grpc_upb_msvc_fix_force_reference(void) {}
  * our definition (which is initialized and preferred by the linker) wins,
  * or at least correctly uses the boundaries defined above.
  */
-extern const UPB_PRIVATE(upb_GeneratedExtensionListEntry)*
+extern const UPB_PRIVATE(upb_GeneratedExtensionListEntry) *
     UPB_PRIVATE(upb_generated_extension_list);
 
 static void __cdecl upb_GeneratedRegistry_Constructor(void) {
@@ -70,11 +70,13 @@ static void __cdecl upb_GeneratedRegistry_Constructor(void) {
 
 #pragma section(".CRT$XCU", long, read)
 /* We use both a unique name and the standard upb name to be extra safe. */
-__declspec(allocate(".CRT$XCU"), selectany, dllexport)
-void (__cdecl * upb_GeneratedRegistry_Constructor_ptr)(void) = upb_GeneratedRegistry_Constructor;
+__declspec(allocate(".CRT$XCU"), selectany, dllexport) void(
+    __cdecl* upb_GeneratedRegistry_Constructor_ptr)(void) =
+    upb_GeneratedRegistry_Constructor;
 
-__declspec(allocate(".CRT$XCU"), selectany, dllexport)
-void (__cdecl * UPB_PRIVATE(upb_GeneratedRegistry_Constructor_))(void) = upb_GeneratedRegistry_Constructor;
+__declspec(allocate(".CRT$XCU"), selectany, dllexport) void(
+    __cdecl* UPB_PRIVATE(upb_GeneratedRegistry_Constructor_))(void) =
+    upb_GeneratedRegistry_Constructor;
 
 #include "upb/port/undef.inc"
 
