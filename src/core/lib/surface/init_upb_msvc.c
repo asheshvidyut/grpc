@@ -48,7 +48,7 @@ const struct upb_MiniTableExtension __stop_linkarr_upb_AllExts = {{0}};
  * by the linker over the uninitialized ones in the upb headers, and it
  * correctly uses the boundaries defined above.
  */
-extern const UPB_PRIVATE(upb_GeneratedExtensionListEntry)*
+extern const UPB_PRIVATE(upb_GeneratedExtensionListEntry) *
     UPB_PRIVATE(upb_generated_extension_list);
 
 static void __cdecl upb_GeneratedRegistry_Constructor(void) {
@@ -63,9 +63,9 @@ static void __cdecl upb_GeneratedRegistry_Constructor(void) {
 }
 
 #pragma section(".CRT$XCU", long, read)
-__declspec(allocate(".CRT$XCU"), selectany) void(__cdecl *
-                                                 upb_GeneratedRegistry_Constructor_ptr)(
-    void) = upb_GeneratedRegistry_Constructor;
+__declspec(allocate(".CRT$XCU"), selectany) void(
+    __cdecl* upb_GeneratedRegistry_Constructor_ptr)(void) =
+    upb_GeneratedRegistry_Constructor;
 
 #include "upb/port/undef.inc"
 
