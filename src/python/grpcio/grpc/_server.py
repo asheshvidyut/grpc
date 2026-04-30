@@ -1119,11 +1119,116 @@ def _reject_rpc(
     )
 
 
+def _unary_response_in_subinterpreter(
+    rpc_event: cygrpc.BaseEvent,
+    state: _RPCState,
+    method_name: str,
+    shard_index: int,
+    pool: SubinterpreterPool,
+    request_deserializer: Optional[DeserializingFunction],
+    response_serializer: Optional[SerializingFunction],
+) -> None:
+    """Handle a unary-unary RPC by dispatching to a sub-interpreter.
+
+    The main interpreter receives the raw request bytes from C-Core,
+    sends them to the sub-interpreter pool, and sends the response
+    bytes back via C-Core. Only the deserialization + handler +
+    serialization runs in the sub-interpreter's GIL.
+    """
+    cygrpc.install_context_from_request_call_event(rpc_event)
+    try:
+        # Receive the serialized request from the client.
+        with state.condition:
+            if not _is_rpc_state_active(state):
+                return
+            rpc_event.call.start_server_batch(
+                (cygrpc.ReceiveMessageOperation(_EMPTY_FLAGS),),
+                _receive_message(
+                    state, rpc_event.call, None  # No deserialization here
+                ),
+            )
+            state.due.add(_RECEIVE_MESSAGE_TOKEN)
+            while True:
+                state.condition.wait()
+                if state.request is None:
+                    if state.client is _CLOSED:
+                        _abort(
+                            state,
+                            rpc_event.call,
+                            cygrpc.StatusCode.unimplemented,
+                            b"Requires exactly one request message.",
+                        )
+                        return
+                    if state.client is _CANCELLED:
+                        return
+                else:
+                    serialized_request = state.request
+                    state.request = None
+                    # Ensure bytes for the pool pipe (may be memoryview/list).
+                    if isinstance(serialized_request, memoryview):
+                        serialized_request = bytes(serialized_request)
+                    elif isinstance(serialized_request, list):
+                        serialized_request = b"".join(serialized_request)
+                    break
+
+        # Dispatch to sub-interpreter pool.
+        # The pool deserializes, runs the handler, and serializes.
+        serialized_response, status_code, details = pool.dispatch(
+            shard_index, method_name, serialized_request,
+        )
+
+        if status_code != 0:
+            with state.condition:
+                _abort(
+                    state,
+                    rpc_event.call,
+                    cygrpc.StatusCode.unknown,
+                    _common.encode(details),
+                )
+            return
+
+        if serialized_response is not None:
+            _status(rpc_event, state, serialized_response)
+    except Exception:  # pylint: disable=broad-except
+        traceback.print_exc()
+    finally:
+        cygrpc.uninstall_context()
+
+
+def _handle_unary_unary_in_subinterpreter(
+    rpc_event: cygrpc.BaseEvent,
+    state: _RPCState,
+    method_handler: grpc.RpcMethodHandler,
+    method_name: str,
+    shard_index: int,
+    pool: SubinterpreterPool,
+    default_thread_pool: futures.ThreadPoolExecutor,
+) -> futures.Future:
+    """Submit a unary-unary RPC to a thread that dispatches to the pool."""
+    thread_pool = _select_thread_pool_for_behavior(
+        method_handler.unary_unary, default_thread_pool
+    )
+    return thread_pool.submit(
+        state.context.run,
+        _unary_response_in_subinterpreter,
+        rpc_event,
+        state,
+        method_name,
+        shard_index,
+        pool,
+        method_handler.request_deserializer,
+        method_handler.response_serializer,
+    )
+
+
 def _handle_with_method_handler(
     rpc_event: cygrpc.BaseEvent,
     state: _RPCState,
     method_handler: grpc.RpcMethodHandler,
     thread_pool: futures.ThreadPoolExecutor,
+    subinterpreter_pool: Optional[SubinterpreterPool] = None,
+    method_name: Optional[str] = None,
+    shard_index: int = 0,
 ) -> futures.Future:
     with state.condition:
         rpc_event.call.start_server_batch(
@@ -1143,6 +1248,21 @@ def _handle_with_method_handler(
             return _handle_unary_stream(
                 rpc_event, state, method_handler, thread_pool
             )
+        # For unary-unary: use sub-interpreter pool if available.
+        if (
+            subinterpreter_pool is not None
+            and method_name is not None
+            and method_handler.unary_unary is not None
+        ):
+            return _handle_unary_unary_in_subinterpreter(
+                rpc_event,
+                state,
+                method_handler,
+                method_name,
+                shard_index,
+                subinterpreter_pool,
+                thread_pool,
+            )
         return _handle_unary_unary(
             rpc_event, state, method_handler, thread_pool
         )
@@ -1154,6 +1274,8 @@ def _handle_call(
     interceptor_pipeline: Optional[_interceptor._ServicePipeline],
     thread_pool: futures.ThreadPoolExecutor,
     concurrency_exceeded: bool,
+    subinterpreter_pool: Optional[SubinterpreterPool] = None,
+    shard_index: int = 0,
 ) -> Tuple[Optional[_RPCState], Optional[futures.Future]]:
     """Handles RPC based on provided handlers.
 
@@ -1170,6 +1292,9 @@ def _handle_call(
         return None, None
     if rpc_event.call_details.method or method_with_handler.name():
         rpc_state = _RPCState()
+        method_name = method_with_handler.name()
+        if not method_name:
+            method_name = _common.decode(rpc_event.call_details.method)
         try:
             method_handler = _find_method_handler(
                 rpc_event,
@@ -1206,7 +1331,13 @@ def _handle_call(
         return (
             rpc_state,
             _handle_with_method_handler(
-                rpc_event, rpc_state, method_handler, thread_pool
+                rpc_event,
+                rpc_state,
+                method_handler,
+                thread_pool,
+                subinterpreter_pool=subinterpreter_pool,
+                method_name=method_name,
+                shard_index=shard_index,
             ),
         )
     return None, None
@@ -1448,6 +1579,8 @@ def _process_event_and_continue(
                 state.interceptor_pipeline,
                 state.thread_pool,
                 concurrency_exceeded,
+                subinterpreter_pool=state.subinterpreter_pool,
+                shard_index=shard_index,
             )
             if rpc_state is not None:
                 state.rpc_states.add(rpc_state)

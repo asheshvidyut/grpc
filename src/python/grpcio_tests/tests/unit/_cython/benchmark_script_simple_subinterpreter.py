@@ -11,10 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Benchmark: sync server under concurrent CPU-bound load (no sub-interpreters).
+"""Benchmark: sync server with sub-interpreters under concurrent CPU-bound load.
 
-Compare with benchmark_script_simple_subinterpreter.py to see the
-throughput difference when sub-interpreters are enabled.
+Sub-interpreters optimize CONCURRENT requests with CPU-bound handlers.
+Each sub-interpreter has its own GIL, so multiple handlers can execute
+Python code simultaneously across cores.
+
+Compare with benchmark_script_simple.py (no sub-interpreters) to see
+the throughput difference under concurrent load.
 """
 
 from concurrent import futures
@@ -35,14 +39,21 @@ def _cpu_work():
     return total
 
 
-def run_server(port):
+def run_server(port, use_subinterpreters):
     options = [
         ("grpc.max_send_message_length", 160 * 1024 * 1024),
         ("grpc.max_receive_message_length", 160 * 1024 * 1024),
     ]
-    server = grpc.server(
-        futures.ThreadPoolExecutor(max_workers=8), options=options
+
+    server_kwargs = dict(
+        thread_pool=futures.ThreadPoolExecutor(max_workers=8),
+        options=options,
     )
+    if use_subinterpreters:
+        server_kwargs["experimental_use_subinterpreters"] = True
+        server_kwargs["experimental_subinterpreter_count"] = 4
+
+    server = grpc.server(**server_kwargs)
 
     class GenericHandler(grpc.GenericRpcHandler):
         def service(self, handler_call_details):
@@ -64,7 +75,7 @@ def run_server(port):
 def run_benchmark(port, num_clients, rpcs_per_client):
     channel = grpc.insecure_channel(f"localhost:{port}")
     stub = channel.unary_unary(_METHOD)
-    payload = b"x" * 1024
+    payload = b"x" * 1024  # 1KB — focus on handler time, not I/O
 
     total_rpcs = num_clients * rpcs_per_client
     print(f"Clients: {num_clients}, RPCs/client: {rpcs_per_client}")
@@ -104,14 +115,24 @@ def run_benchmark(port, num_clients, rpcs_per_client):
 
 
 if __name__ == "__main__":
-    port = 50052
+    port_normal = 50060
+    port_subinterp = 50061
+
     print("=" * 50)
-    print("Sync Server — CPU-bound handler (NO sub-interpreters)")
+    print("Sync Server — CPU-bound handler benchmark")
     print(f"Python {sys.version}")
     print("=" * 50)
 
-    server = run_server(port)
+    print("\n--- WITHOUT sub-interpreters ---")
+    server1 = run_server(port_normal, use_subinterpreters=False)
     try:
-        run_benchmark(port, num_clients=8, rpcs_per_client=50)
+        run_benchmark(port_normal, num_clients=8, rpcs_per_client=50)
     finally:
-        server.stop(0)
+        server1.stop(0)
+
+    print("\n--- WITH sub-interpreters (4 workers) ---")
+    server2 = run_server(port_subinterp, use_subinterpreters=True)
+    try:
+        run_benchmark(port_subinterp, num_clients=8, rpcs_per_client=50)
+    finally:
+        server2.stop(0)

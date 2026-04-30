@@ -13,6 +13,7 @@
 # limitations under the License.
 """Server-side implementation of gRPC Asyncio Python."""
 
+import asyncio
 from concurrent.futures import Executor
 from typing import Any, Dict, Optional, Sequence
 
@@ -21,6 +22,8 @@ from grpc import _common
 from grpc import _compression
 from grpc import _observability
 from grpc._cython import cygrpc
+from grpc._subinterpreter_pool import SubinterpreterPool
+from grpc._subinterpreter_pool import _is_supported as _subinterpreters_supported
 
 from . import _base_server
 from ._interceptor import ServerInterceptor
@@ -41,6 +44,101 @@ def _augment_channel_arguments(
     )
 
 
+class _SubinterpreterMethodHandler:
+    """Wraps a unary-unary handler to dispatch through a sub-interpreter pool.
+
+    The handler runs as a sync function that sends raw bytes to a
+    sub-interpreter worker and returns the raw response bytes.
+    The aio server's existing sync-handler path
+    (loop.run_in_executor) takes care of threading.
+    """
+
+    def __init__(
+        self,
+        original_handler: grpc.RpcMethodHandler,
+        method_name: str,
+        pool: SubinterpreterPool,
+    ):
+        self._original = original_handler
+        self._method_name = method_name
+        self._pool = pool
+
+        # Preserve the handler interface flags.
+        self.request_streaming = original_handler.request_streaming
+        self.response_streaming = original_handler.response_streaming
+        self.request_serializer = getattr(
+            original_handler, "request_serializer", None
+        )
+        self.response_serializer = getattr(
+            original_handler, "response_serializer", None
+        )
+        # Use None for request/response serializers so the aio server
+        # passes us raw bytes and accepts raw bytes back.
+        self.request_deserializer = None
+        self.response_serializer = None
+
+        # The handler itself is a sync function — the Cython aio server
+        # will detect this via inspect and route it through
+        # loop.run_in_executor().
+        self.unary_unary = self._dispatch_handler
+
+    def _dispatch_handler(self, request_bytes, context):
+        """Sync handler dispatched to the sub-interpreter pool."""
+        # request_bytes is raw bytes (no deserializer set).
+        if isinstance(request_bytes, memoryview):
+            request_bytes = bytes(request_bytes)
+        elif isinstance(request_bytes, list):
+            request_bytes = b"".join(request_bytes)
+
+        # Round-robin across pool workers.
+        import threading
+
+        worker_id = hash(threading.current_thread().ident) % self._pool.worker_count
+        response_bytes, status_code, details = self._pool.dispatch(
+            worker_id, self._method_name, request_bytes
+        )
+
+        if status_code != 0:
+            context.set_code(grpc.StatusCode.UNKNOWN)
+            context.set_details(details)
+            return b""
+
+        return response_bytes
+
+
+class _SubinterpreterGenericHandler(grpc.GenericRpcHandler):
+    """Wraps an existing GenericRpcHandler to route unary-unary RPCs
+    through a sub-interpreter pool."""
+
+    def __init__(
+        self,
+        inner: grpc.GenericRpcHandler,
+        pool: SubinterpreterPool,
+    ):
+        self._inner = inner
+        self._pool = pool
+
+    def service(self, handler_call_details):
+        method_handler = self._inner.service(handler_call_details)
+        if method_handler is None:
+            return None
+
+        # Only intercept unary-unary handlers.
+        if (
+            not method_handler.request_streaming
+            and not method_handler.response_streaming
+            and method_handler.unary_unary is not None
+        ):
+            return _SubinterpreterMethodHandler(
+                method_handler,
+                handler_call_details.method,
+                self._pool,
+            )
+
+        # Streaming RPCs pass through unchanged.
+        return method_handler
+
+
 class Server(_base_server.Server):
     """Serves RPCs."""
 
@@ -52,8 +150,10 @@ class Server(_base_server.Server):
         options: ChannelArgumentType,
         maximum_concurrent_rpcs: Optional[int],
         compression: Optional[grpc.Compression],
+        subinterpreter_pool: Optional[SubinterpreterPool] = None,
     ):
         self._loop = cygrpc.get_working_loop()
+        self._subinterpreter_pool = subinterpreter_pool
         if interceptors:
             invalid_interceptors = [
                 interceptor
@@ -68,6 +168,14 @@ class Server(_base_server.Server):
                 # TODO(asheshvidyut): fix the value error below
                 # not caught by ruff.
                 raise ValueError(error_msg)
+
+        # Wrap generic handlers to dispatch through the pool.
+        if subinterpreter_pool is not None:
+            generic_handlers = tuple(
+                _SubinterpreterGenericHandler(h, subinterpreter_pool)
+                for h in (generic_handlers or ())
+            )
+
         self._server = cygrpc.AioServer(
             self._loop,
             thread_pool,
@@ -88,6 +196,11 @@ class Server(_base_server.Server):
           generic_rpc_handlers: A sequence of GenericRpcHandlers that will be
           used to service RPCs.
         """
+        if self._subinterpreter_pool is not None:
+            generic_rpc_handlers = [
+                _SubinterpreterGenericHandler(h, self._subinterpreter_pool)
+                for h in generic_rpc_handlers
+            ]
         self._server.add_generic_rpc_handlers(generic_rpc_handlers)
 
     def add_registered_method_handlers(
@@ -142,6 +255,8 @@ class Server(_base_server.Server):
 
         This method may only be called once. (i.e. it is not idempotent).
         """
+        if self._subinterpreter_pool is not None:
+            self._subinterpreter_pool.start()
         await self._server.start()
 
     async def stop(self, grace: Optional[float]) -> None:
@@ -168,6 +283,8 @@ class Server(_base_server.Server):
           grace: A duration of time in seconds or None.
         """
         await self._server.shutdown(grace)
+        if self._subinterpreter_pool is not None:
+            self._subinterpreter_pool.shutdown()
 
     async def wait_for_termination(
         self, timeout: Optional[float] = None
@@ -214,6 +331,8 @@ def server(
     options: Optional[ChannelArgumentType] = None,
     maximum_concurrent_rpcs: Optional[int] = None,
     compression: Optional[grpc.Compression] = None,
+    experimental_use_subinterpreters: bool = False,
+    experimental_subinterpreter_count: Optional[int] = None,
 ):
     """Creates a Server with which RPCs can be serviced.
 
@@ -227,18 +346,34 @@ def server(
         and optionally manipulate the incoming RPCs before handing them over to
         handlers. The interceptors are given control in the order they are
         specified. This is an EXPERIMENTAL API.
-      options: An optional list of key-value pairs (:term:`channel_arguments` in gRPC runtime)
-        to configure the channel.
+      options: An optional list of key-value pairs (:term:`channel_arguments`
+        in gRPC runtime) to configure the channel.
       maximum_concurrent_rpcs: The maximum number of concurrent RPCs this server
         will service before returning RESOURCE_EXHAUSTED status, or None to
         indicate no limit.
       compression: An element of grpc.Compression, e.g.
         grpc.Compression.Gzip. This compression algorithm will be used for the
         lifetime of the server unless overridden by set_compression.
+      experimental_use_subinterpreters: EXPERIMENTAL. If True, enables
+        sub-interpreter dispatch for unary-unary handlers (Python 3.13+).
+      experimental_subinterpreter_count: EXPERIMENTAL. Number of sub-interpreter
+        workers. Defaults to 4.
 
     Returns:
       A Server object.
     """
+    pool = None
+    if experimental_use_subinterpreters and _subinterpreters_supported():
+        count = experimental_subinterpreter_count or 4
+        # Build servicer specs from handlers at pool creation time.
+        # Workers import servicer modules independently.
+        specs = []
+        if handlers:
+            from grpc._server import _build_servicer_specs
+
+            specs = _build_servicer_specs(handlers)
+        pool = SubinterpreterPool(count=count, servicer_specs=specs)
+
     return Server(
         migration_thread_pool,
         () if handlers is None else handlers,
@@ -246,4 +381,5 @@ def server(
         () if options is None else options,
         maximum_concurrent_rpcs,
         compression,
+        subinterpreter_pool=pool,
     )
