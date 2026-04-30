@@ -14,7 +14,10 @@
 
 from concurrent import futures
 import logging
+import sys
 import unittest
+from unittest import mock
+import warnings
 
 import grpc
 
@@ -159,6 +162,120 @@ class ServerTest(unittest.TestCase):
         )
         with self.assertRaises(RuntimeError):
             server.add_secure_port(bind_address, server_credentials)
+
+    def test_experimental_subinterpreter_count_requires_flag(self):
+        with self.assertRaises(ValueError):
+            grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_subinterpreter_count=1,
+            )
+        with self.assertRaises(ValueError):
+            grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_max_concurrent_rpcs_per_shard=1,
+            )
+        with self.assertRaises(ValueError):
+            grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_subinterpreter_scheduler="least_loaded",
+            )
+
+    def test_experimental_subinterpreter_count_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_subinterpreter_count=0,
+            )
+
+    def test_experimental_subinterpreters_requires_python_3_12(self):
+        with mock.patch("grpc._server.sys.version_info", (3, 11)):
+            with self.assertRaises(ValueError):
+                grpc.server(
+                    futures.ThreadPoolExecutor(max_workers=1),
+                    experimental_use_subinterpreters=True,
+                )
+
+    def test_experimental_subinterpreter_per_shard_limit_must_be_positive(self):
+        with self.assertRaises(ValueError):
+            grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_max_concurrent_rpcs_per_shard=0,
+            )
+
+    def test_experimental_subinterpreter_scheduler_is_validated(self):
+        with self.assertRaises(ValueError):
+            grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_subinterpreter_scheduler="invalid",
+            )
+
+    def test_experimental_subinterpreters_warns(self):
+        if sys.version_info < (3, 12):
+            self.skipTest("experimental subinterpreters require Python 3.12+")
+        with warnings.catch_warnings(record=True) as captured_warnings:
+            warnings.simplefilter("always")
+            server = grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_subinterpreter_count=1,
+            )
+            server.stop(0)
+        self.assertTrue(captured_warnings)
+        self.assertIn(
+            "experimental_use_subinterpreters is experimental",
+            str(captured_warnings[0].message),
+        )
+
+    def test_experimental_subinterpreter_stats_surface(self):
+        if sys.version_info < (3, 12):
+            self.skipTest("experimental subinterpreters require Python 3.12+")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            server = grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_subinterpreter_count=2,
+            )
+        stats = server._experimental_get_server_stats()
+        server.stop(0)
+        self.assertTrue(stats["enabled"])
+        self.assertEqual(2, stats["completion_queue_count"])
+        self.assertEqual(
+            2, len(stats["active_rpc_count_by_shard"])
+        )
+
+    def test_experimental_subinterpreter_stats_include_per_shard_limit(self):
+        if sys.version_info < (3, 12):
+            self.skipTest("experimental subinterpreters require Python 3.12+")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            server = grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_subinterpreter_count=2,
+                experimental_max_concurrent_rpcs_per_shard=3,
+            )
+        stats = server._experimental_get_server_stats()
+        server.stop(0)
+        self.assertEqual(3, stats["max_concurrent_rpcs_per_shard"])
+
+    def test_experimental_subinterpreter_stats_include_scheduler(self):
+        if sys.version_info < (3, 12):
+            self.skipTest("experimental subinterpreters require Python 3.12+")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            server = grpc.server(
+                futures.ThreadPoolExecutor(max_workers=1),
+                experimental_use_subinterpreters=True,
+                experimental_subinterpreter_count=2,
+                experimental_subinterpreter_scheduler="least_loaded",
+            )
+        stats = server._experimental_get_server_stats()
+        server.stop(0)
+        self.assertEqual("least_loaded", stats["scheduler"])
 
 
 class ServerHandlerTest(unittest.TestCase):

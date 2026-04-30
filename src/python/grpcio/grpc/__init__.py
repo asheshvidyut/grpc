@@ -2185,6 +2185,10 @@ def server(
     maximum_concurrent_rpcs=None,
     compression=None,
     xds=False,
+    experimental_use_subinterpreters=False,
+    experimental_subinterpreter_count=None,
+    experimental_max_concurrent_rpcs_per_shard=None,
+    experimental_subinterpreter_scheduler="round_robin",
 ):
     """Creates a Server with which RPCs can be serviced.
 
@@ -2208,6 +2212,18 @@ def server(
         lifetime of the server unless overridden.
       xds: If set to true, retrieves server configuration via xDS. This is an
         EXPERIMENTAL option.
+      experimental_use_subinterpreters: EXPERIMENTAL. If set to True, enables
+        multi-interpreter server mode scaffolding for Python 3.12+, including
+        CQ sharding and lifecycle wiring.
+      experimental_subinterpreter_count: EXPERIMENTAL. Optional positive integer
+        indicating desired sub-interpreter worker count when
+        experimental_use_subinterpreters is enabled.
+      experimental_max_concurrent_rpcs_per_shard: EXPERIMENTAL. Optional
+        positive integer limit for concurrent RPC handlers per shard when
+        experimental_use_subinterpreters is enabled.
+      experimental_subinterpreter_scheduler: EXPERIMENTAL. Scheduler policy for
+        assigning new request slots across shards. Supported values are
+        "round_robin" and "least_loaded".
 
     Returns:
       A Server object.
@@ -2222,6 +2238,10 @@ def server(
         maximum_concurrent_rpcs,
         compression,
         xds,
+        experimental_use_subinterpreters,
+        experimental_subinterpreter_count,
+        experimental_max_concurrent_rpcs_per_shard,
+        experimental_subinterpreter_scheduler,
     )
 
 

@@ -59,9 +59,15 @@ py_library(
 )
 
 py_library(
+    name = "_subinterpreter_pool",
+    srcs = ["_subinterpreter_pool.py"],
+)
+
+py_library(
     name = "server",
     srcs = ["_server.py"],
     deps = [
+        ":_subinterpreter_pool",
         ":common",
         ":compression",
         ":interceptor",

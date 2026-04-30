@@ -21,6 +21,7 @@ from concurrent import futures
 import contextvars
 import enum
 import logging
+import sys
 import threading
 import time
 import traceback
@@ -38,6 +39,7 @@ from typing import (
     Tuple,
     Union,
 )
+import warnings
 
 import grpc
 from grpc import _common
@@ -45,6 +47,10 @@ from grpc import _compression
 from grpc import _interceptor
 from grpc import _observability
 from grpc._cython import cygrpc
+from grpc._subinterpreter_pool import SubinterpreterPool
+from grpc._subinterpreter_pool import _is_supported as _subinterpreters_supported
+from grpc._subinterpreter_pool import _pack_response
+from grpc._subinterpreter_pool import _unpack_response
 from grpc._typing import ArityAgnosticMethodHandler
 from grpc._typing import ChannelArgumentType
 from grpc._typing import DeserializingFunction
@@ -81,6 +87,92 @@ _EMPTY_FLAGS = 0
 
 _DEALLOCATED_SERVER_CHECK_PERIOD_S = 1.0
 _INF_TIMEOUT = 1e9
+
+
+class _ExperimentalSubinterpreterConfig:
+    enabled: bool
+    count: Optional[int]
+    max_concurrent_rpcs_per_shard: Optional[int]
+    scheduler: str
+
+    def __init__(
+        self,
+        enabled: bool,
+        count: Optional[int],
+        max_concurrent_rpcs_per_shard: Optional[int],
+        scheduler: str,
+    ):
+        self.enabled = enabled
+        self.count = count
+        self.max_concurrent_rpcs_per_shard = max_concurrent_rpcs_per_shard
+        self.scheduler = scheduler
+
+
+def _request_call_tag_for_shard(shard_index: int) -> str:
+    return f"{_REQUEST_CALL_TAG}_{shard_index}"
+
+
+def _registered_method_tag_for_shard(method: str, shard_index: int) -> str:
+    return f"{method}#{shard_index}"
+
+
+def _shard_index_from_event_tag(event_tag: str) -> int:
+    if str(event_tag).startswith(f"{_REQUEST_CALL_TAG}_"):
+        return int(str(event_tag).split("_")[-1])
+    if "#" in str(event_tag):
+        return int(str(event_tag).rsplit("#", 1)[1])
+    return 0
+
+
+def _validate_experimental_subinterpreter_config(
+    enabled: bool,
+    count: Optional[int],
+    max_concurrent_rpcs_per_shard: Optional[int],
+    scheduler: str,
+) -> _ExperimentalSubinterpreterConfig:
+    if not enabled:
+        if count is not None or max_concurrent_rpcs_per_shard is not None:
+            raise ValueError(
+                "experimental subinterpreter options require "
+                "experimental_use_subinterpreters=True."
+            )
+        if scheduler != "round_robin":
+            raise ValueError(
+                "experimental_subinterpreter_scheduler requires "
+                "experimental_use_subinterpreters=True unless default "
+                '"round_robin" is used.'
+            )
+        return _ExperimentalSubinterpreterConfig(
+            False, None, None, "round_robin"
+        )
+    if count is not None and count < 1:
+        raise ValueError("experimental_subinterpreter_count must be >= 1.")
+    if (
+        max_concurrent_rpcs_per_shard is not None
+        and max_concurrent_rpcs_per_shard < 1
+    ):
+        raise ValueError(
+            "experimental_max_concurrent_rpcs_per_shard must be >= 1."
+        )
+    if scheduler not in ("round_robin", "least_loaded"):
+        raise ValueError(
+            'experimental_subinterpreter_scheduler must be "round_robin" '
+            'or "least_loaded".'
+        )
+    if sys.version_info < (3, 12):
+        raise ValueError(
+            "experimental_use_subinterpreters requires Python 3.12+."
+        )
+    warnings.warn(
+        "experimental_use_subinterpreters is experimental and currently enables "
+        "CQ sharding plus lifecycle scaffolding; full per-interpreter request "
+        "execution is not yet implemented.",
+        UserWarning,
+        stacklevel=2,
+    )
+    return _ExperimentalSubinterpreterConfig(
+        True, count, max_concurrent_rpcs_per_shard, scheduler
+    )
 
 
 def _serialized_request(request_event: cygrpc.BaseEvent) -> bytes:
@@ -1129,7 +1221,7 @@ class _ServerStage(enum.Enum):
 
 class _ServerState:
     lock: threading.RLock
-    completion_queue: cygrpc.CompletionQueue
+    completion_queues: List[cygrpc.CompletionQueue]
     server: cygrpc.Server
     generic_handlers: List[grpc.GenericRpcHandler]
     registered_method_handlers: Dict[str, grpc.RpcMethodHandler]
@@ -1140,22 +1232,28 @@ class _ServerState:
     shutdown_events: List[threading.Event]
     maximum_concurrent_rpcs: Optional[int]
     active_rpc_count: int
+    active_rpc_count_by_shard: List[int]
     rpc_states: Set[_RPCState]
     due: Set[str]
+    registered_method_tags: Dict[str, str]
+    next_shard_index: int
     server_deallocated: bool
+    experimental_subinterpreter_config: _ExperimentalSubinterpreterConfig
+    subinterpreter_pool: Optional[SubinterpreterPool]
 
     # pylint: disable=too-many-arguments
     def __init__(
         self,
-        completion_queue: cygrpc.CompletionQueue,
+        completion_queues: List[cygrpc.CompletionQueue],
         server: cygrpc.Server,
         generic_handlers: Sequence[grpc.GenericRpcHandler],
         interceptor_pipeline: Optional[_interceptor._ServicePipeline],
         thread_pool: futures.ThreadPoolExecutor,
         maximum_concurrent_rpcs: Optional[int],
+        experimental_subinterpreter_config: _ExperimentalSubinterpreterConfig,
     ):
         self.lock = threading.RLock()
-        self.completion_queue = completion_queue
+        self.completion_queues = completion_queues
         self.server = server
         self.generic_handlers = list(generic_handlers)
         self.interceptor_pipeline = interceptor_pipeline
@@ -1165,7 +1263,14 @@ class _ServerState:
         self.shutdown_events = [self.termination_event]
         self.maximum_concurrent_rpcs = maximum_concurrent_rpcs
         self.active_rpc_count = 0
+        self.active_rpc_count_by_shard = [0] * len(completion_queues)
         self.registered_method_handlers = {}
+        self.registered_method_tags = {}
+        self.next_shard_index = 0
+        self.experimental_subinterpreter_config = (
+            experimental_subinterpreter_config
+        )
+        self.subinterpreter_pool = None
 
         # TODO(https://github.com/grpc/grpc/issues/6597): eliminate these fields.
         self.rpc_states = set()
@@ -1205,18 +1310,24 @@ def _add_secure_port(
         )
 
 
-def _request_call(state: _ServerState) -> None:
+def _request_call(state: _ServerState, shard_index: int) -> None:
+    completion_queue = state.completion_queues[shard_index]
+    request_call_tag = _request_call_tag_for_shard(shard_index)
     state.server.request_call(
-        state.completion_queue, state.completion_queue, _REQUEST_CALL_TAG
+        completion_queue, completion_queue, request_call_tag
     )
-    state.due.add(_REQUEST_CALL_TAG)
+    state.due.add(request_call_tag)
 
 
-def _request_registered_call(state: _ServerState, method: str) -> None:
-    registered_call_tag = method
+def _request_registered_call(
+    state: _ServerState, method: str, shard_index: int
+) -> None:
+    completion_queue = state.completion_queues[shard_index]
+    registered_call_tag = _registered_method_tag_for_shard(method, shard_index)
+    state.registered_method_tags[registered_call_tag] = method
     state.server.request_registered_call(
-        state.completion_queue,
-        state.completion_queue,
+        completion_queue,
+        completion_queue,
         method,
         registered_call_tag,
     )
@@ -1234,9 +1345,60 @@ def _stop_serving(state: _ServerState) -> bool:
     return False
 
 
-def _on_call_completed(state: _ServerState) -> None:
+def _on_call_completed_for_shard(state: _ServerState, shard_index: int) -> None:
     with state.lock:
         state.active_rpc_count -= 1
+        state.active_rpc_count_by_shard[shard_index] -= 1
+
+
+def _experimental_server_stats(state: _ServerState) -> Dict[str, Any]:
+    with state.lock:
+        due_by_shard = [0] * len(state.completion_queues)
+        for tag in state.due:
+            if tag is _SHUTDOWN_TAG:
+                continue
+            shard_index = _shard_index_from_event_tag(str(tag))
+            if shard_index < len(due_by_shard):
+                due_by_shard[shard_index] += 1
+        return {
+            "enabled": state.experimental_subinterpreter_config.enabled,
+            "configured_subinterpreter_count": (
+                state.experimental_subinterpreter_config.count
+            ),
+            "max_concurrent_rpcs_per_shard": (
+                state.experimental_subinterpreter_config.max_concurrent_rpcs_per_shard
+            ),
+            "scheduler": state.experimental_subinterpreter_config.scheduler,
+            "completion_queue_count": len(state.completion_queues),
+            "active_rpc_count": state.active_rpc_count,
+            "active_rpc_count_by_shard": tuple(state.active_rpc_count_by_shard),
+            "pending_due_tags_by_shard": tuple(due_by_shard),
+            "pending_due_tags_total": len(state.due),
+            "stage": state.stage.value,
+            "subinterpreter_pool_active": (
+                state.subinterpreter_pool is not None
+            ),
+        }
+
+
+def _select_next_shard_index(state: _ServerState, current_shard_index: int) -> int:
+    if len(state.completion_queues) == 1:
+        return 0
+    scheduler = state.experimental_subinterpreter_config.scheduler
+    if scheduler == "least_loaded":
+        min_index = 0
+        min_value = state.active_rpc_count_by_shard[0]
+        for index, value in enumerate(state.active_rpc_count_by_shard):
+            if value < min_value:
+                min_index = index
+                min_value = value
+        return min_index
+    # round_robin
+    selected = state.next_shard_index
+    state.next_shard_index = (state.next_shard_index + 1) % len(
+        state.completion_queues
+    )
+    return selected
 
 
 # pylint: disable=too-many-branches
@@ -1249,13 +1411,14 @@ def _process_event_and_continue(
             state.due.remove(_SHUTDOWN_TAG)
             if _stop_serving(state):
                 should_continue = False
-    elif (
-        event.tag is _REQUEST_CALL_TAG
-        or event.tag in state.registered_method_handlers
+    elif event.tag in state.due and (
+        str(event.tag).startswith(f"{_REQUEST_CALL_TAG}_")
+        or event.tag in state.registered_method_tags
     ):
+        shard_index = _shard_index_from_event_tag(str(event.tag))
         registered_method_name = None
-        if event.tag in state.registered_method_handlers:
-            registered_method_name = event.tag
+        if event.tag in state.registered_method_tags:
+            registered_method_name = state.registered_method_tags[event.tag]
             method_with_handler = _RegisteredMethod(
                 registered_method_name,
                 state.registered_method_handlers.get(
@@ -1268,9 +1431,16 @@ def _process_event_and_continue(
             )
         with state.lock:
             state.due.remove(event.tag)
+            max_concurrent_rpcs_per_shard = (
+                state.experimental_subinterpreter_config.max_concurrent_rpcs_per_shard
+            )
             concurrency_exceeded = (
                 state.maximum_concurrent_rpcs is not None
                 and state.active_rpc_count >= state.maximum_concurrent_rpcs
+            ) or (
+                max_concurrent_rpcs_per_shard is not None
+                and state.active_rpc_count_by_shard[shard_index]
+                >= max_concurrent_rpcs_per_shard
             )
             rpc_state, rpc_future = _handle_call(
                 event,
@@ -1283,14 +1453,22 @@ def _process_event_and_continue(
                 state.rpc_states.add(rpc_state)
             if rpc_future is not None:
                 state.active_rpc_count += 1
+                state.active_rpc_count_by_shard[shard_index] += 1
                 rpc_future.add_done_callback(
-                    lambda _unused_future: _on_call_completed(state)
+                    lambda _unused_future: _on_call_completed_for_shard(
+                        state, shard_index
+                    )
                 )
             if state.stage is _ServerStage.STARTED:
+                next_shard_index = _select_next_shard_index(
+                    state, shard_index
+                )
                 if registered_method_name in state.registered_method_handlers:
-                    _request_registered_call(state, registered_method_name)
+                    _request_registered_call(
+                        state, registered_method_name, next_shard_index
+                    )
                 else:
-                    _request_call(state)
+                    _request_call(state, next_shard_index)
             elif _stop_serving(state):
                 should_continue = False
     else:
@@ -1308,10 +1486,10 @@ def _process_event_and_continue(
     return should_continue
 
 
-def _serve(state: _ServerState) -> None:
+def _serve(state: _ServerState, completion_queue: cygrpc.CompletionQueue) -> None:
     while True:
         timeout = time.time() + _DEALLOCATED_SERVER_CHECK_PERIOD_S
-        event = state.completion_queue.poll(timeout)
+        event = completion_queue.poll(timeout)
         if state.server_deallocated:
             _begin_shutdown_once(state)
         is_timeout = (
@@ -1328,7 +1506,7 @@ def _serve(state: _ServerState) -> None:
 def _begin_shutdown_once(state: _ServerState) -> None:
     with state.lock:
         if state.stage is _ServerStage.STARTED:
-            state.server.shutdown(state.completion_queue, _SHUTDOWN_TAG)
+            state.server.shutdown(state.completion_queues[0], _SHUTDOWN_TAG)
             state.stage = _ServerStage.GRACE
             state.due.add(_SHUTDOWN_TAG)
 
@@ -1340,6 +1518,13 @@ def _stop(state: _ServerState, grace: Optional[float]) -> threading.Event:
             shutdown_event.set()
             return shutdown_event
         _begin_shutdown_once(state)
+        # Shutdown sub-interpreter pool if active.
+        if state.subinterpreter_pool is not None:
+            try:
+                state.subinterpreter_pool.shutdown(grace=grace)
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Error shutting down SubinterpreterPool")
+            state.subinterpreter_pool = None
         shutdown_event = threading.Event()
         state.shutdown_events.append(shutdown_event)
         if grace is None:
@@ -1358,21 +1543,134 @@ def _stop(state: _ServerState, grace: Optional[float]) -> threading.Event:
     return shutdown_event
 
 
+def _build_servicer_specs(
+    registered_method_handlers: Dict[str, grpc.RpcMethodHandler],
+) -> list:
+    """Build servicer specs for sub-interpreter import.
+
+    Extracts module and function paths from registered method handlers
+    so each sub-interpreter can independently import and instantiate them.
+    Returns a list suitable for passing to SubinterpreterPool.
+    """
+    specs: List[Tuple[str, str, list]] = []
+    bindings: list = []
+    for method, handler in registered_method_handlers.items():
+        deser_path = None
+        ser_path = None
+        attr_name = None
+        behavior = None
+        if handler.unary_unary is not None:
+            behavior = handler.unary_unary
+            attr_name = "unary_unary"
+        elif handler.unary_stream is not None:
+            behavior = handler.unary_stream
+            attr_name = "unary_stream"
+        elif handler.stream_unary is not None:
+            behavior = handler.stream_unary
+            attr_name = "stream_unary"
+        elif handler.stream_stream is not None:
+            behavior = handler.stream_stream
+            attr_name = "stream_stream"
+        if behavior is None:
+            continue
+        if handler.request_deserializer is not None:
+            deser = handler.request_deserializer
+            deser_path = f"{deser.__module__}.{deser.__qualname__}"
+        if handler.response_serializer is not None:
+            ser = handler.response_serializer
+            ser_path = f"{ser.__module__}.{ser.__qualname__}"
+        # Extract the method name from the bound method's class.
+        if hasattr(behavior, "__self__"):
+            cls = type(behavior.__self__)
+            module_path = cls.__module__
+            class_name = cls.__qualname__
+            func_attr = behavior.__func__.__name__
+        else:
+            # Standalone function — wrap in a trivial spec.
+            module_path = behavior.__module__
+            class_name = behavior.__qualname__.rsplit(".", 1)[0]
+            func_attr = behavior.__name__
+        bindings.append((method, deser_path, ser_path, func_attr))
+        # Group by (module, class) — deduplicate later.
+        found = False
+        for existing_spec in specs:
+            if existing_spec[0] == module_path and existing_spec[1] == class_name:
+                existing_spec[2].append(
+                    (method, deser_path, ser_path, func_attr)
+                )
+                found = True
+                break
+        if not found:
+            specs.append(
+                [module_path, class_name, [(method, deser_path, ser_path, func_attr)]]
+            )
+    return specs
+
+
 def _start(state: _ServerState) -> None:
     with state.lock:
         if state.stage is not _ServerStage.STOPPED:
             error_msg = "Cannot start already-started server!"
             raise ValueError(error_msg)
+        if state.experimental_subinterpreter_config.enabled:
+            _LOGGER.info(
+                "Experimental sub-interpreter mode requested "
+                "(worker_count=%s, max_concurrent_rpcs_per_shard=%s, "
+                "scheduler=%s).",
+                state.experimental_subinterpreter_config.count,
+                state.experimental_subinterpreter_config.max_concurrent_rpcs_per_shard,
+                state.experimental_subinterpreter_config.scheduler,
+            )
+            # Create the sub-interpreter pool if the runtime supports it.
+            if _subinterpreters_supported():
+                worker_count = (
+                    state.experimental_subinterpreter_config.count or 1
+                )
+                servicer_specs = _build_servicer_specs(
+                    state.registered_method_handlers
+                )
+                if servicer_specs:
+                    try:
+                        pool = SubinterpreterPool(
+                            count=worker_count,
+                            servicer_specs=servicer_specs,
+                        )
+                        pool.start()
+                        state.subinterpreter_pool = pool
+                        _LOGGER.info(
+                            "SubinterpreterPool started with %d workers",
+                            worker_count,
+                        )
+                    except Exception:  # pylint: disable=broad-except
+                        _LOGGER.exception(
+                            "Failed to start SubinterpreterPool; "
+                            "falling back to thread pool dispatch."
+                        )
+                else:
+                    _LOGGER.info(
+                        "No servicer specs available for sub-interpreter "
+                        "dispatch; using thread pool."
+                    )
+            else:
+                _LOGGER.info(
+                    "Sub-interpreter runtime not available; "
+                    "CQ sharding active but using thread pool dispatch."
+                )
         state.server.start()
         state.stage = _ServerStage.STARTED
         # Request a call for each registered method so we can handle any of them.
         for method in state.registered_method_handlers:
-            _request_registered_call(state, method)
+            for shard_index, _ in enumerate(state.completion_queues):
+                _request_registered_call(state, method, shard_index)
         # Also request a call for non-registered method.
-        _request_call(state)
-        thread = threading.Thread(target=_serve, args=(state,))
-        thread.daemon = True
-        thread.start()
+        for shard_index, _ in enumerate(state.completion_queues):
+            _request_call(state, shard_index)
+        for completion_queue in state.completion_queues:
+            thread = threading.Thread(
+                target=_serve, args=(state, completion_queue)
+            )
+            thread.daemon = True
+            thread.start()
 
 
 def _validate_generic_rpc_handlers(
@@ -1417,17 +1715,23 @@ class _Server(grpc.Server):
         maximum_concurrent_rpcs: Optional[int],
         compression: Optional[grpc.Compression],
         xds: bool,
+        experimental_subinterpreter_config: _ExperimentalSubinterpreterConfig,
     ):
-        completion_queue = cygrpc.CompletionQueue()
+        queue_count = 1
+        if experimental_subinterpreter_config.enabled:
+            queue_count = experimental_subinterpreter_config.count or 1
+        completion_queues = [cygrpc.CompletionQueue() for _ in range(queue_count)]
         server = cygrpc.Server(_augment_options(options, compression, xds), xds)
-        server.register_completion_queue(completion_queue)
+        for completion_queue in completion_queues:
+            server.register_completion_queue(completion_queue)
         self._state = _ServerState(
-            completion_queue,
+            completion_queues,
             server,
             generic_handlers,
             _interceptor.service_pipeline(interceptors),
             thread_pool,
             maximum_concurrent_rpcs,
+            experimental_subinterpreter_config,
         )
         self._cy_server = server
 
@@ -1487,6 +1791,9 @@ class _Server(grpc.Server):
     def stop(self, grace: Optional[float]) -> threading.Event:
         return _stop(self._state, grace)
 
+    def _experimental_get_server_stats(self) -> Dict[str, Any]:
+        return _experimental_server_stats(self._state)
+
     def __del__(self):
         if hasattr(self, "_state"):
             # We can not grab a lock in __del__(), so set a flag to signal the
@@ -1502,8 +1809,20 @@ def create_server(
     maximum_concurrent_rpcs: Optional[int],
     compression: Optional[grpc.Compression],
     xds: bool,
+    experimental_use_subinterpreters: bool = False,
+    experimental_subinterpreter_count: Optional[int] = None,
+    experimental_max_concurrent_rpcs_per_shard: Optional[int] = None,
+    experimental_subinterpreter_scheduler: str = "round_robin",
 ) -> _Server:
     _validate_generic_rpc_handlers(generic_rpc_handlers)
+    experimental_subinterpreter_config = (
+        _validate_experimental_subinterpreter_config(
+            experimental_use_subinterpreters,
+            experimental_subinterpreter_count,
+            experimental_max_concurrent_rpcs_per_shard,
+            experimental_subinterpreter_scheduler,
+        )
+    )
     return _Server(
         thread_pool,
         generic_rpc_handlers,
@@ -1512,4 +1831,5 @@ def create_server(
         maximum_concurrent_rpcs,
         compression,
         xds,
+        experimental_subinterpreter_config,
     )
