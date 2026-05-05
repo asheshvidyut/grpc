@@ -21,9 +21,9 @@ Usage:
     python benchmark_preread_payload.py [payload_size_bytes] [iterations]
 """
 
+from concurrent import futures
 import sys
 import time
-from concurrent import futures
 
 import grpc
 
@@ -83,7 +83,9 @@ def run_benchmark(port, payload_size, iterations):
     print(f"RPC/s: {rps:.0f}")
     print(f"Avg latency: {avg_latency_us:.1f} μs")
     if payload_size > 0:
-        throughput_mbps = (payload_size * iterations) / (1024 * 1024) / total_time
+        throughput_mbps = (
+            (payload_size * iterations) / (1024 * 1024) / total_time
+        )
         print(f"Throughput: {throughput_mbps:.2f} MB/s")
     print()
 
