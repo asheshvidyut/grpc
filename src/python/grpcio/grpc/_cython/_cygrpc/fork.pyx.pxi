@@ -89,13 +89,15 @@ cdef void __postfork_child() noexcept nogil:
             _LOGGER.error('Exiting child due to raised exception')
             _LOGGER.error(sys.exc_info()[0])
             os._exit(os.EX_USAGE)
-        # Give ~2s to shutdown asynchronously.
-        wait_ms = 10
-        while wait_ms < 1500:
+        # In heavily loaded environments (CI with parallel tests), the
+        # gRPC core shutdown in the child process can take longer than
+        # expected. Use a generous timeout to avoid flaky failures.
+        wait_ms = 0
+        while wait_ms < 5000:
             if grpc_is_initialized() == 0:
                 return
-            time.sleep(wait_ms / 1000)
-            wait_ms = wait_ms * 2
+            time.sleep(0.1)
+            wait_ms = wait_ms + 100
         _LOGGER.error('Failed to shutdown gRPC Core after fork()')
         os._exit(os.EX_USAGE)
 
