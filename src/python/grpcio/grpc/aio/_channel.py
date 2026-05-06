@@ -397,7 +397,7 @@ class Channel(_base_channel.Channel):
         # No new calls will be accepted by the Cython channel.
         self._channel.closing()
 
-        calls = list(self._active_calls)
+        calls = [call for call in self._active_calls if not call.done()]
 
         if grace is not None and grace > 0:
             tasks_to_wait = []
