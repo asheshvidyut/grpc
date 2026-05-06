@@ -408,6 +408,8 @@ class Channel(_base_channel.Channel):
                 # Stream response calls (UnaryStream, StreamStream) use _preparation
                 elif hasattr(call, "_preparation"):
                     tasks_to_wait.append(call._preparation)
+                elif hasattr(call, "_interceptors_task"):
+                    tasks_to_wait.append(call._interceptors_task)
 
             if tasks_to_wait:
                 await asyncio.wait(tasks_to_wait, timeout=grace)
