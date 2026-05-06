@@ -342,9 +342,12 @@ class ServerClientMixin:
                     )
                 )
             elif client_result.type() == cygrpc.OperationType.receive_message:
-                # Single-slice messages should return memoryview (zero-copy)
-                self.assertIsInstance(client_result.message(), memoryview)
-                self.assertEqual(RESPONSE, bytes(client_result.message()))
+                if cygrpc.python_memoryview_enabled():
+                    self.assertIsInstance(client_result.message(), memoryview)
+                    self.assertEqual(RESPONSE, bytes(client_result.message()))
+                else:
+                    self.assertIsInstance(client_result.message(), bytes)
+                    self.assertEqual(RESPONSE, client_result.message())
             elif (
                 client_result.type()
                 == cygrpc.OperationType.receive_status_on_client
@@ -377,9 +380,12 @@ class ServerClientMixin:
             self.assertNotIn(server_result.type(), found_server_op_types)
             found_server_op_types.add(server_result.type())
             if server_result.type() == cygrpc.OperationType.receive_message:
-                # Single-slice messages should return memoryview (zero-copy)
-                self.assertIsInstance(server_result.message(), memoryview)
-                self.assertEqual(REQUEST, bytes(server_result.message()))
+                if cygrpc.python_memoryview_enabled():
+                    self.assertIsInstance(server_result.message(), memoryview)
+                    self.assertEqual(REQUEST, bytes(server_result.message()))
+                else:
+                    self.assertIsInstance(server_result.message(), bytes)
+                    self.assertEqual(REQUEST, server_result.message())
             elif (
                 server_result.type()
                 == cygrpc.OperationType.receive_close_on_server
@@ -509,10 +515,16 @@ class ServerClientMixin:
         client_received, server_received = self._do_simple_echo(
             REQUEST, RESPONSE
         )
-        self.assertIsInstance(server_received, memoryview)
-        self.assertEqual(b"memoryview request payload", bytes(server_received))
-        self.assertIsInstance(client_received, memoryview)
-        self.assertEqual(RESPONSE, bytes(client_received))
+        if cygrpc.python_memoryview_enabled():
+            self.assertIsInstance(server_received, memoryview)
+            self.assertEqual(b"memoryview request payload", bytes(server_received))
+            self.assertIsInstance(client_received, memoryview)
+            self.assertEqual(RESPONSE, bytes(client_received))
+        else:
+            self.assertIsInstance(server_received, bytes)
+            self.assertEqual(b"memoryview request payload", server_received)
+            self.assertIsInstance(client_received, bytes)
+            self.assertEqual(RESPONSE, client_received)
 
     def test_send_list_of_bytes(self):
         """Validates that SendMessageOperation accepts list-of-bytes input
@@ -522,7 +534,10 @@ class ServerClientMixin:
         client_received, server_received = self._do_simple_echo(
             REQUEST, RESPONSE
         )
-        self.assertIsInstance(server_received, memoryview)
+        if cygrpc.python_memoryview_enabled():
+            self.assertIsInstance(server_received, memoryview)
+        else:
+            self.assertIsInstance(server_received, bytes)
         self.assertEqual(b"chunk1chunk2chunk3", bytes(server_received))
 
     def test_empty_message_returns_bytes(self):
