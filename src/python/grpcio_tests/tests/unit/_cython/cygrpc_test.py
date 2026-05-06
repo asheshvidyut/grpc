@@ -517,7 +517,9 @@ class ServerClientMixin:
         )
         if cygrpc.python_memoryview_enabled():
             self.assertIsInstance(server_received, memoryview)
-            self.assertEqual(b"memoryview request payload", bytes(server_received))
+            self.assertEqual(
+                b"memoryview request payload", bytes(server_received)
+            )
             self.assertIsInstance(client_received, memoryview)
             self.assertEqual(RESPONSE, bytes(client_received))
         else:
