@@ -92,6 +92,7 @@ cdef void __postfork_child() noexcept nogil:
         # In heavily loaded environments (CI with parallel tests), the
         # gRPC core shutdown in the child process can take longer than
         # expected. Use a generous timeout to avoid flaky failures.
+        # Give ~5s to shutdown asynchronously.
         wait_ms = 0
         while wait_ms < 5000:
             if grpc_is_initialized() == 0:
