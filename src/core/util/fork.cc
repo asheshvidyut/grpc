@@ -88,13 +88,22 @@ class ExecCtxState {
 
   bool BlockExecCtx() {
     // Assumes there is an active ExecCtx when this function is called
-    if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
-      gpr_mu_lock(&mu_);
-      fork_complete_ = false;
-      gpr_mu_unlock(&mu_);
-      return true;
+    // Wait up to 500ms for other threads to finish their ExecCtx.
+    gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
+                                         gpr_time_from_millis(500, GPR_TIMESPAN));
+    while (true) {
+      if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
+        gpr_mu_lock(&mu_);
+        fork_complete_ = false;
+        gpr_mu_unlock(&mu_);
+        return true;
+      }
+      if (gpr_time_cmp(gpr_now(GPR_CLOCK_MONOTONIC), deadline) >= 0) {
+        return false;
+      }
+      gpr_sleep_until(gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
+                                   gpr_time_from_millis(10, GPR_TIMESPAN)));
     }
-    return false;
   }
 
   void AllowExecCtx() {
