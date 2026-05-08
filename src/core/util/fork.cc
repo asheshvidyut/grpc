@@ -89,8 +89,8 @@ class ExecCtxState {
   bool BlockExecCtx() {
     // Assumes there is an active ExecCtx when this function is called
     // Wait up to 500ms for other threads to finish their ExecCtx.
-    gpr_timespec deadline = gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
-                                         gpr_time_from_millis(500, GPR_TIMESPAN));
+    gpr_timespec deadline = gpr_time_add(
+        gpr_now(GPR_CLOCK_MONOTONIC), gpr_time_from_millis(500, GPR_TIMESPAN));
     while (true) {
       if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
         gpr_mu_lock(&mu_);
