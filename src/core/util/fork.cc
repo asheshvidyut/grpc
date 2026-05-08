@@ -87,14 +87,35 @@ class ExecCtxState {
   }
 
   bool BlockExecCtx() {
-    // Assumes there is an active ExecCtx when this function is called
-    if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
-      gpr_mu_lock(&mu_);
-      fork_complete_ = false;
-      gpr_mu_unlock(&mu_);
-      return true;
+    // Assumes there is an active ExecCtx when this function is called.
+    //
+    // On platforms whose polling engine keeps an ExecCtx live for a large
+    // fraction of wall time (notably macOS, which falls back to the poll(2)
+    // based engine because epoll is unavailable), this CAS frequently loses
+    // a race against background gRPC threads that are mid-ExecCtx at the
+    // moment pthread_atfork fires. A failed CAS makes grpc_prefork() bail
+    // out silently without stopping the timer manager or awaiting threads,
+    // so the child inherits a polluted iomgr and cannot shut gRPC down,
+    // ultimately exiting with EX_USAGE (64) from __postfork_child().
+    //
+    // Retry the CAS for up to 500ms with a 10ms backoff to give in-flight
+    // ExecCtxs time to drain. Linux/epoll1 lands on the first try; this is
+    // a no-op there.
+    gpr_timespec deadline = gpr_time_add(
+        gpr_now(GPR_CLOCK_MONOTONIC), gpr_time_from_millis(500, GPR_TIMESPAN));
+    while (true) {
+      if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
+        gpr_mu_lock(&mu_);
+        fork_complete_ = false;
+        gpr_mu_unlock(&mu_);
+        return true;
+      }
+      if (gpr_time_cmp(gpr_now(GPR_CLOCK_MONOTONIC), deadline) >= 0) {
+        return false;
+      }
+      gpr_sleep_until(gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
+                                   gpr_time_from_millis(10, GPR_TIMESPAN)));
     }
-    return false;
   }
 
   void AllowExecCtx() {
