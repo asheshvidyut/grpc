@@ -23,6 +23,7 @@
 #include <grpc/support/sync.h>
 #include <grpc/support/time.h>
 
+#include <atomic>
 #include <utility>
 
 #include "src/core/config/config_vars.h"
@@ -48,7 +49,7 @@ namespace {
 
 class ExecCtxState {
  public:
-  ExecCtxState() : fork_complete_(true) {
+  ExecCtxState() : fork_complete_(true), blocking_in_progress_(false) {
     gpr_mu_init(&mu_);
     gpr_cv_init(&cv_);
     gpr_atm_no_barrier_store(&count_, UNBLOCKED(0));
@@ -62,11 +63,23 @@ class ExecCtxState {
     }
     gpr_atm count = gpr_atm_no_barrier_load(&count_);
     while (true) {
-      if (count <= BLOCKED(1)) {
+      // Park if either:
+      //   (a) the count has already been transitioned to BLOCKED state, or
+      //   (b) BlockExecCtx() has signalled that it is trying to drain ExecCtxs
+      //       in preparation for fork. (b) keeps new ExecCtxs from being
+      //       created during the drain window so that the BLOCKED(1) CAS in
+      //       BlockExecCtx() can actually land — without it, a workload that
+      //       continuously creates ExecCtxs (e.g. macOS poll-engine workers
+      //       under load, or chatty RPC traffic right up to fork) would
+      //       indefinitely keep the count above UNBLOCKED(1) and the prefork
+      //       handler would silently bail (see fork_posix.cc).
+      if (count <= BLOCKED(1) ||
+          blocking_in_progress_.load(std::memory_order_acquire)) {
         // This only occurs if we are trying to fork.  Wait until the fork()
         // operation completes before allowing new ExecCtxs.
         gpr_mu_lock(&mu_);
-        if (gpr_atm_no_barrier_load(&count_) <= BLOCKED(1)) {
+        if (gpr_atm_no_barrier_load(&count_) <= BLOCKED(1) ||
+            blocking_in_progress_.load(std::memory_order_acquire)) {
           while (!fork_complete_) {
             gpr_cv_wait(&cv_, &mu_, gpr_inf_future(GPR_CLOCK_REALTIME));
           }
@@ -87,38 +100,57 @@ class ExecCtxState {
   }
 
   bool BlockExecCtx() {
-    // Assumes there is an active ExecCtx when this function is called.
+    // Assumes there is an active ExecCtx when this function is called, so the
+    // success state is count_ == UNBLOCKED(1) (only the prefork thread's
+    // ExecCtx remains).
     //
-    // On platforms whose polling engine keeps an ExecCtx live for a large
-    // fraction of wall time (notably macOS, which falls back to the poll(2)
-    // based engine because epoll is unavailable), this CAS frequently loses
-    // a race against background gRPC threads that are mid-ExecCtx at the
-    // moment pthread_atfork fires. A failed CAS makes grpc_prefork() bail
-    // out silently without stopping the timer manager or awaiting threads,
-    // so the child inherits a polluted iomgr and cannot shut gRPC down,
-    // ultimately exiting with EX_USAGE (64) from __postfork_child().
+    // The CAS UNBLOCKED(1) -> BLOCKED(1) only succeeds if at this instant no
+    // other thread holds an ExecCtx. Under realistic workloads — especially
+    // macOS, where gRPC falls back to ev_poll_posix because epoll is
+    // unavailable, and the poll-engine worker holds an ExecCtx for a
+    // significant fraction of wall time — that condition is rarely met,
+    // and grpc_prefork() bails silently (see fork_posix.cc). The child then
+    // inherits live gRPC threads / unfinished iomgr state and either:
+    //   (a) can't shut gRPC down, exiting EX_USAGE (64) from
+    //       __postfork_child(), or
+    //   (b) crashes inside absl::LowLevelAlloc when a fresh thread starts in
+    //       the child and the inherited skiplist is mid-update.
     //
-    // Retry the CAS for up to 500ms with a 10ms backoff to give in-flight
-    // ExecCtxs time to drain. Linux/epoll1 lands on the first try; this is
-    // a no-op there.
+    // To make the drain reliable, set blocking_in_progress_ first: that
+    // routes new IncExecCtxCount() callers to the cv-wait path so they can't
+    // keep replenishing the count while we wait for in-flight ExecCtxs to
+    // finish. Then retry the CAS for up to 5 seconds. If we time out, roll
+    // back the gate and broadcast so any parked waiters can proceed (the
+    // caller will fall back to the same skipped-handlers behaviour as before
+    // — this is a safety net, not a correctness regression).
+    blocking_in_progress_.store(true, std::memory_order_release);
+    gpr_mu_lock(&mu_);
+    fork_complete_ = false;
+    gpr_mu_unlock(&mu_);
+
     gpr_timespec deadline = gpr_time_add(
-        gpr_now(GPR_CLOCK_MONOTONIC), gpr_time_from_millis(500, GPR_TIMESPAN));
+        gpr_now(GPR_CLOCK_MONOTONIC), gpr_time_from_seconds(5, GPR_TIMESPAN));
     while (true) {
       if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
-        gpr_mu_lock(&mu_);
-        fork_complete_ = false;
-        gpr_mu_unlock(&mu_);
         return true;
       }
       if (gpr_time_cmp(gpr_now(GPR_CLOCK_MONOTONIC), deadline) >= 0) {
+        // Roll back: re-open the gate, restore fork_complete_, wake any
+        // threads parked in IncExecCtxCount().
+        blocking_in_progress_.store(false, std::memory_order_release);
+        gpr_mu_lock(&mu_);
+        fork_complete_ = true;
+        gpr_cv_broadcast(&cv_);
+        gpr_mu_unlock(&mu_);
         return false;
       }
       gpr_sleep_until(gpr_time_add(gpr_now(GPR_CLOCK_MONOTONIC),
-                                   gpr_time_from_millis(10, GPR_TIMESPAN)));
+                                   gpr_time_from_millis(2, GPR_TIMESPAN)));
     }
   }
 
   void AllowExecCtx() {
+    blocking_in_progress_.store(false, std::memory_order_release);
     gpr_mu_lock(&mu_);
     gpr_atm_no_barrier_store(&count_, UNBLOCKED(0));
     fork_complete_ = true;
@@ -133,6 +165,11 @@ class ExecCtxState {
 
  private:
   bool fork_complete_;
+  // Flag that BlockExecCtx() flips to true while it's draining in-flight
+  // ExecCtxs. Read by IncExecCtxCount() to decide whether to park even when
+  // the count is in the UNBLOCKED band. Cleared by AllowExecCtx() (success
+  // path) or BlockExecCtx() itself on timeout rollback.
+  std::atomic<bool> blocking_in_progress_;
   gpr_mu mu_;
   gpr_cv cv_;
   gpr_atm count_;
