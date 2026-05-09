@@ -128,8 +128,12 @@ class ExecCtxState {
     fork_complete_ = false;
     gpr_mu_unlock(&mu_);
 
+    // 30s is generous: the drain only blocks the prefork thread, runs at
+    // most once per fork(), and we'd rather pay extra latency on a rare
+    // path than fall back to the skipped-handlers behavior that previously
+    // produced post-fork crashes.
     gpr_timespec deadline = gpr_time_add(
-        gpr_now(GPR_CLOCK_MONOTONIC), gpr_time_from_seconds(5, GPR_TIMESPAN));
+        gpr_now(GPR_CLOCK_MONOTONIC), gpr_time_from_seconds(30, GPR_TIMESPAN));
     while (true) {
       if (gpr_atm_no_barrier_cas(&count_, UNBLOCKED(1), BLOCKED(1))) {
         return true;

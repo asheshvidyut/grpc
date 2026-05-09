@@ -67,12 +67,24 @@ void grpc_prefork() {
                  "polling strategies";
     return;
   }
+  // Stop the timer manager BEFORE attempting to drain ExecCtxs. The timer
+  // thread periodically fires callbacks that construct default-flag
+  // grpc_core::ExecCtx instances (which call IncExecCtxCount). If the timer
+  // is still running while BlockExecCtx() polls for count_ == UNBLOCKED(1),
+  // those callbacks keep replenishing the count and the drain can never
+  // land — manifesting as "Other threads are currently calling into gRPC,
+  // skipping fork() handlers". Stopping it first removes that source of
+  // churn so the BlockExecCtx gate (which already parks application
+  // threads) can actually succeed. If we end up failing to drain, the
+  // timer manager is restarted before we bail so the parent process
+  // continues to function normally.
+  grpc_timer_manager_set_threading(false);
   if (!grpc_core::Fork::BlockExecCtx()) {
+    grpc_timer_manager_set_threading(true);
     LOG(INFO) << "Other threads are currently calling into gRPC, skipping "
                  "fork() handlers";
     return;
   }
-  grpc_timer_manager_set_threading(false);
   grpc_core::ExecCtx::Get()->Flush();
   grpc_core::Fork::AwaitThreads();
   skipped_handler = false;
