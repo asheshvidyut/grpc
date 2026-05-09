@@ -430,9 +430,23 @@ def _in_progress_bidi_continue_call(channel):
                 raise ValueError("Unexpected status code") from rpc_error
             _async_unary(stub)
         inherited_code = parent_bidi_call.code()
-        if inherited_code != grpc.StatusCode.CANCELLED:
+        # The inherited bidi call is terminated post-fork by one of two
+        # independent cleanup paths in the child:
+        #   * Python's __postfork_child() iterates registered channels and
+        #     calls _close_on_fork(), which cancels in-flight calls -> CANCELLED.
+        #   * grpc_postfork_child() (pthread_atfork, in fork_posix.cc) resets
+        #     the polling engine and bumps the fd generation. Any pending I/O
+        #     on the inherited transport then fails the fd-generation guard
+        #     ("Stream removed (sendmsg: Wrong file descriptor generation)")
+        #     and the call's status is stamped UNAVAILABLE.
+        # Either status proves the inherited call was terminated rather than
+        # left alive, which is what this assertion is really checking.
+        if inherited_code not in (
+            grpc.StatusCode.CANCELLED,
+            grpc.StatusCode.UNAVAILABLE,
+        ):
             raise ValueError(
-                "Expected inherited code CANCELLED, "
+                "Expected inherited code CANCELLED or UNAVAILABLE, "
                 f"got {inherited_code} (details: {parent_bidi_call.details()})"
             )
 
