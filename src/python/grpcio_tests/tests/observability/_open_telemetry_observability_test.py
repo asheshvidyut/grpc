@@ -128,6 +128,25 @@ class OpenTelemetryObservabilityTest(unittest.TestCase):
         if self._server:
             self._server.stop(0)
 
+    def testDecodeLabels(self):
+        from grpc_observability._open_telemetry_observability import _OpenTelemetryPlugin
+
+        # Case 1: String values
+        labels_str = {"key1": "value1", "key2": "value2"}
+        res_str = _OpenTelemetryPlugin.decode_labels(labels_str)
+        self.assertEqual(res_str, {"key1": "value1", "key2": "value2"})
+
+        # Case 2: Bytes values
+        labels_bytes = {b"key1": b"value1", "key2": b"value2"}
+        res_bytes = _OpenTelemetryPlugin.decode_labels(labels_bytes)
+        self.assertEqual(res_bytes, {"key1": "value1", "key2": "value2"})
+
+        # Case 3: Other standard types
+        labels_other = {123: 456, "key2": 789}
+        res_other = _OpenTelemetryPlugin.decode_labels(labels_other)
+        self.assertEqual(res_other, {"123": "456", "key2": "789"})
+
+
     def testRecordUnaryUnaryUseContextManager(self):
         with grpc_observability.OpenTelemetryPlugin(
             meter_provider=self._provider
