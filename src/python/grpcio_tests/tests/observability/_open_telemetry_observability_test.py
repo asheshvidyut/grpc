@@ -129,7 +129,9 @@ class OpenTelemetryObservabilityTest(unittest.TestCase):
             self._server.stop(0)
 
     def testDecodeLabels(self):
-        from grpc_observability._open_telemetry_observability import _OpenTelemetryPlugin
+        from grpc_observability._open_telemetry_observability import (
+            _OpenTelemetryPlugin,
+        )
 
         # Case 1: String values
         labels_str = {"key1": "value1", "key2": "value2"}
@@ -145,7 +147,6 @@ class OpenTelemetryObservabilityTest(unittest.TestCase):
         labels_other = {123: 456, "key2": 789}
         res_other = _OpenTelemetryPlugin.decode_labels(labels_other)
         self.assertEqual(res_other, {"123": "456", "key2": "789"})
-
 
     def testRecordUnaryUnaryUseContextManager(self):
         with grpc_observability.OpenTelemetryPlugin(

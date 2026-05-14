@@ -329,16 +329,27 @@ class MetadataExchangeTest(unittest.TestCase):
 
         # Scenario 1: No peer metadata key
         labels_missing = {"foo": "bar"}
-        res_missing = CSMOpenTelemetryLabelInjector.deserialize_labels(labels_missing)
+        res_missing = CSMOpenTelemetryLabelInjector.deserialize_labels(
+            labels_missing
+        )
         self.assertEqual(res_missing["csm.remote_workload_type"], UNKNOWN_VALUE)
-        self.assertEqual(res_missing["csm.remote_workload_canonical_service"], UNKNOWN_VALUE)
+        self.assertEqual(
+            res_missing["csm.remote_workload_canonical_service"], UNKNOWN_VALUE
+        )
         self.assertEqual(res_missing["foo"], "bar")
 
         # Scenario 2: Peer metadata is malformed
-        labels_invalid = {"XEnvoyPeerMetadata": b"corrupted_bytes", "foo": "bar"}
-        res_invalid = CSMOpenTelemetryLabelInjector.deserialize_labels(labels_invalid)
+        labels_invalid = {
+            "XEnvoyPeerMetadata": b"corrupted_bytes",
+            "foo": "bar",
+        }
+        res_invalid = CSMOpenTelemetryLabelInjector.deserialize_labels(
+            labels_invalid
+        )
         self.assertEqual(res_invalid["csm.remote_workload_type"], UNKNOWN_VALUE)
-        self.assertEqual(res_invalid["csm.remote_workload_canonical_service"], UNKNOWN_VALUE)
+        self.assertEqual(
+            res_invalid["csm.remote_workload_canonical_service"], UNKNOWN_VALUE
+        )
         self.assertEqual(res_invalid["foo"], "bar")
 
         # Scenario 3: Valid peer metadata
@@ -350,16 +361,31 @@ class MetadataExchangeTest(unittest.TestCase):
         pb_struct.fields["cluster_name"].string_value = "my_cluster"
         pb_struct.fields["location"].string_value = "my_location"
         pb_struct.fields["project_id"].string_value = "my_project"
-        labels_valid = {"XEnvoyPeerMetadata": pb_struct.SerializeToString(), "foo": "bar"}
+        labels_valid = {
+            "XEnvoyPeerMetadata": pb_struct.SerializeToString(),
+            "foo": "bar",
+        }
 
-        res_valid = CSMOpenTelemetryLabelInjector.deserialize_labels(labels_valid)
+        res_valid = CSMOpenTelemetryLabelInjector.deserialize_labels(
+            labels_valid
+        )
         self.assertEqual(res_valid["csm.remote_workload_type"], TYPE_GKE)
-        self.assertEqual(res_valid["csm.remote_workload_canonical_service"], "my_service")
+        self.assertEqual(
+            res_valid["csm.remote_workload_canonical_service"], "my_service"
+        )
         self.assertEqual(res_valid["csm.remote_workload_name"], "my_work_name")
-        self.assertEqual(res_valid["csm.remote_workload_namespace_name"], "my_namespace")
-        self.assertEqual(res_valid["csm.remote_workload_cluster_name"], "my_cluster")
-        self.assertEqual(res_valid["csm.remote_workload_location"], "my_location")
-        self.assertEqual(res_valid["csm.remote_workload_project_id"], "my_project")
+        self.assertEqual(
+            res_valid["csm.remote_workload_namespace_name"], "my_namespace"
+        )
+        self.assertEqual(
+            res_valid["csm.remote_workload_cluster_name"], "my_cluster"
+        )
+        self.assertEqual(
+            res_valid["csm.remote_workload_location"], "my_location"
+        )
+        self.assertEqual(
+            res_valid["csm.remote_workload_project_id"], "my_project"
+        )
         self.assertEqual(res_valid["foo"], "bar")
 
     @mock.patch(
