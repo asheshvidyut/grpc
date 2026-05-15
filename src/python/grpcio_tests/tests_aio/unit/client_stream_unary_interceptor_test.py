@@ -17,9 +17,9 @@ import logging
 import unittest
 
 import grpc
+from grpc.aio._interceptor import _InterceptedStreamRequestMixin
 from grpc.experimental import aio
 
-from grpc.aio._interceptor import _InterceptedStreamRequestMixin
 from src.proto.grpc.testing import messages_pb2
 from src.proto.grpc.testing import test_pb2_grpc
 from tests.unit.framework.common import test_constants
