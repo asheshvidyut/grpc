@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM arm64v8/debian:11
+FROM arm64v8/python:3.10-bullseye
 
 #=================
 # Basic C core dependencies
@@ -70,30 +70,10 @@ RUN mkdir /var/local/jenkins
 # to be installed before Python.
 RUN apt-get update && apt-get install -y libsqlite3-dev
 
-#=================
-# Compile CPython 3.10.3 from source
+# Google Cloud Platform API libraries
+# These are needed for uploading test results to BigQuery (e.g. by tools/run_tests scripts)
+RUN python3 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
 
-RUN apt-get update && apt-get install -y zlib1g-dev libssl-dev libsqlite3-dev && apt-get clean
-RUN apt-get update && apt-get install -y jq build-essential libffi-dev && apt-get clean
-
-RUN cd /tmp && \
-    wget -q https://www.python.org/ftp/python/3.10.3/Python-3.10.3.tgz && \
-    tar xzvf Python-3.10.3.tgz && \
-    cd Python-3.10.3 && \
-    ./configure && \
-    make -j4 && \
-    make install
-
-RUN cd /tmp && \
-    echo "f276ffcd05bccafe46da023d0a5bb04a Python-3.10.3.tgz" > checksum.md5 && \
-    md5sum -c checksum.md5
-
-RUN python3.10 -m ensurepip && \
-    python3.10 -m pip install coverage
-
-
-# TODO(sergiitk):  Should we updating gcp_api_libraries.include instead?
-RUN python3.10 -m pip install --upgrade google-auth==1.23.0 google-api-python-client==1.12.8 oauth2client==4.1.0
 
 #=================
 # Install cmake

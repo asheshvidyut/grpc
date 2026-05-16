@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM arm64v8/debian:11
+FROM arm64v8/python:3.10-bullseye
 
 #=================
 # Basic C core dependencies
