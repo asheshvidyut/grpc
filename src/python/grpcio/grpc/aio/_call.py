@@ -601,7 +601,9 @@ class UnaryUnaryCall(
 
 
 class UnaryStreamCall(
-    _StreamResponseMixin[ResponseType], Call, _base_call.UnaryStreamCall[RequestType, ResponseType]
+    _StreamResponseMixin[ResponseType],
+    Call,
+    _base_call.UnaryStreamCall[RequestType, ResponseType],
 ):
     """Object for managing unary-stream RPC calls.
 
