@@ -8380,6 +8380,17 @@ grpc_cc_library(
 )
 
 grpc_cc_library(
+    name = "chttp2_simd_dispatch",
+    hdrs = [
+        "ext/transport/chttp2/transport/simd_dispatch.h",
+    ],
+    deps = [
+        "//:gpr_platform",
+        "env",
+    ],
+)
+
+grpc_cc_library(
     name = "decode_huff",
     srcs = [
         "ext/transport/chttp2/transport/decode_huff.cc",

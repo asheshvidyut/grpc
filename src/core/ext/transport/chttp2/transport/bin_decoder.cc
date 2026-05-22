@@ -21,10 +21,21 @@
 #include <grpc/support/alloc.h>
 #include <grpc/support/port_platform.h>
 
+#include "src/core/ext/transport/chttp2/transport/simd_dispatch.h"
 #include "src/core/lib/slice/slice.h"
 #include "src/core/util/grpc_check.h"
 #include "absl/base/attributes.h"
 #include "absl/log/log.h"
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#define GRPC_SIMD_BASE64_X86 1
+#if defined(__GNUC__) || defined(__clang__)
+#define GRPC_SIMD_TARGET_SSE41 __attribute__((target("sse4.1")))
+#else
+#define GRPC_SIMD_TARGET_SSE41
+#endif
+#endif
 
 static uint8_t decode_table[] = {
     0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
@@ -99,12 +110,85 @@ size_t grpc_chttp2_base64_infer_length_after_decode(const grpc_slice& slice) {
   return (tuples * 3) + tail_xtra[tail_case];
 }
 
+#ifdef GRPC_SIMD_BASE64_X86
+namespace {
+
+// SSE4.1 base64 decode chunk: consumes 16 ASCII chars and writes 12 output
+// bytes. Returns true on success; false if any input byte was not a valid
+// base64 character. On false return the output is undefined and the caller
+// must re-process this chunk with the scalar path (which reports the error).
+// Algorithm is the standard Lemire/aklomp nibble-classification technique.
+GRPC_SIMD_TARGET_SSE41
+inline bool base64_decode_chunk_sse41(const uint8_t* in, uint8_t* out) {
+  const __m128i str =
+      _mm_loadu_si128(reinterpret_cast<const __m128i*>(in));
+
+  // Classification LUTs: validity-test pattern is that (lo & hi) == 0
+  // for every valid byte, nonzero for invalid.
+  const __m128i lut_lo =
+      _mm_setr_epi8(0x15, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+                    0x13, 0x1A, 0x1B, 0x1B, 0x1B, 0x1A);
+  const __m128i lut_hi =
+      _mm_setr_epi8(0x10, 0x10, 0x01, 0x02, 0x04, 0x08, 0x04, 0x08, 0x10, 0x10,
+                    0x10, 0x10, 0x10, 0x10, 0x10, 0x10);
+  const __m128i lut_roll =
+      _mm_setr_epi8(0, 16, 19, 4, -65, -65, -71, -71, 0, 0, 0, 0, 0, 0, 0, 0);
+
+  const __m128i hi_nibbles =
+      _mm_and_si128(_mm_srli_epi32(str, 4), _mm_set1_epi8(0x0f));
+  const __m128i lo_nibbles = _mm_and_si128(str, _mm_set1_epi8(0x0f));
+  const __m128i hi = _mm_shuffle_epi8(lut_hi, hi_nibbles);
+  const __m128i lo = _mm_shuffle_epi8(lut_lo, lo_nibbles);
+
+  if (!_mm_testz_si128(lo, hi)) {
+    // Invalid input byte detected. Fall back to scalar.
+    return false;
+  }
+
+  const __m128i eq_2f = _mm_cmpeq_epi8(str, _mm_set1_epi8(0x2f));
+  const __m128i roll =
+      _mm_shuffle_epi8(lut_roll, _mm_add_epi8(eq_2f, hi_nibbles));
+  const __m128i values = _mm_add_epi8(str, roll);
+
+  // Pack the 16 6-bit values into 12 output bytes.
+  const __m128i merge_ab_and_bc =
+      _mm_maddubs_epi16(values, _mm_set1_epi32(0x01400140));
+  const __m128i merged =
+      _mm_madd_epi16(merge_ab_and_bc, _mm_set1_epi32(0x00011000));
+  const __m128i shuf = _mm_setr_epi8(2, 1, 0, 6, 5, 4, 10, 9, 8, 14, 13, 12, -1,
+                                     -1, -1, -1);
+  const __m128i packed = _mm_shuffle_epi8(merged, shuf);
+
+  // Store 16 bytes but only the first 12 are valid output.
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(out), packed);
+  return true;
+}
+
+}  // namespace
+#endif  // GRPC_SIMD_BASE64_X86
+
 bool grpc_base64_decode_partial(struct grpc_base64_decode_context* ctx) {
   size_t input_tail;
 
   if (ctx->input_cur > ctx->input_end || ctx->output_cur > ctx->output_end) {
     return false;
   }
+
+#ifdef GRPC_SIMD_BASE64_X86
+  // SIMD fast path: process 16 input chars -> 12 output bytes per iteration.
+  // We need ≥16 input bytes to load and ≥16 output bytes to safely store
+  // (only first 12 are valid output, the trailing 4 are unused but written).
+  if (grpc_core::simd::UseSse41()) {
+    while (ctx->input_end >= ctx->input_cur + 16 &&
+           ctx->output_end >= ctx->output_cur + 16) {
+      if (!base64_decode_chunk_sse41(ctx->input_cur, ctx->output_cur)) {
+        break;  // invalid byte; let the scalar loop below report the error
+      }
+      ctx->input_cur += 16;
+      ctx->output_cur += 12;
+    }
+  }
+#endif
 
   // Process a block of 4 input characters and 3 output bytes
   while (ctx->input_end >= ctx->input_cur + 4 &&

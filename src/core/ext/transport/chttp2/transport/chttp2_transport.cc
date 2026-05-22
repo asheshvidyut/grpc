@@ -804,6 +804,12 @@ grpc_chttp2_transport::grpc_chttp2_transport(
   num_incoming_streams_before_settings_ack =
       settings.local().max_concurrent_streams();
 
+  // Pre-size stream_map to avoid rehash stalls on the per-frame hot path.
+  // Cap defends against the UINT32_MAX default when MAX_CONCURRENT_STREAMS
+  // is left unbounded (~2KB per transport at the cap).
+  stream_map.reserve(
+      std::min<size_t>(settings.local().max_concurrent_streams(), 128));
+
   grpc_core::ExecCtx exec_ctx;
   combiner->Run(
       grpc_core::InitTransportClosure<init_keepalive_pings_if_enabled_locked>(

@@ -4992,6 +4992,7 @@ grpc_cc_library(
         "hpack_parser_table",
         "stats",
         "//src/core:decode_huff",
+        "//src/core:chttp2_simd_dispatch",
         "//src/core:error",
         "//src/core:grpc_check",
         "//src/core:hpack_constants",
@@ -5053,6 +5054,7 @@ grpc_cc_library(
     deps = [
         "gpr",
         "gpr_platform",
+        "//src/core:chttp2_simd_dispatch",
         "//src/core:grpc_check",
         "//src/core:huffsyms",
         "//src/core:slice",
@@ -5154,6 +5156,7 @@ grpc_cc_library(
         "//src/core:channel_args",
         "//src/core:channelz_property_list",
         "//src/core:chttp2_flow_control",
+        "//src/core:chttp2_simd_dispatch",
         "//src/core:client_channel_internal_header",
         "//src/core:closure",
         "//src/core:connectivity_state",

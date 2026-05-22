@@ -19,11 +19,26 @@
 #include "src/core/ext/transport/chttp2/transport/bin_encoder.h"
 
 #include <grpc/support/port_platform.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
 #include "src/core/ext/transport/chttp2/transport/huffsyms.h"
+#include "src/core/ext/transport/chttp2/transport/simd_dispatch.h"
 #include "src/core/util/grpc_check.h"
+
+#if defined(__x86_64__) || defined(_M_X64)
+#include <immintrin.h>
+#define GRPC_SIMD_BASE64_X86 1
+#define GRPC_SIMD_HUFFMAN_X86 1
+#if defined(__GNUC__) || defined(__clang__)
+#define GRPC_SIMD_TARGET_SSE41 __attribute__((target("sse4.1")))
+#define GRPC_SIMD_TARGET_AVX2 __attribute__((target("avx2")))
+#else
+#define GRPC_SIMD_TARGET_SSE41
+#define GRPC_SIMD_TARGET_AVX2
+#endif
+#endif
 
 static const char alphabet[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -47,6 +62,48 @@ static const b64_huff_sym huff_alphabet[64] = {
 
 static const uint8_t tail_xtra[3] = {0, 2, 3};
 
+#ifdef GRPC_SIMD_BASE64_X86
+namespace {
+
+// SSE4.1 base64 encode chunk: consumes 12 input bytes and writes 16 ASCII
+// output bytes. Loads 16 bytes from `in` (4 trailing bytes loaded but not
+// used); the caller must ensure those 4 bytes are readable. Algorithm is the
+// canonical Lemire/aklomp shuffle+mul technique; see
+// https://arxiv.org/abs/1704.00605.
+GRPC_SIMD_TARGET_SSE41
+inline void base64_encode_chunk_sse41(const uint8_t* in, char* out) {
+  __m128i input = _mm_loadu_si128(reinterpret_cast<const __m128i*>(in));
+
+  // Reshuffle: each 32-bit lane gets [b1 b0 b2 b1] from its source triplet,
+  // arranging the bytes so the four 6-bit groups can be extracted with
+  // independent multiplies on 16-bit halves.
+  const __m128i shuf =
+      _mm_set_epi8(10, 11, 9, 10, 7, 8, 6, 7, 4, 5, 3, 4, 1, 2, 0, 1);
+  input = _mm_shuffle_epi8(input, shuf);
+
+  // Extract the four 6-bit indices per 32-bit lane.
+  const __m128i t0 = _mm_and_si128(input, _mm_set1_epi32(0x0fc0fc00));
+  const __m128i t1 = _mm_mulhi_epu16(t0, _mm_set1_epi32(0x04000040));
+  const __m128i t2 = _mm_and_si128(input, _mm_set1_epi32(0x003f03f0));
+  const __m128i t3 = _mm_mullo_epi16(t2, _mm_set1_epi32(0x01000010));
+  __m128i indices = _mm_or_si128(t1, t3);
+
+  // Classify each 6-bit index into one of 5 ranges and add the right offset
+  // to produce the standard base64 ASCII character.
+  const __m128i lut = _mm_setr_epi8(65, 71, -4, -4, -4, -4, -4, -4, -4, -4, -4,
+                                    -4, -19, -16, 0, 0);
+  __m128i sel = _mm_subs_epu8(indices, _mm_set1_epi8(51));
+  __m128i mask = _mm_cmpgt_epi8(indices, _mm_set1_epi8(25));
+  sel = _mm_sub_epi8(sel, mask);
+  __m128i translated = _mm_shuffle_epi8(lut, sel);
+  __m128i encoded = _mm_add_epi8(indices, translated);
+
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(out), encoded);
+}
+
+}  // namespace
+#endif  // GRPC_SIMD_BASE64_X86
+
 grpc_slice grpc_chttp2_base64_encode(const grpc_slice& input) {
   size_t input_length = GRPC_SLICE_LENGTH(input);
   size_t input_triplets = input_length / 3;
@@ -54,8 +111,23 @@ grpc_slice grpc_chttp2_base64_encode(const grpc_slice& input) {
   size_t output_length = (input_triplets * 4) + tail_xtra[tail_case];
   grpc_slice output = GRPC_SLICE_MALLOC(output_length);
   const uint8_t* in = GRPC_SLICE_START_PTR(input);
+  const uint8_t* in_end = GRPC_SLICE_END_PTR(input);
   char* out = reinterpret_cast<char*> GRPC_SLICE_START_PTR(output);
   size_t i;
+
+#ifdef GRPC_SIMD_BASE64_X86
+  // SIMD fast path (gated on env var GRPC_SIMD_ACCELERATION + runtime CPU
+  // detection). Each chunk consumes 12 input bytes and emits 16 ASCII bytes
+  // but reads 16 input bytes, so we only enter while ≥16 bytes remain.
+  if (grpc_core::simd::UseSse41()) {
+    while (input_triplets >= 4 && in + 16 <= in_end) {
+      base64_encode_chunk_sse41(in, out);
+      in += 12;
+      out += 16;
+      input_triplets -= 4;
+    }
+  }
+#endif
 
   // encode full triplets
   for (i = 0; i < input_triplets; i++) {
@@ -91,6 +163,47 @@ grpc_slice grpc_chttp2_base64_encode(const grpc_slice& input) {
   return output;
 }
 
+#ifdef GRPC_SIMD_HUFFMAN_X86
+namespace {
+
+// AVX2 first-pass length sum: for an aligned chunk of 8 input bytes, gather
+// the 8 corresponding `length` fields from grpc_chttp2_huffsyms and return
+// their sum. Caller is responsible for the gating + boundary handling.
+GRPC_SIMD_TARGET_AVX2
+inline size_t huffman_length_sum_avx2(const uint8_t* in, size_t bytes) {
+  size_t sum = 0;
+  const __m256i ones = _mm256_set1_epi32(0xff);
+  // The huffsym struct is {unsigned bits; unsigned length;} == 8 bytes.
+  // Use base address = &huffsyms[0].length, scale = 8: gather reads
+  //   *(int*)(base + index*8) = huffsyms[index].length.
+  const int* length_base = reinterpret_cast<const int*>(
+      reinterpret_cast<const char*>(&grpc_chttp2_huffsyms[0]) +
+      offsetof(grpc_chttp2_huffsym, length));
+  size_t i = 0;
+  for (; i + 8 <= bytes; i += 8) {
+    __m128i in8 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(in + i));
+    __m256i indices = _mm256_cvtepu8_epi32(in8);
+    __m256i lengths = _mm256_i32gather_epi32(length_base, indices, 8);
+    // Mask to be defensive about width (length is small; mask is a no-op when
+    // the field already fits in 32 bits, but keeps semantics clear).
+    lengths = _mm256_and_si256(lengths, ones);
+    // Horizontal sum of 8 32-bit lanes.
+    __m128i lo = _mm256_castsi256_si128(lengths);
+    __m128i hi = _mm256_extracti128_si256(lengths, 1);
+    __m128i s = _mm_add_epi32(lo, hi);
+    s = _mm_hadd_epi32(s, s);
+    s = _mm_hadd_epi32(s, s);
+    sum += static_cast<size_t>(_mm_cvtsi128_si32(s));
+  }
+  for (; i < bytes; ++i) {
+    sum += grpc_chttp2_huffsyms[in[i]].length;
+  }
+  return sum;
+}
+
+}  // namespace
+#endif  // GRPC_SIMD_HUFFMAN_X86
+
 grpc_slice grpc_chttp2_huffman_compress(const grpc_slice& input) {
   size_t nbits;
   const uint8_t* in;
@@ -99,11 +212,21 @@ grpc_slice grpc_chttp2_huffman_compress(const grpc_slice& input) {
   uint64_t temp = 0;
   uint32_t temp_length = 0;
 
-  nbits = 0;
-  for (in = GRPC_SLICE_START_PTR(input); in != GRPC_SLICE_END_PTR(input);
-       ++in) {
-    nbits += grpc_chttp2_huffsyms[*in].length;
+#ifdef GRPC_SIMD_HUFFMAN_X86
+  // SIMD first pass: vectorized gather of huffsym lengths.
+  if (grpc_core::simd::UseAvx2()) {
+    nbits = huffman_length_sum_avx2(GRPC_SLICE_START_PTR(input),
+                                    GRPC_SLICE_LENGTH(input));
+  } else {
+#endif
+    nbits = 0;
+    for (in = GRPC_SLICE_START_PTR(input); in != GRPC_SLICE_END_PTR(input);
+         ++in) {
+      nbits += grpc_chttp2_huffsyms[*in].length;
+    }
+#ifdef GRPC_SIMD_HUFFMAN_X86
   }
+#endif
 
   output = GRPC_SLICE_MALLOC(nbits / 8 + (nbits % 8 != 0));
   out = GRPC_SLICE_START_PTR(output);

@@ -33,6 +33,7 @@
 #include "src/core/call/metadata_info.h"
 #include "src/core/call/parsed_metadata.h"
 #include "src/core/ext/transport/chttp2/transport/decode_huff.h"
+#include "src/core/ext/transport/chttp2/transport/simd_dispatch.h"
 #include "src/core/ext/transport/chttp2/transport/hpack_constants.h"
 #include "src/core/ext/transport/chttp2/transport/hpack_parse_result.h"
 #include "src/core/ext/transport/chttp2/transport/hpack_parser_table.h"
@@ -363,6 +364,23 @@ HpackParseStatus HPackParser::String::ParseHuff(Input* input, uint32_t length,
   // Grab the byte range, and iterate through it.
   const uint8_t* p = input->cur_ptr();
   input->Advance(length);
+  // SIMD dispatch hook (gated on GRPC_SIMD_ACCELERATION + CPU support).
+  // The HPACK Huffman FSM at decode_huff.h is a 4371-line generated
+  // state machine that doesn't lend itself to a drop-in SIMD replacement
+  // without algorithm-level rework (e.g. speculative parallel decode,
+  // or lookup-table vectorization). This hook exists so a real SIMD
+  // decoder can be plugged in without touching every call site. For
+  // now, the SIMD path is the scalar path; the flag check is here to
+  // measure dispatch overhead and validate flag plumbing end-to-end.
+  // TODO(simd): replace the SIMD branch with a vectorized decoder
+  // that handles the common "all-short-codes, no-EOS" prefix in
+  // parallel and tails out to the scalar FSM.
+  if (grpc_core::simd::UseSse41()) {
+    // Placeholder: identical to scalar. Intentional — see comment above.
+    return HuffDecoder<Out>(output, p, p + length).Run()
+               ? HpackParseStatus::kOk
+               : HpackParseStatus::kParseHuffFailed;
+  }
   return HuffDecoder<Out>(output, p, p + length).Run()
              ? HpackParseStatus::kOk
              : HpackParseStatus::kParseHuffFailed;
