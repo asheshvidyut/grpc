@@ -1,0 +1,25 @@
+// Copyright 2026 gRPC authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+syntax = "proto3";
+
+package echo;
+
+service Echo {
+  // Unary RPC: native handler will receive the wire-format request bytes,
+  // parse with libprotobuf, and respond with wire-format bytes.
+  rpc Echo(EchoRequest) returns (EchoResponse) {}
+}
+
+message EchoRequest {
+  string message = 1;
+  int32 repeat = 2;  // server returns the message repeated this many times
+}
+
+message EchoResponse {
+  string message = 1;
+}
