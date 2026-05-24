@@ -108,7 +108,8 @@ parse/serialize the protobuf for you.
 
 ### Raw C ABI: for non-C++ languages
 
-If you're writing in plain C, Rust, etc., include `grpcio_native/handler.h`
+If you're writing in plain C or another language that can produce a shared
+library with C-linkage exports, include `grpcio_native/handler.h`
 and target the raw struct-based ABI. The C++ macros expand to exactly this
 shape — see [include/grpcio_native/handler.h](include/grpcio_native/handler.h):
 
