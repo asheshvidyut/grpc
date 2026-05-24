@@ -279,6 +279,25 @@ typedef uint32_t (*grpcio_native_abi_version_fn)(void);
  * use this prefix on their function definitions to ensure they're visible. */
 #define GRPCIO_NATIVE_HANDLER GRPCIO_NATIVE_EXPORT
 
+/* ---- Client Fast-Path ABI ---- */
+
+typedef struct {
+  const char* method;
+  const char* req_data;
+  size_t req_len;
+  char* resp_data;
+  size_t resp_len;
+  grpc_native_status status;
+  char* err_msg;
+  size_t err_msg_len;
+} grpc_native_client_call;
+
+typedef int (*grpcio_native_invoke_fn)(
+    void* c_channel,
+    grpc_native_client_call* call,
+    int64_t timeout_ms
+);
+
 #ifdef __cplusplus
 }  /* extern "C" */
 #endif

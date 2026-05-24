@@ -64,6 +64,13 @@ class NativeModule:
             )
         try:
             self._lib = ctypes.CDLL(self._path)
+            # Automatically execute dynamic JIT service pointer initializations on library load
+            if hasattr(self._lib, "grpcio_native_init"):
+                try:
+                    init_fn = ctypes.CFUNCTYPE(None)(self._lib.grpcio_native_init)
+                    init_fn()
+                except Exception as e:
+                    _LOGGER.warning("Dynamic JIT library native initialization failed: %s", e)
         except OSError as e:
             raise NativeHandlerError(
                 f"Failed to load native handler library {self._path}: {e}"
@@ -96,6 +103,12 @@ class NativeModule:
     @property
     def path(self) -> str:
         return self._path
+
+    def __getattr__(self, name: str):
+        if hasattr(self._lib, name):
+            return getattr(self._lib, name)
+        raise AttributeError(f"'NativeModule' object has no attribute '{name}'")
+
 
     def _resolve(self, symbol: str, signature):
         try:

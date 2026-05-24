@@ -6,32 +6,33 @@
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
-# Fast path for invoking native (C/C++) RPC handlers.
-#
-# The grpcio_native Python package exposes the user-facing API; this module is
-# the runtime glue. It calls a user-supplied C function pointer with the GIL
-# released and copies the response back into a Python bytes object.
-#
-# Memory ownership matches the C ABI declared in
-# include/grpcio_native/handler.h: the dispatcher owns request bytes; the
-# native handler malloc()'s response and error buffers; the dispatcher copies
-# them into Python and free()'s the originals.
+# Fast path for invoking native (C/C++) RPC handlers and clients.
+# Exposes direct C function pointers to users to bypass Python GIL
+# and serialization/deserialization overhead completely.
 
-from libc.stdlib cimport free
-from libc.string cimport memcpy
+from libc.stdlib cimport malloc, free
+from libc.string cimport memcpy, memset
+from libc.stdint cimport uint32_t, int64_t
+from libc.stdio cimport printf
+from libc.stddef cimport size_t
 cimport cpython
 
 GRPCIO_NATIVE_ABI_VERSION = 1
 
 
-cdef object dispatch_native_unary_unary(
-    object request_bytes, size_t fn_addr, object context) except *:
+# ===========================================================================
+# Server Fast Path Dispatcher
+# ===========================================================================
+
+def dispatch_native_unary_unary(
+    object request_bytes, size_t fn_addr, size_t context_addr, object context):
     """Call a native unary-unary handler.
 
     Args:
       request_bytes: bytes-like request payload (wire format).
       fn_addr:       address (uintptr_t) of the native function. Obtain via
                      ctypes.cast(lib.symbol, ...).value or similar.
+      context_addr:  address of the native context bridge.
       context:       grpc.ServicerContext for setting status on error.
 
     Returns:
@@ -48,11 +49,12 @@ cdef object dispatch_native_unary_unary(
     cpython.PyBytes_AsStringAndSize(
         bytes(request_bytes), <char**>&req_data, &req_len)
 
+    call.context = <grpc_native_context_c*><void*>context_addr
     call.req_data = req_data
     call.req_len = <size_t>req_len
     call.resp_data = NULL
     call.resp_len = 0
-    call.status = 0
+    call.status = <grpc_native_status>0
     call.err_msg = NULL
     call.err_msg_len = 0
 
@@ -140,3 +142,146 @@ def validate_native_abi(size_t version_fn_addr):
             "grpcio_native ABI version mismatch: library reports v%d, "
             "runtime expects v%d" % (reported, GRPCIO_NATIVE_ABI_VERSION))
     return reported
+
+
+cdef void _shutdown_and_destroy_cq(grpc_completion_queue* cq) noexcept nogil:
+    grpc_completion_queue_shutdown(cq)
+    cdef grpc_event ev
+    while True:
+        ev = grpc_completion_queue_next(cq, gpr_inf_future(GPR_CLOCK_REALTIME), NULL)
+        if ev.type == GRPC_QUEUE_SHUTDOWN:
+            break
+    grpc_completion_queue_destroy(cq)
+
+
+# ===========================================================================
+# Client Fast Path Dynamic C-Core Invoker
+# ===========================================================================
+
+cdef int grpcio_native_invoke(
+    void* c_channel, 
+    grpc_native_client_call_c* call, 
+    int64_t timeout_ms) noexcept nogil:
+    
+    cdef grpc_completion_queue* cq = grpc_completion_queue_create_for_next(NULL)
+    if cq == NULL:
+        call.status = <grpc_native_status>13 # INTERNAL
+        return -1
+        
+    cdef gpr_timespec deadline = gpr_time_add(
+        gpr_now(GPR_CLOCK_REALTIME),
+        gpr_time_from_millis(timeout_ms, GPR_TIMESPAN)
+    )
+    
+    cdef grpc_slice method_slice = grpc_slice_from_copied_string(call.method)
+    cdef grpc_call* c_call = grpc_channel_create_call(
+        <grpc_channel*>c_channel, NULL, 0, cq, method_slice, NULL, deadline, NULL
+    )
+    grpc_slice_unref(method_slice)
+    
+    if c_call == NULL:
+        _shutdown_and_destroy_cq(cq)
+        call.status = <grpc_native_status>13 # INTERNAL
+        return -1
+        
+    cdef grpc_op[6] ops
+    cdef grpc_op* op
+    memset(ops, 0, sizeof(ops))
+    
+    # 1. Send initial metadata
+    op = &ops[0]
+    op.type = GRPC_OP_SEND_INITIAL_METADATA
+    op.data.send_initial_metadata.count = 0
+    op.data.send_initial_metadata.metadata = NULL
+    
+    # 2. Send message (request wire bytes)
+    cdef grpc_slice request_slice = grpc_slice_from_copied_buffer(call.req_data, call.req_len)
+    cdef grpc_byte_buffer* request_buffer = grpc_raw_byte_buffer_create(&request_slice, 1)
+    grpc_slice_unref(request_slice)
+    op = &ops[1]
+    op.type = GRPC_OP_SEND_MESSAGE
+    op.data.send_message.send_message = request_buffer
+    
+    # 3. Send close from client
+    op = &ops[2]
+    op.type = GRPC_OP_SEND_CLOSE_FROM_CLIENT
+    
+    # 4. Receive initial metadata
+    cdef grpc_metadata_array recv_initial_metadata
+    grpc_metadata_array_init(&recv_initial_metadata)
+    op = &ops[3]
+    op.type = GRPC_OP_RECV_INITIAL_METADATA
+    op.data.receive_initial_metadata.receive_initial_metadata = &recv_initial_metadata
+    
+    # 5. Receive message (response wire bytes)
+    cdef grpc_byte_buffer* recv_message = NULL
+    op = &ops[4]
+    op.type = GRPC_OP_RECV_MESSAGE
+    op.data.receive_message.receive_message = &recv_message
+    
+    # 6. Receive status on client
+    cdef grpc_metadata_array recv_trailing_metadata
+    grpc_metadata_array_init(&recv_trailing_metadata)
+    cdef grpc_status_code status
+    cdef grpc_slice status_details = grpc_empty_slice()
+    op = &ops[5]
+    op.type = GRPC_OP_RECV_STATUS_ON_CLIENT
+    op.data.receive_status_on_client.trailing_metadata = &recv_trailing_metadata
+    op.data.receive_status_on_client.status = &status
+    op.data.receive_status_on_client.status_details = &status_details
+    
+    cdef grpc_call_error start_error = grpc_call_start_batch(c_call, ops, 6, <void*>1, NULL)
+    if start_error != GRPC_CALL_OK:
+        grpc_byte_buffer_destroy(request_buffer)
+        grpc_call_unref(c_call)
+        _shutdown_and_destroy_cq(cq)
+        call.status = <grpc_native_status>13 # INTERNAL
+        return -1
+        
+    cdef grpc_event event = grpc_completion_queue_next(cq, deadline, NULL)
+    
+    cdef int rc = 0
+    cdef grpc_byte_buffer_reader reader
+    cdef grpc_slice response_slice
+    cdef size_t response_len
+    cdef int next_status
+    
+    if event.type == GRPC_OP_COMPLETE and event.success != 0:
+        call.status = <grpc_native_status><int>status
+        if status == GRPC_STATUS_OK:
+            if recv_message != NULL:
+                grpc_byte_buffer_reader_init(&reader, recv_message)
+                next_status = grpc_byte_buffer_reader_next(&reader, &response_slice)
+                if next_status != 0:
+                    response_len = grpc_slice_length(response_slice)
+                    call.resp_data = <char*>malloc(response_len)
+                    if call.resp_data != NULL:
+                        memcpy(call.resp_data, grpc_slice_start_ptr(response_slice), response_len)
+                        call.resp_len = response_len
+                    grpc_slice_unref(response_slice)
+                grpc_byte_buffer_reader_destroy(&reader)
+                grpc_byte_buffer_destroy(recv_message)
+        else:
+            response_len = grpc_slice_length(status_details)
+            if response_len > 0:
+                call.err_msg = <char*>malloc(response_len)
+                if call.err_msg != NULL:
+                    memcpy(call.err_msg, grpc_slice_start_ptr(status_details), response_len)
+                    call.err_msg_len = response_len
+    else:
+        call.status = <grpc_native_status>4 # DEADLINE_EXCEEDED
+        rc = -1
+        
+    grpc_slice_unref(status_details)
+    grpc_metadata_array_destroy(&recv_initial_metadata)
+    grpc_metadata_array_destroy(&recv_trailing_metadata)
+    grpc_byte_buffer_destroy(request_buffer)
+    grpc_call_unref(c_call)
+    _shutdown_and_destroy_cq(cq)
+    
+    return rc
+
+
+def get_c_core_invoke_fn_addr():
+    """Return the address of the C-Core invocation function pointer."""
+    return <size_t><void*>grpcio_native_invoke

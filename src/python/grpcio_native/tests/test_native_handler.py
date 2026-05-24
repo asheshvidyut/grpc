@@ -314,5 +314,74 @@ class ModuleLoadTest(unittest.TestCase):
             module.unary_unary("nonexistent_handler_symbol")
 
 
+class CompilerTest(unittest.TestCase):
+    def test_compile_and_load_cython(self):
+        src_file = os.path.join(os.path.dirname(__file__), "temp_handler.pyx")
+        import textwrap
+        code = textwrap.dedent("""\
+            from libc.stdlib cimport malloc, free
+            from libc.string cimport memcpy
+            from libc.stdint cimport uint32_t
+
+            cdef struct grpc_native_unary_call:
+                void* context
+                const char* req_data
+                size_t req_len
+                char* resp_data
+                size_t resp_len
+                int status
+                char* err_msg
+                size_t err_msg_len
+
+            cdef public uint32_t grpcio_native_abi_version() nogil:
+                return 3
+
+            cdef public int jitted_echo(grpc_native_unary_call* call) nogil:
+                call.resp_data = <char*>malloc(call.req_len)
+                if call.resp_data != NULL:
+                    memcpy(call.resp_data, call.req_data, call.req_len)
+                    call.resp_len = call.req_len
+                call.status = 0
+                return 0
+        """)
+        with open(src_file, "w") as f:
+            f.write(code)
+
+        try:
+            out_dir = os.path.dirname(__file__)
+            module = grpcio_native.compile_and_load_cython(
+                pyx_file=src_file,
+                output_dir=out_dir,
+                lib_name="temp_jitted_handler"
+            )
+            
+            handler = grpcio_native.native_unary_unary_rpc_method_handler(
+                module, "jitted_echo"
+            )
+            
+            generic_handler = grpc.method_handlers_generic_handler(
+                "jitted.Jitted", {"Echo": handler}
+            )
+            server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
+            server.add_generic_rpc_handlers((generic_handler,))
+            port = server.add_insecure_port("localhost:0")
+            server.start()
+            
+            try:
+                with grpc.insecure_channel(f"localhost:{port}") as channel:
+                    reply = channel.unary_unary("/jitted.Jitted/Echo")(b"hello cython jit")
+                    self.assertEqual(reply, b"hello cython jit")
+            finally:
+                server.stop(grace=0).wait()
+                
+        finally:
+            if os.path.exists(src_file):
+                os.remove(src_file)
+            ext = ".dylib" if platform.system() == "Darwin" else ".so"
+            compiled_lib = os.path.join(out_dir, f"temp_jitted_handler{ext}")
+            if os.path.exists(compiled_lib):
+                os.remove(compiled_lib)
+
+
 if __name__ == "__main__":
     unittest.main()
