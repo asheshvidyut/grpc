@@ -602,7 +602,3 @@ cdef class Channel:
     if method not in self._registered_call_handles.keys():
       self._registered_call_handles[method] = CallHandle(self._state, method)
     return self._registered_call_handles[method].call_handle
-
-  @property
-  def c_channel_address(self):
-    return cpython.PyLong_FromVoidPtr(self._state.c_channel)
