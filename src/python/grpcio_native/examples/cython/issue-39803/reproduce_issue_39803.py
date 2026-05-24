@@ -128,7 +128,7 @@ async def main():
     
     # Launch large_message_server.py in a background subprocess
     server_proc = subprocess.Popen(
-        [sys.executable, "large_message_server.py", str(port_native)]
+        [sys.executable, os.path.join(_GEN_DIR, "large_message_server.py"), str(port_native)]
     )
     await asyncio.sleep(10.0) # Wait for JIT compilation and startup
     
