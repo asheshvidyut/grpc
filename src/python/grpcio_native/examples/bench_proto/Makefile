@@ -39,7 +39,7 @@ $(PROTO_CC) $(PROTO_H): bench.proto
 	$(PROTOC) --cpp_out=. bench.proto
 
 $(PROTO_PY) $(PROTO_GRPC_PY): bench.proto
-	python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. bench.proto
+	python3 -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. bench.proto
 
 clean:
 	rm -f $(TARGET) $(PROTO_CC) $(PROTO_H) $(PROTO_PY) $(PROTO_GRPC_PY)
