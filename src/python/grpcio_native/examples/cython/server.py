@@ -7,8 +7,8 @@ import grpc
 _GEN_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROTO_PATH = os.path.join(_GEN_DIR, "echo.proto")
 
-# Add grpcio_native path
-sys.path.insert(0, os.path.abspath(os.path.join(__file__, "..", "..", "..", "..")))
+# Add grpcio_native path (robust absolute resolution)
+sys.path.insert(0, os.path.abspath(os.path.join(_GEN_DIR, "..", "..")))
 import grpcio_native
 
 def main():

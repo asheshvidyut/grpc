@@ -51,15 +51,15 @@ sys.path.insert(0, _GEN_DIR)
 import large_message_pb2
 import large_message_pb2_grpc
 
-# 2. Background loop latency monitor
-async def event_loop_monitor():
-    print("[Monitor] Starting event loop latency monitor (checking every 10ms)...")
+# 2. Background loop latency monitor for the Standard Server
+async def standard_server_event_loop_monitor():
+    print("[Monitor] Starting STANDARD SERVER event loop latency monitor (checking every 10ms)...")
     while True:
         t0 = time.perf_counter()
         await asyncio.sleep(0.01)
         elapsed = (time.perf_counter() - t0) * 1000.0 # ms
         if elapsed > 50.0: # Warn if the loop was blocked for more than 50ms
-            print(f"\n>>> [WARNING] !!! Event Loop was BLOCKED/FROZEN for {elapsed:.1f} ms !!! <<<\n")
+            print(f"\n>>> [WARNING] [STANDARD SERVER EVENT LOOP] !!! Standard Server Event Loop was BLOCKED/FROZEN for {elapsed:.1f} ms !!! <<<\n")
 
 # 3. Standard gRPC AsyncIO Servicer using standard Protobuf
 class StandardLargeMessageServicer(large_message_pb2_grpc.LargeMessageServiceServicer):
@@ -109,7 +109,7 @@ async def main():
     print("================================================================================")
     
     std_server = await start_standard_server(port_standard, options)
-    monitor_task = asyncio.create_task(event_loop_monitor())
+    monitor_task = asyncio.create_task(standard_server_event_loop_monitor())
     
     await asyncio.sleep(1.0)
     await run_unified_client(port_standard, num_floats, options)
@@ -132,11 +132,9 @@ async def main():
     )
     await asyncio.sleep(10.0) # Wait for JIT compilation and startup
     
-    monitor_task = asyncio.create_task(event_loop_monitor())
     await run_unified_client(port_native, num_floats, options)
     
     # Stop Native Server
-    monitor_task.cancel()
     server_proc.terminate()
     server_proc.wait()
     

@@ -14,12 +14,26 @@ from concurrent import futures
 import grpc
 
 import asyncio
+import time
 
-# Add grpcio_native path
-sys.path.insert(0, os.path.abspath(os.path.join(__file__, "..", "..", "..", "..", "..")))
+# Add grpcio_native path (robust absolute resolution)
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(_SCRIPT_DIR, "..", "..", "..")))
 import grpcio_native
 
+async def event_loop_monitor():
+    print("[Monitor] Starting SERVER event loop latency monitor (checking every 10ms)...")
+    while True:
+        t0 = time.perf_counter()
+        await asyncio.sleep(0.01)
+        elapsed = (time.perf_counter() - t0) * 1000.0 # ms
+        if elapsed > 50.0: # Warn if the loop was blocked for more than 50ms
+            print(f"\n>>> [WARNING] [SERVER EVENT LOOP] !!! JIT Server Event Loop was BLOCKED/FROZEN for {elapsed:.1f} ms !!! <<<\n")
+
 async def main_async():
+    # Spawn the server-side event loop monitor task in the background
+    asyncio.create_task(event_loop_monitor())
+    
     port = 50051
     if len(sys.argv) > 1:
         port = int(sys.argv[1])
