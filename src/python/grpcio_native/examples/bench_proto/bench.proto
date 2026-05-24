@@ -1,0 +1,34 @@
+// Three-way benchmark proto: pure Python vs naive ctypes vs grpcio_native.
+//
+// The two RPCs mirror the synthetic workloads documented in the grpcio_native
+// README: a per-byte CPU loop (FNV-1a hash) and a numerical compute kernel
+// (n*n float matrix multiply). Both have small request/response shapes so
+// the comparison isolates handler cost, not transport cost.
+
+syntax = "proto3";
+
+package bench;
+
+service BenchService {
+  rpc Hash (HashRequest) returns (HashResponse);
+  rpc MatMul (MatMulRequest) returns (MatMulResponse);
+}
+
+message HashRequest {
+  bytes data = 1;
+  uint32 iterations = 2;
+}
+
+message HashResponse {
+  uint64 hash = 1;
+}
+
+message MatMulRequest {
+  uint32 n = 1;
+  repeated float a = 2 [packed = true];
+  repeated float b = 3 [packed = true];
+}
+
+message MatMulResponse {
+  repeated float c = 1 [packed = true];
+}
