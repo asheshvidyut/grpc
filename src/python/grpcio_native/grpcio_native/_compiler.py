@@ -68,7 +68,20 @@ def compile_and_load_cython(
             if len(proto_files) == 1:
                 proto_name = proto_files[0]
             else:
-                proto_name = "large_message.proto"
+                service_base = class_name.replace("Service", "").replace("Servicer", "")
+                for f in proto_files:
+                    try:
+                        proto_path = os.path.join(dir_name, f)
+                        with open(proto_path, "r") as pf:
+                            content = pf.read()
+                            if re.search(r"\bservice\s+" + re.escape(service_base) + r"\b", content):
+                                proto_name = f
+                                break
+                    except Exception:
+                        pass
+                if proto_name is None:
+                    # Fallback to first proto or default
+                    proto_name = proto_files[0] if proto_files else "large_message.proto"
                 
             proto_path = os.path.join(dir_name, proto_name)
             

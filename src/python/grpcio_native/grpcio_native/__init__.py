@@ -98,13 +98,28 @@ def add_native_handlers(
     derived_methods = {}
     package_name = service_name.split(".")[0]
 
-    # Locate the .proto schema file dynamically
+    # Locate the .proto schema file dynamically by matching the service definition
     dir_name = os.path.dirname(os.path.abspath(pyx_file))
     proto_name = None
+    service_base = service_name.split(".")[-1]
+    import re
     for f in os.listdir(dir_name):
         if f.endswith(".proto"):
-            proto_name = f
-            break
+            try:
+                proto_path = os.path.join(dir_name, f)
+                with open(proto_path, "r") as pf:
+                    content = pf.read()
+                    if re.search(r"\bservice\s+" + re.escape(service_base) + r"\b", content):
+                        proto_name = f
+                        break
+            except Exception:
+                pass
+    if proto_name is None:
+        # Fallback to first proto if no service matches
+        for f in os.listdir(dir_name):
+            if f.endswith(".proto"):
+                proto_name = f
+                break
             
     from ._compiler import parse_proto_service_methods
     rpc_methods = {}
