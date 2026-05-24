@@ -14,14 +14,19 @@
 // only difference being measured is the framework cost around it.
 
 #include "grpcio_native/handler.h"
+#ifndef NO_PROTO_BINDINGS
 #include "bench.pb.h"
+#endif
 
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 #include <vector>
 
+#ifndef NO_PROTO_BINDINGS
 GRPCIO_NATIVE_DECLARE_ABI()
+#endif
 
 namespace {
 
@@ -52,6 +57,7 @@ void matmul_kernel(const float* a, const float* b, float* c, uint32_t n) {
   }
 }
 
+#ifndef NO_PROTO_BINDINGS
 char* malloc_copy(const std::string& s) {
   char* buf = static_cast<char*>(std::malloc(s.size()));
   if (buf && !s.empty()) {
@@ -59,6 +65,7 @@ char* malloc_copy(const std::string& s) {
   }
   return buf;
 }
+#endif
 
 }  // namespace
 
@@ -76,6 +83,7 @@ void matmul_raw(const float* a, const float* b, float* c, uint32_t n) {
 
 // ---- grpcio_native entry points -------------------------------------------
 
+#ifndef NO_PROTO_BINDINGS
 extern "C" GRPCIO_NATIVE_EXPORT
 int fnv1a_hash(grpc_native_unary_call* call) {
   bench::HashRequest req;
@@ -118,3 +126,4 @@ int matmul_handler(grpc_native_unary_call* call) {
   call->resp_len = out.size();
   return 0;
 }
+#endif

@@ -154,19 +154,7 @@ class NaiveCtypesServicer(bench_pb2_grpc.BenchServiceServicer):
 # ---------------------------------------------------------------------------
 
 
-def _make_native_handlers():
-    module = grpcio_native.load_native_module(_LIB_PATH)
-    return grpc.method_handlers_generic_handler(
-        "bench.BenchService",
-        {
-            "Hash": grpcio_native.native_unary_unary_rpc_method_handler(
-                module, "fnv1a_hash"
-            ),
-            "MatMul": grpcio_native.native_unary_unary_rpc_method_handler(
-                module, "matmul_handler"
-            ),
-        },
-    )
+# (Removed _make_native_handlers in favor of JIT add_native_handlers)
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +193,13 @@ def start_all() -> dict:
         )
 
     def reg_native(s):
-        s.add_generic_rpc_handlers((_make_native_handlers(),))
+        src_path = os.path.join(_HERE, "handler.pyx")
+        grpcio_native.add_native_handlers(
+            server=s,
+            pyx_file=src_path,
+            service_name="bench.BenchService",
+            class_name="BenchService"
+        )
 
     for name, fn in (
         ("python", reg_python),
@@ -336,6 +330,23 @@ def _print_table(label: str, servers: dict, method: str, payload: bytes,
 
 
 def main():
+    import subprocess
+
+    # 1. Dynamically generate Python and C++ protobuf classes at startup
+    proto_path = os.path.join(_HERE, "bench.proto")
+    print("Generating Python Protobuf classes from bench.proto...")
+    subprocess.check_call([
+        sys.executable, "-m", "grpc_tools.protoc",
+        f"-I{_HERE}", f"--python_out={_HERE}", f"--grpc_python_out={_HERE}",
+        proto_path
+    ])
+    
+    print("Generating C++ Protobuf classes from bench.proto...")
+    subprocess.check_call([
+        "protoc", f"-I{_HERE}", f"--cpp_out={_HERE}",
+        proto_path
+    ])
+
     print(f"loaded {_LIB_PATH}")
     print("starting three servers...")
     servers = start_all()

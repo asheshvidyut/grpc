@@ -32,8 +32,8 @@ PROTO_GRPC_PY = bench_pb2_grpc.py
 
 all: $(TARGET) $(PROTO_PY) $(PROTO_GRPC_PY)
 
-$(TARGET): bench_handler.cc $(PROTO_CC) $(PROTO_H)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) bench_handler.cc $(PROTO_CC) $(LIBS) -o $@
+$(TARGET): bench_handler.cpp
+	$(CXX) $(CXXFLAGS) -DNO_PROTO_BINDINGS $(LDFLAGS) bench_handler.cpp -o $@
 
 $(PROTO_CC) $(PROTO_H): bench.proto
 	$(PROTOC) --cpp_out=. bench.proto

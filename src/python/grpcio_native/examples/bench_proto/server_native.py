@@ -5,18 +5,16 @@
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
-"""MatMul server using grpcio_native — wire bytes straight to the C handler.
+"""MatMul server using JIT compiled Cython handlers via grpcio_native.
 
-The handler is bench_handler.matmul_handler in bench_handler.{so,dylib};
-it parses the protobuf with libprotobuf, runs the kernel, and serializes
-the response, all with the GIL released.
+Automatically compiles clean Cython handlers and registers them to the server.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
-import platform
+import subprocess
 import sys
 from concurrent import futures
 
@@ -26,13 +24,6 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(_HERE, "..", "..")))
 
 import grpcio_native  # noqa: E402
-
-_LIB_NAME = (
-    "bench_handler.dylib"
-    if platform.system() == "Darwin"
-    else "bench_handler.so"
-)
-_LIB_PATH = os.path.join(_HERE, _LIB_NAME)
 
 _DEFAULT_OPTIONS = [
     ("grpc.max_receive_message_length", 64 * 1024 * 1024),
@@ -46,31 +37,41 @@ def main():
     parser.add_argument("--workers", type=int, default=8)
     args = parser.parse_args()
 
-    if not os.path.isfile(_LIB_PATH):
-        sys.stderr.write(
-            f"{_LIB_PATH} not built. Run `make` in this directory first.\n"
-        )
-        sys.exit(1)
+    # 1. Dynamically generate Python and C++ protobuf classes at startup
+    proto_path = os.path.join(_HERE, "bench.proto")
+    print("Generating Python Protobuf classes from bench.proto...")
+    subprocess.check_call([
+        sys.executable, "-m", "grpc_tools.protoc",
+        f"-I{_HERE}", f"--python_out={_HERE}", f"--grpc_python_out={_HERE}",
+        proto_path
+    ])
+    print("Generating C++ Protobuf classes from bench.proto...")
+    subprocess.check_call([
+        "protoc", f"-I{_HERE}", f"--cpp_out={_HERE}",
+        proto_path
+    ])
 
-    module = grpcio_native.load_native_module(_LIB_PATH)
-    handlers = grpc.method_handlers_generic_handler(
-        "bench.BenchService",
-        {
-            "MatMul": grpcio_native.native_unary_unary_rpc_method_handler(
-                module, "matmul_handler"
-            ),
-        },
-    )
+    src_path = os.path.join(_HERE, "handler.pyx")
 
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=args.workers),
         options=_DEFAULT_OPTIONS,
     )
-    server.add_generic_rpc_handlers((handlers,))
+
+    # Automatically JIT-compile and register the service class!
+    print("Compiling and registering Cython handlers dynamically...")
+    grpcio_native.add_native_handlers(
+        server=server,
+        pyx_file=src_path,
+        service_name="bench.BenchService",
+        class_name="BenchService"
+    )
+    print("Cython JIT module compiled and registered successfully!")
+
     server.add_insecure_port(f"[::]:{args.port}")
     server.start()
-    print(f"native matmul server listening on :{args.port}")
-    print(f"  workers={args.workers}  lib={_LIB_PATH}")
+    print(f"JIT Cython server listening on :{args.port}")
+    print(f"  workers={args.workers}  src={src_path}")
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:
