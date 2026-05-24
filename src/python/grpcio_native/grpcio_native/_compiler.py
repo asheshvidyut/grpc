@@ -141,7 +141,7 @@ def compile_and_load_cython(
 # distutils: language = c++
 
 from libc.stdlib cimport malloc, free
-from libc.stdint cimport uint32_t
+from libc.stdint cimport uint32_t, uint64_t
 from libcpp cimport bool
 from libcpp.string cimport string
 """
@@ -435,10 +435,14 @@ cdef extern from "google/protobuf/repeated_field.h" namespace "google::protobuf"
         decl += f'        {msg_name}()\n'
         for f_type, f_name, is_repeated in fields:
             cython_type = f_type
-            if f_type == "string":
+            if f_type in ("string", "bytes"):
                 cython_type = "string"
             elif f_type in ("int32", "int64"):
                 cython_type = "int"
+            elif f_type == "uint32":
+                cython_type = "uint32_t"
+            elif f_type == "uint64":
+                cython_type = "uint64_t"
                 
             if is_repeated:
                 decl += f'        int {f_name}_size() nogil\n'
