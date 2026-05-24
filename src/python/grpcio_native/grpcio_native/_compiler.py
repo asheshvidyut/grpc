@@ -247,13 +247,33 @@ cdef int {fn}_wrapper(grpc_native_unary_call* call) nogil:
     call.status = <grpc_native_status>rc # OK
     return 0
 """
-        # Append dynamic C-linkage Cython initializer block at the bottom (fully completed class definitions scope!)
+        # Append JIT initializer block at the very bottom of the generated wrapper file (Cython-space allocation + C++ forwarder)
         if class_name:
+            mangled_init = f"__pyx_f_{len(wrapper_lib_name)}{wrapper_lib_name}__cython_init"
             wrapper_content += f"""
-cdef public void grpcio_native_init() nogil:
+cdef int _cython_init() nogil:
     global _global_servicer
     if _global_servicer == NULL:
         _global_servicer = new {class_name}()
+    return 0
+
+cdef extern from *:
+    \"\"\"
+    #ifdef __cplusplus
+    extern "C" {{
+    #endif
+    
+    static int {mangled_init}(void);
+    
+    void grpcio_native_init(void) {{
+        {mangled_init}();
+    }}
+    
+    #ifdef __cplusplus
+    }}
+    #endif
+    \"\"\"
+    void grpcio_native_init()
 """
 
         with open(wrapper_pyx_path, "w") as f:
