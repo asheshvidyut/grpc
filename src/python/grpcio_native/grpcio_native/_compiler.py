@@ -366,8 +366,8 @@ cdef extern from *:
         if os.path.exists(h_file):
             os.remove(h_file)
         # Cleanup dynamically generated JIT wrapper .pyx source file
-        if is_wrapper and os.path.exists(pyx_path):
-            os.remove(pyx_path)
+        # if is_wrapper and os.path.exists(pyx_path):
+        #     os.remove(pyx_path)
     return load_native_module(out_path)
 
 
