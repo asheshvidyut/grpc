@@ -404,7 +404,13 @@ def parse_proto_fields(proto_path):
 def generate_cppclass_declarations(proto_path, request_types, response_types):
     """Dynamically generates the complete C++ cppclass definition string in Cython."""
     messages = parse_proto_fields(proto_path)
-    decl = ""
+    decl = """
+cdef extern from "google/protobuf/repeated_field.h" namespace "google::protobuf":
+    cdef cppclass RepeatedField[T]:
+        const T* data() nogil
+        T* mutable_data() nogil
+        void Resize(int new_size, T value) nogil
+"""
     header_basename = os.path.basename(proto_path).replace(".proto", ".pb.h")
     
     # Extract the protobuf package name as the C++ namespace name dynamically
@@ -438,6 +444,8 @@ def generate_cppclass_declarations(proto_path, request_types, response_types):
                 decl += f'        int {f_name}_size() nogil\n'
                 decl += f'        {cython_type} {f_name}(int index) nogil\n'
                 decl += f'        void add_{f_name}({cython_type} value) nogil\n'
+                decl += f'        const RepeatedField[{cython_type}]& {f_name}() nogil\n'
+                decl += f'        RepeatedField[{cython_type}]* mutable_{f_name}() nogil\n'
             else:
                 if f_type == "string":
                     decl += f'        const string& {f_name}() nogil\n'

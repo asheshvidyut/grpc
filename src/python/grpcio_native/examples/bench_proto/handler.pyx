@@ -42,16 +42,21 @@ cdef cppclass BenchService:
     int cython_matmul(MatMulRequest* req, MatMulResponse* resp) nogil:
         cdef uint32_t n = req.n()
         cdef int expected = <int>n * <int>n
-        if req.a_size() != expected or req.b_size() != expected:
-            return 3 # INVALID_ARGUMENT
-            
+        
+        cdef const float* a_ptr = req.a().data()
+        cdef const float* b_ptr = req.b().data()
+        
+        cdef RepeatedField[float]* c_field = resp.mutable_c()
+        c_field.Resize(expected, 0.0)
+        cdef float* c_ptr = c_field.mutable_data()
+        
         cdef int i, j, k
         cdef float sum_val
         for i in range(n):
             for j in range(n):
                 sum_val = 0.0
                 for k in range(n):
-                    sum_val += req.a(i * n + k) * req.b(k * n + j)
-                resp.add_c(sum_val)
+                    sum_val += a_ptr[i * n + k] * b_ptr[k * n + j]
+                c_ptr[i * n + j] = sum_val
                 
         return 0
