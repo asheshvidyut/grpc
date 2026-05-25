@@ -174,13 +174,33 @@ def _copy_and_free_native_buffer(
     """
     if not ptr or length == 0:
         return b""
-    try:
-        return ctypes.string_at(ptr, length)
-    finally:
-        _libc_free(ctypes.cast(ptr, ctypes.c_void_p))
+    
+    _ensure_libc_loaded()
+    
+    # Allocate blank Python bytes object
+    resp_bytes = bytes(length)
+    
+    void_ptr = ctypes.cast(ptr, ctypes.c_void_p)
+    # Copy memory using GIL-released libc memcpy (offset 32 for PyBytesObject ob_sval)
+    _LIBC.memcpy(id(resp_bytes) + 32, void_ptr, length)
+    
+    # Free native buffer
+    _LIBC.free(void_ptr)
+    
+    return resp_bytes
 
 
 _LIBC = None
+
+
+def _ensure_libc_loaded() -> None:
+    global _LIBC
+    if _LIBC is None:
+        _LIBC = ctypes.CDLL(None)
+        _LIBC.free.argtypes = [ctypes.c_void_p]
+        _LIBC.free.restype = None
+        _LIBC.memcpy.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t]
+        _LIBC.memcpy.restype = ctypes.c_void_p
 
 
 def _libc_free(ptr: ctypes.c_void_p) -> None:
@@ -188,15 +208,7 @@ def _libc_free(ptr: ctypes.c_void_p) -> None:
 
     Loaded lazily and cached.
     """
-    global _LIBC
-    if _LIBC is None:
-        # On macOS this is /usr/lib/libc.dylib; on Linux libc.so.6; on
-        # Windows we can't free with libc — handlers must use a different
-        # allocator strategy, see README. CDLL(None) returns the main process
-        # handle on POSIX which exports free().
-        _LIBC = ctypes.CDLL(None)
-        _LIBC.free.argtypes = [ctypes.c_void_p]
-        _LIBC.free.restype = None
+    _ensure_libc_loaded()
     _LIBC.free(ptr)
 
 
