@@ -40,10 +40,21 @@ int echo_unary(grpc_native_unary_call* call) {
   }
 
   echo::EchoResponse resp;
-  resp.set_message(req.message());
+  // Transfer ownership of the message string without copying
+  resp.set_allocated_message(req.release_message());
 
-  std::string out;
-  if (!resp.SerializeToString(&out)) {
+  size_t size = resp.ByteSizeLong();
+  char* buf = static_cast<char*>(std::malloc(size));
+  if (!buf) {
+    call->status = GRPC_NATIVE_STATUS_INTERNAL;
+    const char* err = "Failed to allocate memory for EchoResponse";
+    call->err_msg = malloc_copy(err);
+    call->err_msg_len = std::strlen(err);
+    return 0;
+  }
+
+  if (!resp.SerializeToArray(buf, static_cast<int>(size))) {
+    std::free(buf);
     call->status = GRPC_NATIVE_STATUS_INTERNAL;
     const char* err = "Failed to serialize EchoResponse";
     call->err_msg = malloc_copy(err);
@@ -51,8 +62,8 @@ int echo_unary(grpc_native_unary_call* call) {
     return 0;
   }
 
-  call->resp_data = malloc_copy(out);
-  call->resp_len = out.size();
+  call->resp_data = buf;
+  call->resp_len = size;
   call->status = GRPC_NATIVE_STATUS_OK;
   return 0;
 }

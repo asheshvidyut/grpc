@@ -54,7 +54,11 @@ def main():
     )
 
     # 4. Set up standard Python gRPC server and register generic handlers
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    options = [
+        ("grpc.max_receive_message_length", 2000 * 1024 * 1024),
+        ("grpc.max_send_message_length", 2000 * 1024 * 1024),
+    ]
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=4), options=options)
     
     method_handlers = {
         "Echo": echo_unary_handler,
