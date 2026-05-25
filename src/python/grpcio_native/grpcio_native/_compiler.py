@@ -328,6 +328,8 @@ cdef extern from *:
     ext = ".dylib" if sys.platform == "darwin" else ".so"
     out_path = os.path.abspath(os.path.join(output_dir, f"{lib_name}{ext}"))
     
+    pyx_dir = os.path.dirname(pyx_path)
+
     # Detect extra C++ sources (like large_message.pb.cc) in output_dir
     extra_sources = []
     extra_libs = []
@@ -337,7 +339,6 @@ cdef extern from *:
         compiler = "g++"
         extra_libs.append("-lprotobuf")
         # Look for any generated C++ Protobuf sources in the same directory as the .pyx file
-        pyx_dir = os.path.dirname(pyx_path)
         for f in os.listdir(pyx_dir):
             if f.endswith(".pb.cc") or f.endswith(".pb.cpp") or (f.endswith(".cc") and f != os.path.basename(c_file)):
                 extra_sources.append(os.path.join(pyx_dir, f))
@@ -349,6 +350,7 @@ cdef extern from *:
         "-O3",
         f"-I{native_include_dir}",
         f"-I{grpc_include_dir}",
+        f"-I{pyx_dir}",
         "-o", out_path,
         c_file
     ] + extra_sources + py_includes + extra_libs
