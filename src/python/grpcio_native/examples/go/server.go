@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"go_server/pb"
 )
 
@@ -53,6 +54,7 @@ func main() {
 
 	s := grpc.NewServer(opts...)
 	pb.RegisterEchoServiceServer(s, &server{})
+	reflection.Register(s)
 
 	log.Printf("Go gRPC Server listening on port %d with unlimited max message sizes", *port)
 	if err := s.Serve(lis); err != nil {
