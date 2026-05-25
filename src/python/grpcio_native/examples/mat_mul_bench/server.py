@@ -82,20 +82,30 @@ def main():
         ]
         lib.matmul_c.restype = None
 
+        import array
+
         class CtypesMatMulServicer(matmul_pb2_grpc.MatMulServiceServicer):
             def MatMul(self, request, context):
                 n = request.n
                 size = n * n
                 
-                # Convert python lists to ctypes float arrays
-                a_arr = (ctypes.c_float * size)(*request.a)
-                b_arr = (ctypes.c_float * size)(*request.b)
-                c_arr = (ctypes.c_float * size)()
+                # 1. Create contiguous C float arrays using the highly optimized built-in 'array' module
+                a_arr = array.array('f', request.a)
+                b_arr = array.array('f', request.b)
+                c_arr = array.array('f', [0.0] * size)
                 
-                # Delegate multiplication to C library
-                lib.matmul_c(a_arr, b_arr, c_arr, n)
+                # 2. Get raw memory addresses of the array buffers
+                a_ptr = ctypes.cast(a_arr.buffer_info()[0], ctypes.POINTER(ctypes.c_float))
+                b_ptr = ctypes.cast(b_arr.buffer_info()[0], ctypes.POINTER(ctypes.c_float))
+                c_ptr = ctypes.cast(c_arr.buffer_info()[0], ctypes.POINTER(ctypes.c_float))
                 
-                return matmul_pb2.MatMulResponse(c=list(c_arr))
+                # 3. Delegate multiplication to C library via zero-copy pointers
+                lib.matmul_c(a_ptr, b_ptr, c_ptr, n)
+                
+                # 4. Construct response (RepeatedScalarFieldContainer.extend is highly optimized for array.array)
+                resp = matmul_pb2.MatMulResponse()
+                resp.c.extend(c_arr)
+                return resp
         
         matmul_pb2_grpc.add_MatMulServiceServicer_to_server(CtypesMatMulServicer(), server)
 
