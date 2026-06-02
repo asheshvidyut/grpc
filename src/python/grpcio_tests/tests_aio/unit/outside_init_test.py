@@ -61,12 +61,12 @@ class TestOutsideInit(unittest.TestCase):
             channel = aio.insecure_channel(address)
             logging.info(f"Channel loop: {id(channel._loop)=}")
 
-            stub = test_pb2_grpc.TestServiceStub(channel, wait_for_ready=True)
+            stub = test_pb2_grpc.TestServiceStub(channel)
 
             await stub.UnaryCall(messages_pb2.SimpleRequest())
 
             await channel.close()
-            await server.stop(0)
+            await server.stop(None)
 
         for i in range(_NUM_OF_LOOPS):
             # In python 3.14+, the first time we attempt getting the old loop,
