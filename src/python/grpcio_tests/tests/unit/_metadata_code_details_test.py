@@ -205,7 +205,7 @@ class MetadataCodeDetailsTest(unittest.TestCase):
         port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
         self._server.start()
 
-        self._channel = grpc.insecure_channel("{'127.0.0.1' if __import__('sys').platform == 'darwin' else 'localhost'}:{}".format(port))
+        self._channel = grpc.insecure_channel(("127.0.0.1:{}" if __import__('sys').platform == 'darwin' else "localhost:{}").format(port))
         unary_unary_method_name = "/".join(
             (
                 "",
@@ -834,7 +834,7 @@ class InspectContextTest(unittest.TestCase):
         port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
         self._server.start()
 
-        self._channel = grpc.insecure_channel("{'127.0.0.1' if __import__('sys').platform == 'darwin' else 'localhost'}:{}".format(port))
+        self._channel = grpc.insecure_channel(("127.0.0.1:{}" if __import__('sys').platform == 'darwin' else "localhost:{}").format(port))
         unary_unary_method_name = "/".join(
             (
                 "",
