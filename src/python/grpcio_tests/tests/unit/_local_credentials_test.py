@@ -65,8 +65,9 @@ class LocalCredentialsTest(unittest.TestCase):
         os.name == "nt", "Unix Domain Socket is not supported on Windows"
     )
     def test_uds(self):
-        import tempfile
         import shutil
+        import tempfile
+
         temp_dir = tempfile.mkdtemp()
         server_addr = "unix:{}".format(os.path.join(temp_dir, "grpc_uds.sock"))
         try:
@@ -84,7 +85,9 @@ class LocalCredentialsTest(unittest.TestCase):
                 self.assertEqual(
                     b"abc",
                     channel.unary_unary(
-                        grpc._common.fully_qualified_method(_SERVICE_NAME, _METHOD),
+                        grpc._common.fully_qualified_method(
+                            _SERVICE_NAME, _METHOD
+                        ),
                         _registered_method=True,
                     )(b"abc", wait_for_ready=True),
                 )

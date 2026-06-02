@@ -26,7 +26,6 @@ import datetime
 import select
 import socket
 import threading
-
 import time
 
 from tests.unit.framework.common import get_socket
@@ -118,7 +117,9 @@ class TcpProxy:
                         if socket_to_read in self._client_sockets:
                             self._client_sockets.remove(socket_to_read)
                 else:
-                    raise RuntimeError("Unidentified socket appeared in read set.")
+                    raise RuntimeError(
+                        "Unidentified socket appeared in read set."
+                    )
             except socket.error:
                 if socket_to_read is self._proxy_socket:
                     self._stop_event.set()
@@ -155,9 +156,10 @@ class TcpProxy:
     def _run_proxy(self):
         try:
             while not self._stop_event.is_set():
-                expected_reads = (self._listen_socket, self._proxy_socket) + tuple(
-                    self._client_sockets
-                )
+                expected_reads = (
+                    self._listen_socket,
+                    self._proxy_socket,
+                ) + tuple(self._client_sockets)
                 expected_writes = []
                 if self._southbound_data:
                     expected_writes.append(self._proxy_socket)
