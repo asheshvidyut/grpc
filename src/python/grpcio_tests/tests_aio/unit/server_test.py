@@ -631,7 +631,7 @@ class TestServer(AioTestBase):
         max_concurrent = 1
         server = aio.server(maximum_concurrent_rpcs=max_concurrent)
         port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
-        bind_address = f"{'127.0.0.1' if __import__('sys').platform == 'darwin' else ('127.0.0.1' if __import__("sys").platform == "darwin" else 'localhost')}:port"
+        bind_address = f"{'127.0.0.1' if __import__('sys').platform == 'darwin' else 'localhost'}:{port}"
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         channel = aio.insecure_channel(bind_address)

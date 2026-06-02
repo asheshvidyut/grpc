@@ -87,7 +87,7 @@ async def _start_test_server():
     port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
     server.add_generic_rpc_handlers((_GenericHandler(),))
     await server.start()
-    return f"{'127.0.0.1' if __import__('sys').platform == 'darwin' else ('127.0.0.1' if __import__("sys").platform == "darwin" else 'localhost')}:port", server
+    return f"{'127.0.0.1' if __import__('sys').platform == 'darwin' else 'localhost'}:{port}", server
 
 
 class TestTimeout(AioTestBase):

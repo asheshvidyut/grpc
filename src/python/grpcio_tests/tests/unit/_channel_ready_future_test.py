@@ -70,7 +70,7 @@ class ChannelReadyFutureTest(unittest.TestCase):
         )
         port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
         server.start()
-        channel = grpc.insecure_channel("{'127.0.0.1' if __import__('sys').platform == 'darwin' else ('127.0.0.1' if __import__("sys").platform == "darwin" else 'localhost')}:".format(port))
+        channel = grpc.insecure_channel("{'127.0.0.1' if __import__('sys').platform == 'darwin' else 'localhost'}:{}".format(port))
         callback = _Callback()
 
         ready_future = grpc.channel_ready_future(channel)
