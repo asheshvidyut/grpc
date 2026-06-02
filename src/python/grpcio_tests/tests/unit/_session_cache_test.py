@@ -66,7 +66,7 @@ def start_secure_server():
     server = test_common.test_server()
     server.add_registered_method_handlers(_SERVICE_NAME, _METHOD_HANDLERS)
     server_cred = grpc.ssl_server_credentials(_SERVER_CERTS)
-    port = server.add_secure_port("[::]:0", server_cred)
+    port = server.add_secure_port("127.0.0.1:0", server_cred)
     server.start()
 
     return server, port
@@ -82,7 +82,7 @@ class SSLSessionCacheTest(unittest.TestCase):
         response = channel.unary_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
             _registered_method=True,
-        )(_REQUEST)
+        )(_REQUEST, wait_for_ready=True)
         auth_data = pickle.loads(response)
         self.assertEqual(
             expect_ssl_session_reused,
@@ -131,7 +131,8 @@ class SSLSessionCacheTest(unittest.TestCase):
             port_2,
             expect_ssl_session_reused=[b"true"],
         )
-        server_2.stop(None)
+
+        server_2.stop(0)
 
         # Connection to server_1 now falls back to full TLS handshake
         self._do_one_shot_client_rpc(
@@ -142,7 +143,9 @@ class SSLSessionCacheTest(unittest.TestCase):
         )
 
         # Re-creating server_1 causes old sessions to become invalid
-        server_1.stop(None)
+
+        server_1.stop(0)
+
         server_1, port_1 = start_secure_server()
 
         # Old sessions should no longer be valid
@@ -160,8 +163,8 @@ class SSLSessionCacheTest(unittest.TestCase):
             port_1,
             expect_ssl_session_reused=[b"true"],
         )
-        server_1.stop(None)
 
+        server_1.stop(0)
 
 if __name__ == "__main__":
     logging.basicConfig()
