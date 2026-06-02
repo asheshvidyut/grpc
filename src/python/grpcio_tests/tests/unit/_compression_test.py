@@ -164,11 +164,10 @@ def _instrumented_client_server_pair(
     channel_kwargs, server_kwargs, server_handler
 ):
     import sys
+
     server_options = ()
     if sys.platform == "darwin":
-        server_options = (
-            ('grpc.so_reuseport', 0),
-        )
+        server_options = (("grpc.so_reuseport", 0),)
     server = grpc.server(
         futures.ThreadPoolExecutor(), options=server_options, **server_kwargs
     )
