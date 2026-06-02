@@ -177,10 +177,10 @@ class MetadataTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(weakref.proxy(self))
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
         self._server.start()
         self._channel = grpc.insecure_channel(
-            "localhost:%d" % port, options=_CHANNEL_ARGS
+            ("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port, options=_CHANNEL_ARGS
         )
 
     def tearDown(self):
