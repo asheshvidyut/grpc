@@ -25,6 +25,7 @@ from typing_extensions import override
 from src.proto.grpc.testing import messages_pb2
 from src.proto.grpc.testing import test_pb2_grpc
 from tests_aio.unit import _common
+from tests_aio.unit import wait_for_ready_test
 from tests_aio.unit._test_server import start_test_server
 
 _NUM_OF_LOOPS = 50
@@ -61,9 +62,9 @@ class TestOutsideInit(unittest.TestCase):
             channel = aio.insecure_channel(address)
             logging.info(f"Channel loop: {id(channel._loop)=}")
 
-            stub = test_pb2_grpc.TestServiceStub(channel, wait_for_ready=True)
+            stub = test_pb2_grpc.TestServiceStub(channel)
 
-            await stub.UnaryCall(messages_pb2.SimpleRequest())
+            await stub.UnaryCall(messages_pb2.SimpleRequest(), wait_for_ready=True)
 
             await channel.close()
             await server.stop(0)
