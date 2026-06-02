@@ -63,6 +63,7 @@ def _start_a_test_server():
     server.add_generic_rpc_handlers((_GenericHandler(),))
     if os.name == "posix":
         import tempfile
+
         server.temp_dir = tempfile.mkdtemp()
         socket_path = os.path.join(server.temp_dir, "grpc_leak_test.sock")
         address = f"unix:{socket_path}"
@@ -108,6 +109,7 @@ class TestLeak(unittest.TestCase):
             server.stop(None)
             if hasattr(server, "temp_dir"):
                 import shutil
+
                 shutil.rmtree(server.temp_dir, ignore_errors=True)
 
 
