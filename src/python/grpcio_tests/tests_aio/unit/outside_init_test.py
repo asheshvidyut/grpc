@@ -64,7 +64,9 @@ class TestOutsideInit(unittest.TestCase):
 
             stub = test_pb2_grpc.TestServiceStub(channel)
 
-            await stub.UnaryCall(messages_pb2.SimpleRequest(), wait_for_ready=True)
+            await stub.UnaryCall(
+                messages_pb2.SimpleRequest(), wait_for_ready=True
+            )
 
             await channel.close()
             await server.stop(0)
