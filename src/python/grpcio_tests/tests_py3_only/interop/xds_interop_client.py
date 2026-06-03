@@ -421,36 +421,33 @@ def _run_single_channel(config: _ChannelConfiguration) -> None:
         stub = test_pb2_grpc.TestServiceStub(channel)
         futures: Dict[int, Tuple[FutureFromCallType, str]] = {}
         while not _stop_event.is_set():
-            qps_is_zero = False
             with config.condition:
                 if config.qps == 0:
-                    qps_is_zero = True
                     config.condition.wait(
                         timeout=_CONFIG_CHANGE_TIMEOUT.total_seconds()
                     )
+                    continue
                 else:
                     duration_per_query = 1.0 / float(config.qps)
-                    request_id = None
-                    with _global_lock:
-                        request_id = _global_rpc_id
-                        _global_rpc_id += 1
-                        _global_rpcs_started[config.method] += 1
-                    start = time.time()
-                    end = start + duration_per_query
-                    _start_rpc(
-                        config.method,
-                        config.metadata,
-                        request_id,
-                        stub,
-                        float(config.rpc_timeout_sec),
-                        futures,
-                        config.request_payload_size,
-                        config.response_payload_size,
-                    )
-                    print_response = config.print_response
+                request_id = None
+                with _global_lock:
+                    request_id = _global_rpc_id
+                    _global_rpc_id += 1
+                    _global_rpcs_started[config.method] += 1
+                start = time.time()
+                end = start + duration_per_query
+                _start_rpc(
+                    config.method,
+                    config.metadata,
+                    request_id,
+                    stub,
+                    float(config.rpc_timeout_sec),
+                    futures,
+                    config.request_payload_size,
+                    config.response_payload_size,
+                )
+                print_response = config.print_response
             _remove_completed_rpcs(futures, config.print_response)
-            if qps_is_zero:
-                continue
             logger.debug(f"Currently {len(futures)} in-flight RPCs")
             now = time.time()
             while now < end:

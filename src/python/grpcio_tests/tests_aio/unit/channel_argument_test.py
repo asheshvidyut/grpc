@@ -74,7 +74,7 @@ async def test_if_reuse_port_enabled(server: aio.Server):
 
     try:
         with common.bound_socket(
-            bind_address=("localhost"),
+            bind_address="localhost",
             port=port,
             listen=False,
         ) as (unused_host, bound_port):

@@ -48,50 +48,38 @@ def _unique_options() -> Sequence[Tuple[str, float]]:
     "Compatible mode needs POLLER completion queue.",
 )
 class TestCompatibility(AioTestBase):
-    @classmethod
-    def setUpClass(cls):
-        cls._TEST_LOOP.run_until_complete(cls.asyncSetUpClass())
-
-    @classmethod
-    def tearDownClass(cls):
-        cls._TEST_LOOP.run_until_complete(cls.asyncTearDownClass())
-
-    @classmethod
-    async def asyncSetUpClass(cls):
-        cls._async_server = aio.server(
+    async def setUp(self):
+        self._async_server = aio.server(
             options=(("grpc.so_reuseport", 0),),
-            migration_thread_pool=ThreadPoolExecutor(
-                max_workers=None
-            ),
+            migration_thread_pool=ThreadPoolExecutor(),
         )
 
         test_pb2_grpc.add_TestServiceServicer_to_server(
-            TestServiceServicer(), cls._async_server
+            TestServiceServicer(), self._async_server
         )
-        cls._adhoc_handlers = _common.AdhocGenericHandler()
-        cls._async_server.add_generic_rpc_handlers((cls._adhoc_handlers,))
+        self._adhoc_handlers = _common.AdhocGenericHandler()
+        self._async_server.add_generic_rpc_handlers((self._adhoc_handlers,))
 
-        port = cls._async_server.add_insecure_port("[::]:0")
+        port = self._async_server.add_insecure_port("[::]:0")
         address = "localhost:%d" % port
-        await cls._async_server.start()
+        await self._async_server.start()
 
         # Create async stub
-        cls._async_channel = aio.insecure_channel(
+        self._async_channel = aio.insecure_channel(
             address, options=_unique_options()
         )
-        cls._async_stub = test_pb2_grpc.TestServiceStub(cls._async_channel)
+        self._async_stub = test_pb2_grpc.TestServiceStub(self._async_channel)
 
         # Create sync stub
-        cls._sync_channel = grpc.insecure_channel(
+        self._sync_channel = grpc.insecure_channel(
             address, options=_unique_options()
         )
-        cls._sync_stub = test_pb2_grpc.TestServiceStub(cls._sync_channel)
+        self._sync_stub = test_pb2_grpc.TestServiceStub(self._sync_channel)
 
-    @classmethod
-    async def asyncTearDownClass(cls):
-        cls._sync_channel.close()
-        await cls._async_channel.close()
-        await cls._async_server.stop(None)
+    async def tearDown(self):
+        self._sync_channel.close()
+        await self._async_channel.close()
+        await self._async_server.stop(None)
 
     async def _run_in_another_thread(self, func: Callable[[], None]):
         work_done = asyncio.Event()
@@ -206,17 +194,13 @@ class TestCompatibility(AioTestBase):
         # It's fine to instantiate server object in the event loop thread.
         # The server will spawn its own serving thread.
         server = grpc.server(
-            ThreadPoolExecutor(
-                max_workers=None
-            ),
-            handlers=(GenericHandlers(),),
+            ThreadPoolExecutor(), handlers=(GenericHandlers(),)
         )
         port = server.add_insecure_port("localhost:0")
         server.start()
 
         def sync_work() -> None:
-            iterations = 100
-            for _ in range(iterations):
+            for _ in range(100):
                 with grpc.insecure_channel("localhost:%d" % port) as channel:
                     response = channel.unary_unary("/test/test")(b"\x07\x08")
                     self.assertEqual(response, b"\x07\x08")

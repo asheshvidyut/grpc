@@ -39,9 +39,7 @@ _EMPTY_EXTENSIONS_SYMBOL_NAME = "grpc.testing.proto2.EmptyWithExtensions"
 
 class ReflectionClientTest(unittest.TestCase):
     def setUp(self):
-        self._server = test_common.test_server(
-            max_workers=10
-        )
+        self._server = test_common.test_server()
         self._SERVICE_NAMES = (
             test_pb2.DESCRIPTOR.services_by_name["TestService"].full_name,
             reflection.SERVICE_NAME,

@@ -63,10 +63,10 @@ class TestOutsideInit(unittest.TestCase):
 
             stub = test_pb2_grpc.TestServiceStub(channel)
 
-            await stub.UnaryCall(messages_pb2.SimpleRequest(), wait_for_ready=True)
+            await stub.UnaryCall(messages_pb2.SimpleRequest())
 
             await channel.close()
-            await server.stop(0)
+            await server.stop(None)
 
         for i in range(_NUM_OF_LOOPS):
             # In python 3.14+, the first time we attempt getting the old loop,

@@ -165,31 +165,24 @@ async def start_test_server(
     interceptors=None,
     record: Optional[list] = None,
 ):
-    from concurrent.futures import ThreadPoolExecutor
     server = aio.server(
-        options=(("grpc.so_reuseport", 0),),
-        interceptors=interceptors,
-        migration_thread_pool=ThreadPoolExecutor(
-            max_workers=None
-        ),
+        options=(("grpc.so_reuseport", 0),), interceptors=interceptors
     )
     servicer = TestServiceServicer(record)
     test_pb2_grpc.add_TestServiceServicer_to_server(servicer, server)
 
     server.add_generic_rpc_handlers((_create_extra_generic_handler(servicer),))
 
-    bind_addr = "[::]:%d"
     if secure:
         if server_credentials is None:
             server_credentials = grpc.ssl_server_credentials(
                 [(resources.private_key(), resources.certificate_chain())]
             )
-        port = server.add_secure_port(bind_addr % port, server_credentials)
+        port = server.add_secure_port("[::]:%d" % port, server_credentials)
     else:
-        port = server.add_insecure_port(bind_addr % port)
+        port = server.add_insecure_port("[::]:%d" % port)
 
     await server.start()
 
     # NOTE(lidizheng) returning the server to prevent it from deallocation
-    target_addr = "localhost:%d"
-    return target_addr % port, server
+    return "localhost:%d" % port, server

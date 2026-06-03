@@ -86,7 +86,7 @@ async def _start_test_server(options=None):
     port = server.add_insecure_port("[::]:0")
     server.add_generic_rpc_handlers((_GenericHandler(),))
     await server.start()
-    return f"{'localhost'}:{port}", server
+    return f"localhost:{port}", server
 
 
 class TestTypeMetadata(unittest.TestCase):

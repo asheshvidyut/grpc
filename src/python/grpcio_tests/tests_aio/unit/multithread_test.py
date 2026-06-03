@@ -47,7 +47,7 @@ class MultithreadTest(AioTestBase):
         return port, server
 
     async def run_client(self, port):
-        async with aio.insecure_channel(f"{'localhost'}:{port}") as channel:
+        async with aio.insecure_channel(f"localhost:{port}") as channel:
             unary_call = channel.unary_unary(
                 "/grpc.testing.TestService/UnaryCall"
             )

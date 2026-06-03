@@ -106,29 +106,20 @@ class TestAuthContext(AioTestBase):
         server = aio.server()
         server.add_generic_rpc_handlers((handler,))
         server_cred = grpc.ssl_server_credentials(_SERVER_CERTS)
-
-        bind_addr = "[::]:0"
-        port = server.add_secure_port(bind_addr, server_cred)
-
+        port = server.add_secure_port("[::]:0", server_cred)
         await server.start()
 
         channel_creds = grpc.ssl_channel_credentials(
             root_certificates=_TEST_ROOT_CERTIFICATES
         )
-
-        target_addr = "localhost:{}"
         channel = aio.secure_channel(
-            target_addr.format(port),
+            "localhost:{}".format(port),
             channel_creds,
             options=_PROPERTY_OPTIONS,
         )
-
-        response = await channel.unary_unary(_UNARY_UNARY)(
-            _REQUEST, wait_for_ready=True
-        )
+        response = await channel.unary_unary(_UNARY_UNARY)(_REQUEST)
         await channel.close()
-
-        await server.stop(0)
+        await server.stop(None)
 
         auth_data = pickle.loads(response)
         self.assertIsNone(auth_data[_ID])
@@ -158,8 +149,7 @@ class TestAuthContext(AioTestBase):
             root_certificates=_TEST_ROOT_CERTIFICATES,
             require_client_auth=True,
         )
-        bind_addr = "[::]:0"
-        port = server.add_secure_port(bind_addr, server_cred)
+        port = server.add_secure_port("[::]:0", server_cred)
         await server.start()
 
         channel_creds = grpc.ssl_channel_credentials(
@@ -213,8 +203,7 @@ class TestAuthContext(AioTestBase):
         server = aio.server()
         server.add_generic_rpc_handlers((handler,))
         server_cred = grpc.ssl_server_credentials(_SERVER_CERTS)
-        bind_addr = "[::]:0"
-        port = server.add_secure_port(bind_addr, server_cred)
+        port = server.add_secure_port("[::]:0", server_cred)
         await server.start()
 
         # Create a cache for TLS session tickets

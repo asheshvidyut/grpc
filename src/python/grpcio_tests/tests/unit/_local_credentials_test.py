@@ -16,7 +16,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
 import unittest
-import uuid
 
 import grpc
 
@@ -66,11 +65,7 @@ class LocalCredentialsTest(unittest.TestCase):
         os.name == "nt", "Unix Domain Socket is not supported on Windows"
     )
     def test_uds(self):
-        unique_id = uuid.uuid4().hex
-        server_addr = f"unix:/tmp/grpc_fullstack_test_{unique_id}"
-        file_path = server_addr.replace("unix:", "")
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        server_addr = "unix:/tmp/grpc_fullstack_test"
         channel_creds = grpc.local_channel_credentials(
             grpc.LocalConnectionType.UDS
         )

@@ -106,8 +106,7 @@ _RPC_ACTIONS = (
 
 class TestWaitForReady(AioTestBase):
     async def setUp(self):
-        address = "localhost"
-        _, self._port, self._socket = get_socket(bind_address=address, listen=False)
+        address, self._port, self._socket = get_socket(listen=False)
         self._channel = aio.insecure_channel(f"{address}:{self._port}")
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)
         self._socket.close()

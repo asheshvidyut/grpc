@@ -13,7 +13,6 @@
 # limitations under the License.
 """Tests metadata flags feature by testing wait-for-ready semantics"""
 
-import contextlib
 import logging
 import queue
 import socket
@@ -277,10 +276,7 @@ class MetadataFlagsTest(unittest.TestCase):
 
         # Start the server after the connections are waiting
         wg.wait()
-        server = test_common.test_server(
-            max_workers=10,
-            reuse_port=True,
-        )
+        server = test_common.test_server(reuse_port=True)
         server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(weakref.proxy(self))
         )
