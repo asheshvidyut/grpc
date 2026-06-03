@@ -46,7 +46,6 @@ build:linux   --cxxopt='-std=c++17'
 build:linux   --host_cxxopt='-std=c++17'
 build:macos   --cxxopt='-std=c++17'
 build:macos   --host_cxxopt='-std=c++17'
-build:macos   --macos_minimum_os=11.0
 build:freebsd   --cxxopt='-std=c++17'
 build:freebsd   --host_cxxopt='-std=c++17'
 
@@ -67,7 +66,6 @@ build:dbg --compilation_mode=dbg
 # Dynamic link cause issues like: `dyld: malformed mach-o: load commands size (59272) > 32768`
 # https://github.com/bazelbuild/bazel/issues/9190
 build:macos --dynamic_mode=off
-build:macos --local_test_jobs=4
 
 build:windows_opt --compilation_mode=opt
 build:windows_dbg --compilation_mode=dbg
