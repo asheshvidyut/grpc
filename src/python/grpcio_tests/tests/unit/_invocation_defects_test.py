@@ -276,13 +276,24 @@ class InvocationDefectsTest(unittest.TestCase):
         self._handler = _Handler(self._control)
 
         self._server = test_common.test_server()
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port(
+            "127.0.0.1:0"
+            if __import__("sys").platform == "darwin"
+            else "[::]:0"
+        )
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(self._handler)
         )
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port)
+        self._channel = grpc.insecure_channel(
+            (
+                "127.0.0.1:%d"
+                if __import__("sys").platform == "darwin"
+                else "localhost:%d"
+            )
+            % port
+        )
 
     def tearDown(self):
         self._server.stop(0)
