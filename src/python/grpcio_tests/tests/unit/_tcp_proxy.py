@@ -47,8 +47,7 @@ def _init_proxy_socket(gateway_address, gateway_port):
     for attempt in range(10):
         try:
             proxy_socket = socket.create_connection(
-                (gateway_address, gateway_port),
-                timeout=2.0
+                (gateway_address, gateway_port), timeout=2.0
             )
             proxy_socket.settimeout(None)
             return proxy_socket
@@ -101,7 +100,10 @@ class TcpProxy:
                 if socket_to_read is self._listen_socket:
                     client_socket, client_address = socket_to_read.accept()
                     self._client_sockets.append(client_socket)
-                elif socket_to_read is self._proxy_socket and self._proxy_socket is not None:
+                elif (
+                    socket_to_read is self._proxy_socket
+                    and self._proxy_socket is not None
+                ):
                     data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
                     if data:
                         with self._byte_count_lock:
@@ -123,7 +125,10 @@ class TcpProxy:
                 if socket_to_read is self._listen_socket:
                     _close_socket(self._listen_socket)
                     self._listen_socket = None
-                elif socket_to_read is self._proxy_socket and self._proxy_socket is not None:
+                elif (
+                    socket_to_read is self._proxy_socket
+                    and self._proxy_socket is not None
+                ):
                     _close_socket(self._proxy_socket)
                     self._proxy_socket = None
                 elif socket_to_read in self._client_sockets:
@@ -134,7 +139,10 @@ class TcpProxy:
     def _handle_writes(self, sockets_to_write):
         for socket_to_write in sockets_to_write:
             try:
-                if socket_to_write is self._proxy_socket and self._proxy_socket is not None:
+                if (
+                    socket_to_write is self._proxy_socket
+                    and self._proxy_socket is not None
+                ):
                     if self._southbound_data:
                         self._proxy_socket.sendall(self._southbound_data)
                         self._southbound_data = b""
@@ -143,7 +151,10 @@ class TcpProxy:
                         socket_to_write.sendall(self._northbound_data)
                         self._northbound_data = b""
             except socket.error:
-                if socket_to_write is self._proxy_socket and self._proxy_socket is not None:
+                if (
+                    socket_to_write is self._proxy_socket
+                    and self._proxy_socket is not None
+                ):
                     _close_socket(self._proxy_socket)
                     self._proxy_socket = None
                 elif socket_to_write in self._client_sockets:
