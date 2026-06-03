@@ -40,17 +40,28 @@ _EMPTY_EXTENSIONS_SYMBOL_NAME = "grpc.testing.proto2.EmptyWithExtensions"
 class ReflectionClientTest(unittest.TestCase):
     def setUp(self):
         self._server = test_common.test_server(
-            max_workers=2 if __import__('sys').platform == 'darwin' else 10
+            max_workers=2 if __import__("sys").platform == "darwin" else 10
         )
         self._SERVICE_NAMES = (
             test_pb2.DESCRIPTOR.services_by_name["TestService"].full_name,
             reflection.SERVICE_NAME,
         )
         reflection.enable_server_reflection(self._SERVICE_NAMES, self._server)
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port(
+            "127.0.0.1:0"
+            if __import__("sys").platform == "darwin"
+            else "[::]:0"
+        )
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port)
+        self._channel = grpc.insecure_channel(
+            (
+                "127.0.0.1:%d"
+                if __import__("sys").platform == "darwin"
+                else "localhost:%d"
+            )
+            % port
+        )
 
         self._reflection_db = ProtoReflectionDescriptorDatabase(self._channel)
         self.desc_pool = DescriptorPool(self._reflection_db)

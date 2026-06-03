@@ -282,7 +282,7 @@ class MetadataFlagsTest(unittest.TestCase):
         # Start the server after the connections are waiting
         wg.wait()
         server = test_common.test_server(
-            max_workers=2 if __import__('sys').platform == "darwin" else 10,
+            max_workers=2 if __import__("sys").platform == "darwin" else 10,
             reuse_port=True,
         )
         server.add_registered_method_handlers(

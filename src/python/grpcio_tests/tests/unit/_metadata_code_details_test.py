@@ -199,15 +199,25 @@ class MetadataCodeDetailsTest(unittest.TestCase):
     def setUp(self):
         self._servicer = _Servicer()
         self._server = test_common.test_server(
-            max_workers=2 if __import__('sys').platform == 'darwin' else 10
+            max_workers=2 if __import__("sys").platform == "darwin" else 10
         )
         self._server.add_registered_method_handlers(
             _SERVICE, get_method_handlers(self._servicer)
         )
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port(
+            "127.0.0.1:0"
+            if __import__("sys").platform == "darwin"
+            else "[::]:0"
+        )
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("127.0.0.1:{}" if __import__('sys').platform == 'darwin' else "localhost:{}").format(port))
+        self._channel = grpc.insecure_channel(
+            (
+                "127.0.0.1:{}"
+                if __import__("sys").platform == "darwin"
+                else "localhost:{}"
+            ).format(port)
+        )
         unary_unary_method_name = "/".join(
             (
                 "",
@@ -830,15 +840,25 @@ class InspectContextTest(unittest.TestCase):
     def setUp(self):
         self._servicer = _InspectServicer()
         self._server = test_common.test_server(
-            max_workers=2 if __import__('sys').platform == 'darwin' else 10
+            max_workers=2 if __import__("sys").platform == "darwin" else 10
         )
         self._server.add_registered_method_handlers(
             _SERVICE, get_method_handlers(self._servicer)
         )
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port(
+            "127.0.0.1:0"
+            if __import__("sys").platform == "darwin"
+            else "[::]:0"
+        )
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("127.0.0.1:{}" if __import__('sys').platform == 'darwin' else "localhost:{}").format(port))
+        self._channel = grpc.insecure_channel(
+            (
+                "127.0.0.1:{}"
+                if __import__("sys").platform == "darwin"
+                else "localhost:{}"
+            ).format(port)
+        )
         unary_unary_method_name = "/".join(
             (
                 "",
