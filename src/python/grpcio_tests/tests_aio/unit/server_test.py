@@ -439,11 +439,11 @@ class TestServer(AioTestBase):
 
         with self.assertRaises(aio.AioRpcError) as exception_context:
             await call
-        
-        if sys.platform == 'darwin':
+
+        if sys.platform == "darwin":
             self.assertIn(
                 exception_context.exception.code(),
-                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED)
+                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
             )
         else:
             self.assertEqual(
@@ -483,11 +483,11 @@ class TestServer(AioTestBase):
 
         with self.assertRaises(aio.AioRpcError) as exception_context:
             await call
-        
-        if sys.platform == 'darwin':
+
+        if sys.platform == "darwin":
             self.assertIn(
                 exception_context.exception.code(),
-                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED)
+                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
             )
         else:
             self.assertEqual(
@@ -520,8 +520,10 @@ class TestServer(AioTestBase):
         await self._server.stop(None)
 
         code = await call.code()
-        if sys.platform == 'darwin':
-            self.assertIn(code, (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED))
+        if sys.platform == "darwin":
+            self.assertIn(
+                code, (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED)
+            )
         else:
             self.assertEqual(grpc.StatusCode.UNAVAILABLE, code)
         # No segfault
