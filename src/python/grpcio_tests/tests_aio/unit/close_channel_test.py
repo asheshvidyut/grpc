@@ -46,7 +46,6 @@ class TestCloseChannel(AioTestBase):
         )
 
         call = UnaryCallWithSleep(messages_pb2.SimpleRequest())
-        await call.initial_metadata()
 
         await channel.close(grace=_LONG_TIMEOUT_THAT_SHOULD_NOT_EXPIRE)
 
@@ -61,7 +60,6 @@ class TestCloseChannel(AioTestBase):
         )
 
         call = UnaryCallWithSleep(messages_pb2.SimpleRequest())
-        await call.initial_metadata()
 
         await channel.close(None)
 
