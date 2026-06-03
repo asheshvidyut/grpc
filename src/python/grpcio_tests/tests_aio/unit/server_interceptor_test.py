@@ -180,6 +180,7 @@ class TestServerInterceptor(AioTestBase):
         channel = aio.insecure_channel(server_target)
         self._channels.append(channel)
         return server, test_pb2_grpc.TestServiceStub(channel)
+
     async def test_invalid_interceptor(self):
         class InvalidInterceptor:
             """Just an invalid Interceptor"""
