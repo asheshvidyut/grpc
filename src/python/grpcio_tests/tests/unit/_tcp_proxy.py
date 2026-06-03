@@ -26,6 +26,7 @@ import datetime
 import select
 import socket
 import threading
+import time
 
 from tests.unit.framework.common import get_socket
 
@@ -34,8 +35,19 @@ _TCP_PROXY_TIMEOUT = datetime.timedelta(milliseconds=500)
 
 
 def _init_proxy_socket(gateway_address, gateway_port):
-    proxy_socket = socket.create_connection((gateway_address, gateway_port))
-    return proxy_socket
+    last_err = None
+    for attempt in range(5):
+        try:
+            proxy_socket = socket.create_connection(
+                (gateway_address, gateway_port),
+                timeout=5.0
+            )
+            proxy_socket.settimeout(None)
+            return proxy_socket
+        except (socket.error, TimeoutError) as err:
+            last_err = err
+            time.sleep(0.1)
+    raise last_err
 
 
 class TcpProxy:
