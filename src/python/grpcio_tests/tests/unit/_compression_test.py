@@ -36,7 +36,7 @@ _STREAM_STREAM = "StreamStream"
 # Cut down on test time.
 _STREAM_LENGTH = test_constants.STREAM_LENGTH // 16
 
-_HOST = "127.0.0.1" if __import__('sys').platform == 'darwin' else "localhost"
+_HOST = "127.0.0.1" if __import__("sys").platform == "darwin" else "localhost"
 
 _REQUEST = b"\x00" * 100
 _COMPRESSION_RATIO_THRESHOLD = 0.05
@@ -165,9 +165,9 @@ def _instrumented_client_server_pair(
 ):
     server = grpc.server(
         futures.ThreadPoolExecutor(
-            max_workers=2 if __import__('sys').platform == "darwin" else None
+            max_workers=2 if __import__("sys").platform == "darwin" else None
         ),
-        **server_kwargs
+        **server_kwargs,
     )
     server.add_registered_method_handlers(_SERVICE_NAME, server_handler)
     server_port = server.add_insecure_port("{}:0".format(_HOST))

@@ -41,7 +41,7 @@ _METHODS = (
     (messages_pb2.ClientConfigureRequest.EMPTY_CALL, "EMPTY_CALL"),
 )
 
-_IS_DARWIN = __import__('sys').platform == "darwin"
+_IS_DARWIN = __import__("sys").platform == "darwin"
 _QPS = 20 if _IS_DARWIN else 100
 _NUM_CHANNELS = 5 if _IS_DARWIN else 20
 
