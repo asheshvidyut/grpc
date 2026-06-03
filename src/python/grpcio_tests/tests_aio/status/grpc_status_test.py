@@ -113,10 +113,21 @@ class StatusTest(AioTestBase):
     async def setUp(self):
         self._server = aio.server()
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port(
+            "127.0.0.1:0"
+            if __import__("sys").platform == "darwin"
+            else "[::]:0"
+        )
         await self._server.start()
 
-        self._channel = aio.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port)
+        self._channel = aio.insecure_channel(
+            (
+                "127.0.0.1:%d"
+                if __import__("sys").platform == "darwin"
+                else "localhost:%d"
+            )
+            % port
+        )
 
     async def tearDown(self):
         await self._server.stop(None)
