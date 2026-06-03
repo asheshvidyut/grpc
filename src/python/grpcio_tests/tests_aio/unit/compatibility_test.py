@@ -60,9 +60,7 @@ class TestCompatibility(AioTestBase):
     async def asyncSetUpClass(cls):
         cls._async_server = aio.server(
             options=(("grpc.so_reuseport", 0),),
-            migration_thread_pool=ThreadPoolExecutor(
-                max_workers=None
-            ),
+            migration_thread_pool=ThreadPoolExecutor(max_workers=None),
         )
 
         test_pb2_grpc.add_TestServiceServicer_to_server(
@@ -206,9 +204,7 @@ class TestCompatibility(AioTestBase):
         # It's fine to instantiate server object in the event loop thread.
         # The server will spawn its own serving thread.
         server = grpc.server(
-            ThreadPoolExecutor(
-                max_workers=None
-            ),
+            ThreadPoolExecutor(max_workers=None),
             handlers=(GenericHandlers(),),
         )
         port = server.add_insecure_port("localhost:0")

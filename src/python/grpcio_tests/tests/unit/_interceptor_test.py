@@ -462,9 +462,7 @@ class InterceptorTest(unittest.TestCase):
         self._control = test_control.PauseFailControl()
         self._record = []
         self._handler = _Handler(self._control, self._record)
-        self._server_pool = logging_pool.pool(
-            test_constants.THREAD_CONCURRENCY
-        )
+        self._server_pool = logging_pool.pool(test_constants.THREAD_CONCURRENCY)
 
         conditional_interceptor = _filter_server_interceptor(
             lambda x: ("secret", "42") in x.invocation_metadata,

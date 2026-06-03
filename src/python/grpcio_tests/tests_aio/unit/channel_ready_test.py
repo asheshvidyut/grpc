@@ -36,7 +36,7 @@ class TestChannelReady(AioTestBase):
         _, self._port, self._socket = get_socket(
             bind_address=address,
             listen=False,
-            sock_options=(socket.SO_REUSEADDR,)
+            sock_options=(socket.SO_REUSEADDR,),
         )
         self._channel = aio.insecure_channel(f"{address}:{self._port}")
         self._socket.close()

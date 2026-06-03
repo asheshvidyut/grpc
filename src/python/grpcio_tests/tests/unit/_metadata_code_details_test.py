@@ -198,9 +198,7 @@ def get_method_handlers(servicer):
 class MetadataCodeDetailsTest(unittest.TestCase):
     def setUp(self):
         self._servicer = _Servicer()
-        self._server = test_common.test_server(
-            max_workers=10
-        )
+        self._server = test_common.test_server(max_workers=10)
         self._server.add_registered_method_handlers(
             _SERVICE, get_method_handlers(self._servicer)
         )
@@ -829,9 +827,7 @@ class _InspectServicer(_Servicer):
 class InspectContextTest(unittest.TestCase):
     def setUp(self):
         self._servicer = _InspectServicer()
-        self._server = test_common.test_server(
-            max_workers=10
-        )
+        self._server = test_common.test_server(max_workers=10)
         self._server.add_registered_method_handlers(
             _SERVICE, get_method_handlers(self._servicer)
         )
