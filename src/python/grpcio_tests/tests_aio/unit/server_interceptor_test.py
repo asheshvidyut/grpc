@@ -159,21 +159,27 @@ class _CacheInterceptor(aio.ServerInterceptor):
         return wrap_server_method_handler(wrapper, handler)
 
 
-async def _create_server_stub_pair(
-    record: list, *interceptors: aio.ServerInterceptor
-) -> Tuple[aio.Server, test_pb2_grpc.TestServiceStub]:
-    """Creates a server-stub pair with given record and interceptors.
-
-    Returning the server object to protect it from being garbage collected.
-    """
-    server_target, server = await start_test_server(
-        interceptors=interceptors, record=record
-    )
-    channel = aio.insecure_channel(server_target)
-    return server, test_pb2_grpc.TestServiceStub(channel)
-
-
 class TestServerInterceptor(AioTestBase):
+    async def setUp(self):
+        self._servers = []
+        self._channels = []
+
+    async def tearDown(self):
+        for channel in self._channels:
+            await channel.close()
+        for server in self._servers:
+            await server.stop(None)
+
+    async def _create_server_stub_pair(
+        self, record: list, *interceptors: aio.ServerInterceptor
+    ) -> Tuple[aio.Server, test_pb2_grpc.TestServiceStub]:
+        server_target, server = await start_test_server(
+            interceptors=interceptors, record=record
+        )
+        self._servers.append(server)
+        channel = aio.insecure_channel(server_target)
+        self._channels.append(channel)
+        return server, test_pb2_grpc.TestServiceStub(channel)
     async def test_invalid_interceptor(self):
         class InvalidInterceptor:
             """Just an invalid Interceptor"""
@@ -185,7 +191,7 @@ class TestServerInterceptor(AioTestBase):
 
     async def test_executed_right_order(self):
         record = []
-        server_target, _ = await start_test_server(
+        server_target, server = await start_test_server(
             record=record,
             interceptors=(
                 _LoggingInterceptor("log1", record),
@@ -193,6 +199,7 @@ class TestServerInterceptor(AioTestBase):
                 _LoggingInterceptor("log2", record),
             ),
         )
+        self._servers.append(server)
 
         async with aio.insecure_channel(server_target) as channel:
             multicallable = channel.unary_unary(
@@ -217,7 +224,7 @@ class TestServerInterceptor(AioTestBase):
 
     async def test_unique_context_per_call(self):
         record = []
-        server, stub = await _create_server_stub_pair(
+        server, stub = await self._create_server_stub_pair(
             record,
             _LoggingInterceptor("log1", record),
             _ContextVarSettingInterceptor("context_var_value"),
@@ -253,9 +260,10 @@ class TestServerInterceptor(AioTestBase):
 
     async def test_response_ok(self):
         record = []
-        server_target, _ = await start_test_server(
+        server_target, server = await start_test_server(
             interceptors=(_LoggingInterceptor("log1", record),)
         )
+        self._servers.append(server)
 
         async with aio.insecure_channel(server_target) as channel:
             multicallable = channel.unary_unary(
@@ -277,13 +285,14 @@ class TestServerInterceptor(AioTestBase):
             lambda x: ("secret", "42") in x.invocation_metadata,
             _LoggingInterceptor("log3", record),
         )
-        server_target, _ = await start_test_server(
+        server_target, server = await start_test_server(
             interceptors=(
                 _LoggingInterceptor("log1", record),
                 conditional_interceptor,
                 _LoggingInterceptor("log2", record),
             )
         )
+        self._servers.append(server)
 
         async with aio.insecure_channel(server_target) as channel:
             multicallable = channel.unary_unary(
@@ -333,7 +342,7 @@ class TestServerInterceptor(AioTestBase):
         )
 
         # Constructs a server with the cache interceptor
-        server, stub = await _create_server_stub_pair([], interceptor)
+        server, stub = await self._create_server_stub_pair([], interceptor)
 
         # Tests if the cache store is used
         response = await stub.UnaryCall(
@@ -355,7 +364,7 @@ class TestServerInterceptor(AioTestBase):
 
     async def test_interceptor_unary_stream(self):
         record = []
-        server, stub = await _create_server_stub_pair(
+        server, stub = await self._create_server_stub_pair(
             record,
             _ContextVarSettingInterceptor("context_var_value"),
             _LoggingInterceptor("log_unary_stream", record),
@@ -388,7 +397,7 @@ class TestServerInterceptor(AioTestBase):
 
     async def test_interceptor_stream_unary(self):
         record = []
-        server, stub = await _create_server_stub_pair(
+        server, stub = await self._create_server_stub_pair(
             record,
             _ContextVarSettingInterceptor("context_var_value"),
             _LoggingInterceptor("log_stream_unary", record),
@@ -426,7 +435,7 @@ class TestServerInterceptor(AioTestBase):
 
     async def test_interceptor_stream_stream(self):
         record = []
-        server, stub = await _create_server_stub_pair(
+        server, stub = await self._create_server_stub_pair(
             record,
             _ContextVarSettingInterceptor("context_var_value"),
             _LoggingInterceptor("log_stream_stream", record),
