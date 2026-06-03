@@ -34,6 +34,14 @@ _TCP_PROXY_BUFFER_SIZE = 1024
 _TCP_PROXY_TIMEOUT = datetime.timedelta(milliseconds=500)
 
 
+def _close_socket(sock):
+    if sock is not None:
+        try:
+            sock.close()
+        except socket.error:
+            pass
+
+
 def _init_proxy_socket(gateway_address, gateway_port):
     last_err = None
     for attempt in range(10):
@@ -113,24 +121,15 @@ class TcpProxy:
                         socket_to_read.close()
             except socket.error:
                 if socket_to_read is self._listen_socket:
-                    try:
-                        self._listen_socket.close()
-                    except socket.error:
-                        pass
+                    _close_socket(self._listen_socket)
                     self._listen_socket = None
                 elif socket_to_read is self._proxy_socket and self._proxy_socket is not None:
-                    try:
-                        self._proxy_socket.close()
-                    except socket.error:
-                        pass
+                    _close_socket(self._proxy_socket)
                     self._proxy_socket = None
                 elif socket_to_read in self._client_sockets:
                     if socket_to_read in self._client_sockets:
                         self._client_sockets.remove(socket_to_read)
-                    try:
-                        socket_to_read.close()
-                    except socket.error:
-                        pass
+                    _close_socket(socket_to_read)
 
     def _handle_writes(self, sockets_to_write):
         for socket_to_write in sockets_to_write:
@@ -145,38 +144,26 @@ class TcpProxy:
                         self._northbound_data = b""
             except socket.error:
                 if socket_to_write is self._proxy_socket and self._proxy_socket is not None:
-                    try:
-                        self._proxy_socket.close()
-                    except socket.error:
-                        pass
+                    _close_socket(self._proxy_socket)
                     self._proxy_socket = None
                 elif socket_to_write in self._client_sockets:
                     if socket_to_write in self._client_sockets:
                         self._client_sockets.remove(socket_to_write)
-                    try:
-                        socket_to_write.close()
-                    except socket.error:
-                        pass
+                    _close_socket(socket_to_write)
 
     def _cleanup_bad_sockets(self):
         if self._listen_socket is not None:
             try:
                 select.select([self._listen_socket], [], [], 0)
             except (select.error, socket.error, ValueError):
-                try:
-                    self._listen_socket.close()
-                except socket.error:
-                    pass
+                _close_socket(self._listen_socket)
                 self._listen_socket = None
 
         if self._proxy_socket is not None:
             try:
                 select.select([self._proxy_socket], [], [], 0)
             except (select.error, socket.error, ValueError):
-                try:
-                    self._proxy_socket.close()
-                except socket.error:
-                    pass
+                _close_socket(self._proxy_socket)
                 self._proxy_socket = None
 
         valid_clients = []
@@ -185,10 +172,7 @@ class TcpProxy:
                 select.select([s], [], [], 0)
                 valid_clients.append(s)
             except (select.error, socket.error, ValueError):
-                try:
-                    s.close()
-                except socket.error:
-                    pass
+                _close_socket(s)
         self._client_sockets = valid_clients
 
     def _run_proxy(self):
@@ -226,29 +210,15 @@ class TcpProxy:
                 self._handle_writes(sockets_to_write)
         finally:
             for client_socket in list(self._client_sockets):
-                try:
-                    client_socket.close()
-                except socket.error:
-                    pass
+                _close_socket(client_socket)
             self._client_sockets.clear()
 
     def stop(self):
         self._stop_event.set()
-        if self._listen_socket is not None:
-            try:
-                self._listen_socket.close()
-            except socket.error:
-                pass
-        if self._proxy_socket is not None:
-            try:
-                self._proxy_socket.close()
-            except socket.error:
-                pass
+        _close_socket(self._listen_socket)
+        _close_socket(self._proxy_socket)
         for client_socket in list(self._client_sockets):
-            try:
-                client_socket.close()
-            except socket.error:
-                pass
+            _close_socket(client_socket)
         self._thread.join()
 
     def get_byte_count(self):
