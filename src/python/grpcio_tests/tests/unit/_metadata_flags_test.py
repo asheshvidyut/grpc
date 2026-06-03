@@ -13,6 +13,7 @@
 # limitations under the License.
 """Tests metadata flags feature by testing wait-for-ready semantics"""
 
+import contextlib
 import logging
 import queue
 import socket
@@ -95,11 +96,15 @@ def get_method_handlers(test):
     }
 
 
+@contextlib.contextmanager
 def create_phony_channel():
     """Creating phony channels is a workaround for retries"""
     host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
-    sock.close()
-    return grpc.insecure_channel("{}:{}".format(host, port))
+    try:
+        with grpc.insecure_channel("{}:{}".format(host, port)) as channel:
+            yield channel
+    finally:
+        sock.close()
 
 
 def perform_unary_unary_call(channel, wait_for_ready=None):
@@ -276,7 +281,10 @@ class MetadataFlagsTest(unittest.TestCase):
 
         # Start the server after the connections are waiting
         wg.wait()
-        server = test_common.test_server(reuse_port=True)
+        server = test_common.test_server(
+            max_workers=2 if __import__('sys').platform == "darwin" else 10,
+            reuse_port=True,
+        )
         server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(weakref.proxy(self))
         )
