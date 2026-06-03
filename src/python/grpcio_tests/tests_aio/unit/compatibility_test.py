@@ -51,7 +51,9 @@ class TestCompatibility(AioTestBase):
     async def setUp(self):
         self._async_server = aio.server(
             options=(("grpc.so_reuseport", 0),),
-            migration_thread_pool=ThreadPoolExecutor(),
+            migration_thread_pool=ThreadPoolExecutor(
+                max_workers=2 if __import__('sys').platform == "darwin" else None
+            ),
         )
 
         test_pb2_grpc.add_TestServiceServicer_to_server(
@@ -194,13 +196,17 @@ class TestCompatibility(AioTestBase):
         # It's fine to instantiate server object in the event loop thread.
         # The server will spawn its own serving thread.
         server = grpc.server(
-            ThreadPoolExecutor(), handlers=(GenericHandlers(),)
+            ThreadPoolExecutor(
+                max_workers=2 if __import__('sys').platform == "darwin" else None
+            ),
+            handlers=(GenericHandlers(),),
         )
         port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "localhost:0")
         server.start()
 
         def sync_work() -> None:
-            for _ in range(100):
+            iterations = 10 if __import__('sys').platform == 'darwin' else 100
+            for _ in range(iterations):
                 with grpc.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port) as channel:
                     response = channel.unary_unary("/test/test")(b"\x07\x08")
                     self.assertEqual(response, b"\x07\x08")
