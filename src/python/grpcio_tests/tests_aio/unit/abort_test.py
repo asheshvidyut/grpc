@@ -79,10 +79,10 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 async def _start_test_server():
     server = aio.server()
-    port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+    port = server.add_insecure_port("[::]:0")
     server.add_generic_rpc_handlers((_GenericHandler(),))
     await server.start()
-    return ("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port, server
+    return ("localhost:%d") % port, server
 
 
 class TestAbort(AioTestBase):

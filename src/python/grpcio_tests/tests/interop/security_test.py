@@ -46,7 +46,7 @@ class SecurityTest(unittest.TestCase):
 
     def setUp(self):
         self.server = test_common.test_server(
-            max_workers=2 if __import__('sys').platform == 'darwin' else 10
+            max_workers=10
         )
         test_pb2_grpc.add_TestServiceServicer_to_server(
             service.TestService(), self.server

@@ -463,7 +463,7 @@ class InterceptorTest(unittest.TestCase):
         self._record = []
         self._handler = _Handler(self._control, self._record)
         self._server_pool = logging_pool.pool(
-            2 if __import__("sys").platform == "darwin" else test_constants.THREAD_CONCURRENCY
+            test_constants.THREAD_CONCURRENCY
         )
 
         conditional_interceptor = _filter_server_interceptor(
@@ -492,13 +492,13 @@ class InterceptorTest(unittest.TestCase):
                 _LoggingInterceptor("s2", self._record),
             ),
         )
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port("[::]:0")
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(self._handler)
         )
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port)
+        self._channel = grpc.insecure_channel(("localhost:%d") % port)
 
     def tearDown(self):
         self._channel.close()

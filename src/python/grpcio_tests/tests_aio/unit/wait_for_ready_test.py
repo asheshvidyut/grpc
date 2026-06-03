@@ -106,7 +106,7 @@ _RPC_ACTIONS = (
 
 class TestWaitForReady(AioTestBase):
     async def setUp(self):
-        address = "127.0.0.1" if __import__('sys').platform == 'darwin' else "localhost"
+        address = "localhost"
         _, self._port, self._socket = get_socket(bind_address=address, listen=False)
         self._channel = aio.insecure_channel(f"{address}:{self._port}")
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)

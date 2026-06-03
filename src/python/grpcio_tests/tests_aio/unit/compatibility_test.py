@@ -61,7 +61,7 @@ class TestCompatibility(AioTestBase):
         cls._async_server = aio.server(
             options=(("grpc.so_reuseport", 0),),
             migration_thread_pool=ThreadPoolExecutor(
-                max_workers=2 if __import__('sys').platform == "darwin" else None
+                max_workers=None
             ),
         )
 
@@ -71,8 +71,8 @@ class TestCompatibility(AioTestBase):
         cls._adhoc_handlers = _common.AdhocGenericHandler()
         cls._async_server.add_generic_rpc_handlers((cls._adhoc_handlers,))
 
-        port = cls._async_server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
-        address = ("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port
+        port = cls._async_server.add_insecure_port("[::]:0")
+        address = ("localhost:%d") % port
         await cls._async_server.start()
 
         # Create async stub
@@ -207,17 +207,17 @@ class TestCompatibility(AioTestBase):
         # The server will spawn its own serving thread.
         server = grpc.server(
             ThreadPoolExecutor(
-                max_workers=2 if __import__('sys').platform == "darwin" else None
+                max_workers=None
             ),
             handlers=(GenericHandlers(),),
         )
-        port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "localhost:0")
+        port = server.add_insecure_port("localhost:0")
         server.start()
 
         def sync_work() -> None:
-            iterations = 10 if __import__('sys').platform == 'darwin' else 100
+            iterations = 100
             for _ in range(iterations):
-                with grpc.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port) as channel:
+                with grpc.insecure_channel(("localhost:%d") % port) as channel:
                     response = channel.unary_unary("/test/test")(b"\x07\x08")
                     self.assertEqual(response, b"\x07\x08")
 

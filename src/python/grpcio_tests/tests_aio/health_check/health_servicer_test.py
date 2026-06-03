@@ -54,13 +54,13 @@ class HealthServicerTest(AioTestBase):
             _NOT_SERVING_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
         )
         self._server = aio.server()
-        port = self._server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+        port = self._server.add_insecure_port("[::]:0")
         health_pb2_grpc.add_HealthServicer_to_server(
             self._servicer, self._server
         )
         await self._server.start()
 
-        self._channel = aio.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port)
+        self._channel = aio.insecure_channel(("localhost:%d") % port)
         self._stub = health_pb2_grpc.HealthStub(self._channel)
 
     async def tearDown(self):

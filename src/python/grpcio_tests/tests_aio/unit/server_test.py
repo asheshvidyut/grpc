@@ -241,11 +241,11 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 async def _start_test_server():
     server = aio.server()
-    port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
+    port = server.add_insecure_port("[::]:0")
     generic_handler = _GenericHandler()
     server.add_generic_rpc_handlers((generic_handler,))
     await server.start()
-    return ("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port, server, generic_handler
+    return ("localhost:%d") % port, server, generic_handler
 
 
 class TestServer(AioTestBase):
@@ -504,10 +504,7 @@ class TestServer(AioTestBase):
         await call.write(_REQUEST)
         await self._server.stop(None)
 
-        if __import__('sys').platform == 'darwin':
-            self.assertIn(await call.code(), (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED))
-        else:
-            self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
+        self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
         # No segfault
 
     async def test_error_in_stream_stream(self):
@@ -560,8 +557,8 @@ class TestServer(AioTestBase):
 
     async def test_port_binding_exception(self):
         server = aio.server(options=(("grpc.so_reuseport", 0),))
-        port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "localhost:0")
-        bind_address = ("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port
+        port = server.add_insecure_port("localhost:0")
+        bind_address = ("localhost:%d") % port
 
         with self.assertRaises(RuntimeError):
             server.add_insecure_port(bind_address)
@@ -578,8 +575,8 @@ class TestServer(AioTestBase):
 
         # Build the server with concurrent rpc argument
         server = aio.server(maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS)
-        port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "localhost:0")
-        bind_address = ("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port
+        port = server.add_insecure_port("localhost:0")
+        bind_address = ("localhost:%d") % port
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         # Build the channel
@@ -633,8 +630,8 @@ class TestServer(AioTestBase):
         # Use a limit of 1 to make the test deterministic
         max_concurrent = 1
         server = aio.server(maximum_concurrent_rpcs=max_concurrent)
-        port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "[::]:0")
-        bind_address = f"{'127.0.0.1' if __import__('sys').platform == 'darwin' else 'localhost'}:{port}"
+        port = server.add_insecure_port("[::]:0")
+        bind_address = f"{'localhost'}:{port}"
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         channel = aio.insecure_channel(bind_address)
