@@ -96,17 +96,11 @@ def get_method_handlers(test):
     }
 
 
-@contextlib.contextmanager
 def create_phony_channel():
     """Creating phony channels is a workaround for retries"""
-    host, port, sock = get_socket(
-        listen=False, sock_options=(socket.SO_REUSEADDR,)
-    )
-    try:
-        with grpc.insecure_channel("{}:{}".format(host, port)) as channel:
-            yield channel
-    finally:
-        sock.close()
+    host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
+    sock.close()
+    return grpc.insecure_channel("{}:{}".format(host, port))
 
 
 def perform_unary_unary_call(channel, wait_for_ready=None):
