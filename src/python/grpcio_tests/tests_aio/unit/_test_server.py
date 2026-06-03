@@ -165,8 +165,13 @@ async def start_test_server(
     interceptors=None,
     record: Optional[list] = None,
 ):
+    from concurrent.futures import ThreadPoolExecutor
     server = aio.server(
-        options=(("grpc.so_reuseport", 0),), interceptors=interceptors
+        options=(("grpc.so_reuseport", 0),),
+        interceptors=interceptors,
+        migration_thread_pool=ThreadPoolExecutor(
+            max_workers=2 if __import__("sys").platform == "darwin" else None
+        ),
     )
     servicer = TestServiceServicer(record)
     test_pb2_grpc.add_TestServiceServicer_to_server(servicer, server)
