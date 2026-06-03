@@ -36,17 +36,17 @@ _TCP_PROXY_TIMEOUT = datetime.timedelta(milliseconds=500)
 
 def _init_proxy_socket(gateway_address, gateway_port):
     last_err = None
-    for attempt in range(5):
+    for attempt in range(10):
         try:
             proxy_socket = socket.create_connection(
                 (gateway_address, gateway_port),
-                timeout=5.0
+                timeout=2.0
             )
             proxy_socket.settimeout(None)
             return proxy_socket
         except (socket.error, TimeoutError) as err:
             last_err = err
-            time.sleep(0.1)
+            time.sleep(0.1 * (attempt + 1))
     raise last_err
 
 
