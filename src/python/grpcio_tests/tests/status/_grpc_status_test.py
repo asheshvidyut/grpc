@@ -127,7 +127,7 @@ class StatusTest(unittest.TestCase):
         port = self._server.add_insecure_port("[::]:0")
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("localhost:%d") % port)
+        self._channel = grpc.insecure_channel("localhost:%d" % port)
 
     def tearDown(self):
         self._server.stop(None)

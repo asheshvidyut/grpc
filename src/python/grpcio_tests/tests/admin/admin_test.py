@@ -32,7 +32,7 @@ class TestAdmin(unittest.TestCase):
         grpc_admin.add_admin_servicers(self._server)
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("localhost:%s") % port)
+        self._channel = grpc.insecure_channel("localhost:%s" % port)
 
     def tearDown(self):
         self._channel.close()

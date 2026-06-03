@@ -116,7 +116,7 @@ class StatusTest(AioTestBase):
         port = self._server.add_insecure_port("[::]:0")
         await self._server.start()
 
-        self._channel = aio.insecure_channel(("localhost:%d") % port)
+        self._channel = aio.insecure_channel("localhost:%d" % port)
 
     async def tearDown(self):
         await self._server.stop(None)

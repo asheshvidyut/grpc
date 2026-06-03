@@ -78,7 +78,7 @@ class _ChannelServerPair:
 
         # Channel will enable channelz service...
         self.channel = grpc.insecure_channel(
-            ("localhost:%d") % port, _ENABLE_CHANNELZ
+            "localhost:%d" % port, _ENABLE_CHANNELZ
         )
 
 
@@ -152,7 +152,7 @@ class ChannelzServicerTest(unittest.TestCase):
         # This channel is used to fetch Channelz info only
         # Channelz should not be enabled
         self._channel = grpc.insecure_channel(
-            ("localhost:%d") % port, _DISABLE_CHANNELZ
+            "localhost:%d" % port, _DISABLE_CHANNELZ
         )
         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
 

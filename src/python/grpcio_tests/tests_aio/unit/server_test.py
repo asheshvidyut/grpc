@@ -245,7 +245,7 @@ async def _start_test_server():
     generic_handler = _GenericHandler()
     server.add_generic_rpc_handlers((generic_handler,))
     await server.start()
-    return ("localhost:%d") % port, server, generic_handler
+    return "localhost:%d" % port, server, generic_handler
 
 
 class TestServer(AioTestBase):
@@ -558,7 +558,7 @@ class TestServer(AioTestBase):
     async def test_port_binding_exception(self):
         server = aio.server(options=(("grpc.so_reuseport", 0),))
         port = server.add_insecure_port("localhost:0")
-        bind_address = ("localhost:%d") % port
+        bind_address = "localhost:%d" % port
 
         with self.assertRaises(RuntimeError):
             server.add_insecure_port(bind_address)
@@ -576,7 +576,7 @@ class TestServer(AioTestBase):
         # Build the server with concurrent rpc argument
         server = aio.server(maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS)
         port = server.add_insecure_port("localhost:0")
-        bind_address = ("localhost:%d") % port
+        bind_address = "localhost:%d" % port
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         # Build the channel

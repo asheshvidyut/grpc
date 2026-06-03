@@ -81,7 +81,7 @@ class _ChannelServerPair:
         # Server will enable channelz service
         self.server = aio.server(options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ)
         port = self.server.add_insecure_port("[::]:0")
-        self.address = ("localhost:%d") % port
+        self.address = "localhost:%d" % port
         self.server.add_generic_rpc_handlers((_GenericHandler(),))
         await self.server.start()
 
@@ -137,7 +137,7 @@ class ChannelzServicerTest(AioTestBase):
         # This channel is used to fetch Channelz info only
         # Channelz should not be enabled
         self._channel = aio.insecure_channel(
-            ("localhost:%d") % port, options=_DISABLE_CHANNELZ
+            "localhost:%d" % port, options=_DISABLE_CHANNELZ
         )
         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
 

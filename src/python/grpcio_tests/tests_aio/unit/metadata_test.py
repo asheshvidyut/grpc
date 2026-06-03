@@ -217,7 +217,7 @@ async def _start_test_server():
         )
     )
     await server.start()
-    return ("localhost:%d") % port, server
+    return "localhost:%d" % port, server
 
 
 class TestMetadata(AioTestBase):

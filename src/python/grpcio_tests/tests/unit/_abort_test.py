@@ -97,7 +97,7 @@ class AbortTest(unittest.TestCase):
         )
         self._server.start()
 
-        self._channel = grpc.insecure_channel(("localhost:%d") % port)
+        self._channel = grpc.insecure_channel("localhost:%d" % port)
 
     def tearDown(self):
         self._channel.close()

@@ -75,7 +75,7 @@ class AuthContextTest(unittest.TestCase):
         port = server.add_insecure_port("[::]:0")
         server.start()
 
-        with grpc.insecure_channel(("localhost:%d") % port) as channel:
+        with grpc.insecure_channel("localhost:%d" % port) as channel:
             response = channel.unary_unary(
                 grpc._common.fully_qualified_method(
                     _SERVICE_NAME, _UNARY_UNARY

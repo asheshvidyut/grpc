@@ -79,7 +79,7 @@ class TestAuthContext(AioTestBase):
         port = server.add_insecure_port("[::]:0")
         await server.start()
 
-        async with aio.insecure_channel(("localhost:%d") % port) as channel:
+        async with aio.insecure_channel("localhost:%d" % port) as channel:
             response = await channel.unary_unary(_UNARY_UNARY)(_REQUEST)
         await server.stop(None)
 

@@ -180,7 +180,7 @@ class MetadataTest(unittest.TestCase):
         port = self._server.add_insecure_port("[::]:0")
         self._server.start()
         self._channel = grpc.insecure_channel(
-            ("localhost:%d") % port, options=_CHANNEL_ARGS
+            "localhost:%d" % port, options=_CHANNEL_ARGS
         )
 
     def tearDown(self):
