@@ -179,12 +179,14 @@ async def start_test_server(
             server_credentials = grpc.ssl_server_credentials(
                 [(resources.private_key(), resources.certificate_chain())]
             )
-        if sys.platform == 'darwin':
-            port = server.add_secure_port("127.0.0.1:%d" % port, server_credentials)
+        if sys.platform == "darwin":
+            port = server.add_secure_port(
+                "127.0.0.1:%d" % port, server_credentials
+            )
         else:
             port = server.add_secure_port("[::]:%d" % port, server_credentials)
     else:
-        if sys.platform == 'darwin':
+        if sys.platform == "darwin":
             port = server.add_insecure_port("127.0.0.1:%d" % port)
         else:
             port = server.add_insecure_port("[::]:%d" % port)
@@ -192,6 +194,6 @@ async def start_test_server(
     await server.start()
 
     # NOTE(lidizheng) returning the server to prevent it from deallocation
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
         return "127.0.0.1:%d" % port, server
     return "localhost:%d" % port, server
