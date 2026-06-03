@@ -45,7 +45,9 @@ class SecurityTest(unittest.TestCase):
     Each test tests a variety of different security configurations."""
 
     def setUp(self):
-        self.server = test_common.test_server()
+        self.server = test_common.test_server(
+            max_workers=2 if __import__('sys').platform == 'darwin' else 10
+        )
         test_pb2_grpc.add_TestServiceServicer_to_server(
             service.TestService(), self.server
         )

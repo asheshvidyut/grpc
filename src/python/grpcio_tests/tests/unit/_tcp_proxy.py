@@ -234,7 +234,6 @@ class TcpProxy:
 
     def stop(self):
         self._stop_event.set()
-        self._thread.join()
         if self._listen_socket is not None:
             try:
                 self._listen_socket.close()
@@ -245,6 +244,12 @@ class TcpProxy:
                 self._proxy_socket.close()
             except socket.error:
                 pass
+        for client_socket in list(self._client_sockets):
+            try:
+                client_socket.close()
+            except socket.error:
+                pass
+        self._thread.join()
 
     def get_byte_count(self):
         with self._byte_count_lock:

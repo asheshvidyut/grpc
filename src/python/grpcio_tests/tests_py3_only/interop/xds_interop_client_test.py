@@ -119,6 +119,8 @@ def _collect_stats(
         "target": f"localhost:{stats_port}",
         "insecure": True,
     }
+    # Wait for the configuration change to propagate and in-flight RPCs to clear
+    time.sleep(0.2)
     response = test_pb2_grpc.LoadBalancerStatsService.GetClientAccumulatedStats(
         messages_pb2.LoadBalancerAccumulatedStatsRequest(), **settings
     )
