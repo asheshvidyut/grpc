@@ -499,9 +499,9 @@ class InterceptorTest(unittest.TestCase):
         self._channel = grpc.insecure_channel(("127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d") % port)
 
     def tearDown(self):
-        self._server.stop(None)
-        self._server_pool.shutdown(wait=True)
         self._channel.close()
+        self._server.stop(0)
+        self._server_pool.shutdown(wait=True)
 
     def testTripleRequestMessagesClientInterceptor(self):
         def triple(request_iterator):
