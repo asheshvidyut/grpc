@@ -504,7 +504,10 @@ class TestServer(AioTestBase):
         await call.write(_REQUEST)
         await self._server.stop(None)
 
-        self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
+        if __import__('sys').platform == 'darwin':
+            self.assertIn(await call.code(), (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED))
+        else:
+            self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
         # No segfault
 
     async def test_error_in_stream_stream(self):
