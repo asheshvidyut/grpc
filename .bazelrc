@@ -1,3 +1,7 @@
 # load bazelrc from the legacy location
 # as recommended in https://github.com/bazelbuild/bazel/issues/6319
 import %workspace%/tools/bazel.rc
+
+# Configure rules_python to use the script-based bootstrap runner to ensure
+# subprocesses spawned via sys.executable inherit the Bazel sys.path.
+build --@rules_python//python/config_settings:bootstrap_impl=script
