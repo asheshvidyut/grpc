@@ -18,12 +18,12 @@ import collections
 import datetime
 import io
 import itertools
+import sys
 import traceback
 import unittest
 from xml.etree import ElementTree
 
 import coverage
-import sys
 
 from tests import _loader
 
