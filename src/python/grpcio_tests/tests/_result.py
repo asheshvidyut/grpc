@@ -23,6 +23,7 @@ import unittest
 from xml.etree import ElementTree
 
 import coverage
+import sys
 
 from tests import _loader
 
