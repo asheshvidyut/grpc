@@ -575,7 +575,7 @@ class UnaryUnaryCall(_UnaryResponseMixin, Call, _base_call.UnaryUnaryCall):
         self._invocation_task = loop.create_task(self._invoke())
         self._init_unary_response_mixin(self._invocation_task)
 
-    async def _invoke(self) -> ResponseType:
+    async def _invoke(self) -> Union[ResponseType, EOFType]:
         serialized_request = _common.serialize(
             self._request, self._request_serializer
         )
@@ -611,10 +611,6 @@ class UnaryStreamCall(_StreamResponseMixin, Call, _base_call.UnaryStreamCall):
 
     _request: RequestType
     _send_unary_request_task: asyncio.Task
-
-    @property
-    def _done_writing_flag(self) -> bool:
-        return True
 
     # pylint: disable=too-many-arguments
     def __init__(

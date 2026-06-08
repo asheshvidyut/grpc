@@ -1137,16 +1137,12 @@ class UnaryUnaryCallResponse(_base_call.UnaryUnaryCall, Generic[ResponseType]):
 
 
 class _StreamCallResponseIterator(Generic[ResponseType]):
-    _call: Optional[
-        Union[_base_call.UnaryStreamCall, _base_call.StreamStreamCall]
-    ]
+    _call: Union[_base_call.UnaryStreamCall, _base_call.StreamStreamCall]
     _response_iterator: AsyncIterable[ResponseType]
 
     def __init__(
         self,
-        call: Optional[
-            Union[_base_call.UnaryStreamCall, _base_call.StreamStreamCall]
-        ],
+        call: Union[_base_call.UnaryStreamCall, _base_call.StreamStreamCall],
         response_iterator: AsyncIterable[ResponseType],
     ) -> None:
         self._response_iterator = response_iterator
@@ -1222,17 +1218,13 @@ class UnaryStreamCallResponseIterator(
         # async iterator. So this path should not be reached.
         raise NotImplementedError()
 
-    @property
-    def _done_writing_flag(self) -> bool:
-        if self._call is None:
-            return False
-        return getattr(self._call, "_done_writing_flag", True)
-
 
 class StreamStreamCallResponseIterator(
     _StreamCallResponseIterator, _base_call.StreamStreamCall
 ):
     """StreamStreamCall class which uses an alternative response iterator."""
+
+    _call: Optional[_base_call.StreamStreamCall]
 
     async def read(self) -> Union[EOFType, ResponseType]:
         # Behind the scenes everything goes through the
