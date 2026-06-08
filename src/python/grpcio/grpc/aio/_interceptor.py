@@ -1233,7 +1233,7 @@ class StreamStreamCallResponseIterator(
     _StreamCallResponseIterator, _base_call.StreamStreamCall
 ):
     """StreamStreamCall class which uses an alternative response iterator."""
-
+_call: _base_call.StreamStreamCall
     async def read(self) -> Union[EOFType, ResponseType]:
         # Behind the scenes everything goes through the
         # async iterator. So this path should not be reached.
