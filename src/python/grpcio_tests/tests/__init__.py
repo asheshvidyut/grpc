@@ -16,8 +16,11 @@ from __future__ import absolute_import
 
 import sys
 
+
 class _RetryIterator:
-    def __init__(self, orig_iterator, orig_callable, args, kwargs, start_attempt=0):
+    def __init__(
+        self, orig_iterator, orig_callable, args, kwargs, start_attempt=0
+    ):
         self._orig_iterator = orig_iterator
         self._orig_callable = orig_callable
         self._args = args
@@ -30,7 +33,9 @@ class _RetryIterator:
 
     def __next__(self):
         import time
+
         import grpc
+
         if self._first_next:
             self._first_next = False
             for attempt in range(self._start_attempt, 6):
@@ -39,7 +44,9 @@ class _RetryIterator:
                 except grpc.RpcError as e:
                     if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 5:
                         time.sleep(0.5)
-                        self._orig_iterator = self._orig_callable(*self._args, **self._kwargs)
+                        self._orig_iterator = self._orig_callable(
+                            *self._args, **self._kwargs
+                        )
                         continue
                     raise
         else:
@@ -60,17 +67,25 @@ class _RetryFuture:
 
     def _done_callback_handler(self, future):
         import grpc
+
         try:
             exc = future.exception()
         except Exception as e:
             exc = e
-        if exc is not None and isinstance(exc, grpc.RpcError) and exc.code() == grpc.StatusCode.UNAVAILABLE:
+        if (
+            exc is not None
+            and isinstance(exc, grpc.RpcError)
+            and exc.code() == grpc.StatusCode.UNAVAILABLE
+        ):
             import time
+
             time.sleep(0.5)
-            self._orig_future = self._orig_callable.future(*self._args, **self._kwargs)
+            self._orig_future = self._orig_callable.future(
+                *self._args, **self._kwargs
+            )
             self._orig_future.add_done_callback(self._done_callback_handler)
             return
-        
+
         for cb in list(self._callbacks):
             cb(self)
 
@@ -79,32 +94,47 @@ class _RetryFuture:
 
     def result(self, timeout=None):
         import time
+
         import grpc
+
         for attempt in range(6):
             try:
                 return self._orig_future.result(timeout)
             except grpc.RpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 5:
                     time.sleep(0.5)
-                    self._orig_future = self._orig_callable.future(*self._args, **self._kwargs)
+                    self._orig_future = self._orig_callable.future(
+                        *self._args, **self._kwargs
+                    )
                     continue
                 raise
 
     def exception(self, timeout=None):
         import time
+
         import grpc
+
         for attempt in range(6):
             try:
                 exc = self._orig_future.exception(timeout)
-                if exc is not None and isinstance(exc, grpc.RpcError) and exc.code() == grpc.StatusCode.UNAVAILABLE and attempt < 5:
+                if (
+                    exc is not None
+                    and isinstance(exc, grpc.RpcError)
+                    and exc.code() == grpc.StatusCode.UNAVAILABLE
+                    and attempt < 5
+                ):
                     time.sleep(0.5)
-                    self._orig_future = self._orig_callable.future(*self._args, **self._kwargs)
+                    self._orig_future = self._orig_callable.future(
+                        *self._args, **self._kwargs
+                    )
                     continue
                 return exc
             except grpc.RpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 5:
                     time.sleep(0.5)
-                    self._orig_future = self._orig_callable.future(*self._args, **self._kwargs)
+                    self._orig_future = self._orig_callable.future(
+                        *self._args, **self._kwargs
+                    )
                     continue
                 raise
 
@@ -119,7 +149,9 @@ class _RetryMultiCallable:
 
     def _retry_loop(self, func, *args, **kwargs):
         import time
+
         import grpc
+
         for attempt in range(6):
             try:
                 return func(*args, **kwargs)
@@ -132,11 +164,15 @@ class _RetryMultiCallable:
     def __call__(self, *args, **kwargs):
         if self._is_streaming_response:
             import time
+
             import grpc
+
             for attempt in range(6):
                 try:
                     iterator = self._orig_callable(*args, **kwargs)
-                    return _RetryIterator(iterator, self._orig_callable, args, kwargs, attempt)
+                    return _RetryIterator(
+                        iterator, self._orig_callable, args, kwargs, attempt
+                    )
                 except grpc.RpcError as e:
                     if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 5:
                         time.sleep(0.5)
@@ -149,7 +185,9 @@ class _RetryMultiCallable:
         return self._retry_loop(self._orig_callable.with_call, *args, **kwargs)
 
     def future(self, *args, **kwargs):
-        future_obj = self._retry_loop(self._orig_callable.future, *args, **kwargs)
+        future_obj = self._retry_loop(
+            self._orig_callable.future, *args, **kwargs
+        )
         return _RetryFuture(future_obj, self._orig_callable, args, kwargs)
 
 
@@ -158,16 +196,24 @@ class _RetryChannel:
         self._orig_channel = orig_channel
 
     def unary_unary(self, *args, **kwargs):
-        return _RetryMultiCallable(self._orig_channel.unary_unary(*args, **kwargs), False)
+        return _RetryMultiCallable(
+            self._orig_channel.unary_unary(*args, **kwargs), False
+        )
 
     def unary_stream(self, *args, **kwargs):
-        return _RetryMultiCallable(self._orig_channel.unary_stream(*args, **kwargs), True)
+        return _RetryMultiCallable(
+            self._orig_channel.unary_stream(*args, **kwargs), True
+        )
 
     def stream_unary(self, *args, **kwargs):
-        return _RetryMultiCallable(self._orig_channel.stream_unary(*args, **kwargs), False)
+        return _RetryMultiCallable(
+            self._orig_channel.stream_unary(*args, **kwargs), False
+        )
 
     def stream_stream(self, *args, **kwargs):
-        return _RetryMultiCallable(self._orig_channel.stream_stream(*args, **kwargs), True)
+        return _RetryMultiCallable(
+            self._orig_channel.stream_stream(*args, **kwargs), True
+        )
 
     def __enter__(self):
         self._orig_channel.__enter__()
@@ -205,97 +251,128 @@ def _patch_grpc_localhost():
         return address
 
     orig_server = grpc.server
+
     def new_server(*args, **kwargs):
-        options = list(kwargs.get('options') or [])
-        if not any(k == 'grpc.so_reuseport' for k, _ in options):
-            options.append(('grpc.so_reuseport', 0))
-        kwargs['options'] = tuple(options)
+        options = list(kwargs.get("options") or [])
+        if not any(k == "grpc.so_reuseport" for k, _ in options):
+            options.append(("grpc.so_reuseport", 0))
+        kwargs["options"] = tuple(options)
 
         server = orig_server(*args, **kwargs)
         orig_add_insecure = server.add_insecure_port
+
         def new_add_insecure(address):
             return orig_add_insecure(patch_address(address))
+
         server.add_insecure_port = new_add_insecure
-        
+
         orig_add_secure = server.add_secure_port
+
         def new_add_secure(address, *args, **kwargs):
             return orig_add_secure(patch_address(address), *args, **kwargs)
+
         server.add_secure_port = new_add_secure
         return server
+
     grpc.server = new_server
 
     orig_insecure_channel = grpc.insecure_channel
+
     def new_insecure_channel(target, *args, **kwargs):
-        options = list(kwargs.get('options') or [])
-        options.append(('grpc.initial_reconnect_backoff_ms', 100))
-        options.append(('grpc.min_reconnect_backoff_ms', 100))
-        options.append(('grpc.max_reconnect_backoff_ms', 200))
-        kwargs['options'] = tuple(options)
-        return _RetryChannel(orig_insecure_channel(patch_address(target), *args, **kwargs))
+        options = list(kwargs.get("options") or [])
+        options.append(("grpc.initial_reconnect_backoff_ms", 100))
+        options.append(("grpc.min_reconnect_backoff_ms", 100))
+        options.append(("grpc.max_reconnect_backoff_ms", 200))
+        kwargs["options"] = tuple(options)
+        return _RetryChannel(
+            orig_insecure_channel(patch_address(target), *args, **kwargs)
+        )
+
     grpc.insecure_channel = new_insecure_channel
 
     orig_secure_channel = grpc.secure_channel
+
     def new_secure_channel(target, *args, **kwargs):
-        options = list(kwargs.get('options') or [])
-        options.append(('grpc.initial_reconnect_backoff_ms', 100))
-        options.append(('grpc.min_reconnect_backoff_ms', 100))
-        options.append(('grpc.max_reconnect_backoff_ms', 200))
-        kwargs['options'] = tuple(options)
-        return _RetryChannel(orig_secure_channel(patch_address(target), *args, **kwargs))
+        options = list(kwargs.get("options") or [])
+        options.append(("grpc.initial_reconnect_backoff_ms", 100))
+        options.append(("grpc.min_reconnect_backoff_ms", 100))
+        options.append(("grpc.max_reconnect_backoff_ms", 200))
+        kwargs["options"] = tuple(options)
+        return _RetryChannel(
+            orig_secure_channel(patch_address(target), *args, **kwargs)
+        )
+
     grpc.secure_channel = new_secure_channel
 
     def patch_aio(aio_module):
         orig_aio_server = aio_module.server
+
         def new_aio_server(*args, **kwargs):
-            options = list(kwargs.get('options') or [])
-            if not any(k == 'grpc.so_reuseport' for k, _ in options):
-                options.append(('grpc.so_reuseport', 0))
-            kwargs['options'] = tuple(options)
+            options = list(kwargs.get("options") or [])
+            if not any(k == "grpc.so_reuseport" for k, _ in options):
+                options.append(("grpc.so_reuseport", 0))
+            kwargs["options"] = tuple(options)
 
             server = orig_aio_server(*args, **kwargs)
             orig_add_insecure = server.add_insecure_port
+
             def new_add_insecure(address):
                 return orig_add_insecure(patch_address(address))
+
             server.add_insecure_port = new_add_insecure
-            
+
             orig_add_secure = server.add_secure_port
+
             def new_add_secure(address, *args, **kwargs):
                 return orig_add_secure(patch_address(address), *args, **kwargs)
+
             server.add_secure_port = new_add_secure
             return server
+
         aio_module.server = new_aio_server
 
         orig_aio_insecure_channel = aio_module.insecure_channel
+
         def new_aio_insecure_channel(target, *args, **kwargs):
-            options = list(kwargs.get('options') or [])
-            options.append(('grpc.initial_reconnect_backoff_ms', 100))
-            options.append(('grpc.min_reconnect_backoff_ms', 100))
-            options.append(('grpc.max_reconnect_backoff_ms', 200))
-            kwargs['options'] = tuple(options)
-            return orig_aio_insecure_channel(patch_address(target), *args, **kwargs)
+            options = list(kwargs.get("options") or [])
+            options.append(("grpc.initial_reconnect_backoff_ms", 100))
+            options.append(("grpc.min_reconnect_backoff_ms", 100))
+            options.append(("grpc.max_reconnect_backoff_ms", 200))
+            kwargs["options"] = tuple(options)
+            return orig_aio_insecure_channel(
+                patch_address(target), *args, **kwargs
+            )
+
         aio_module.insecure_channel = new_aio_insecure_channel
 
         orig_aio_secure_channel = aio_module.secure_channel
+
         def new_aio_secure_channel(target, *args, **kwargs):
-            options = list(kwargs.get('options') or [])
-            options.append(('grpc.initial_reconnect_backoff_ms', 100))
-            options.append(('grpc.min_reconnect_backoff_ms', 100))
-            options.append(('grpc.max_reconnect_backoff_ms', 200))
-            kwargs['options'] = tuple(options)
-            return orig_aio_secure_channel(patch_address(target), *args, **kwargs)
+            options = list(kwargs.get("options") or [])
+            options.append(("grpc.initial_reconnect_backoff_ms", 100))
+            options.append(("grpc.min_reconnect_backoff_ms", 100))
+            options.append(("grpc.max_reconnect_backoff_ms", 200))
+            kwargs["options"] = tuple(options)
+            return orig_aio_secure_channel(
+                patch_address(target), *args, **kwargs
+            )
+
         aio_module.secure_channel = new_aio_secure_channel
 
     try:
         from grpc.experimental import aio as exp_aio
+
         patch_aio(exp_aio)
     except (ImportError, AttributeError):
         pass
 
     try:
         import grpc.aio as public_aio
+
         patch_aio(public_aio)
     except (ImportError, AttributeError):
         pass
+
 
 _patch_grpc_localhost()
 
