@@ -18,7 +18,6 @@ import collections
 import datetime
 import io
 import itertools
-import sys
 import traceback
 import unittest
 from xml.etree import ElementTree
@@ -254,9 +253,6 @@ class CoverageResult(AugmentedResult):
         Additionally initializes and begins code coverage tracking."""
         super(CoverageResult, self).startTest(test)
         self.coverage_context = coverage.Coverage(data_suffix=True)
-        if sys.version_info >= (3, 15):
-            self.coverage_context.set_option("run:plugins", [])
-            self.coverage_context.set_option("run:core", "sysmon")
         self.coverage_context.start()
 
     def stopTest(self, test):
