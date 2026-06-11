@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package large_message;
+
+service LargeMessageService {
+    rpc ProcessLargeMessage (LargeMessageRequest) returns (LargeMessageResponse);
+}
+
+message LargeMessageRequest {
+    repeated float values = 1;
+}
+
+message LargeMessageResponse {
+    string status = 1;
+}
