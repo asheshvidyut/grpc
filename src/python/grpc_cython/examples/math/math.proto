@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package mypackage;
+
+message MathRequest {
+    repeated float matrix_a = 1;
+    repeated float matrix_b = 2;
+}
+
+message MathResponse {
+    repeated float result_matrix = 1;
+}
+
+service MathService {
+    rpc ComputeMatrix(MathRequest) returns (MathResponse) {}
+}
