@@ -18,6 +18,12 @@ def generate_pxd_content(proto_file, service):
                 messages_seen.add(msg_name)
                 content.append(f"    cdef cppclass {msg_name}:")
                 content.append(f"        {msg_name}()")
+                content.append(f"        float* mutable_matrix_a()")
+                content.append(f"        int matrix_a_size()")
+                content.append(f"        float* mutable_matrix_b()")
+                content.append(f"        int matrix_b_size()")
+                content.append(f"        float* mutable_result_matrix()")
+                content.append(f"        int result_matrix_size()")
                 content.append(f"        size_t ByteSizeLong()")
                 content.append(f"        bint SerializeToArray(void* data, int size)")
                 content.append(f"        bint ParseFromArray(const void* data, int size)\n")
@@ -36,7 +42,7 @@ def generate_pyx_content(proto_file, service):
     content = [
         f"# distutils: language = c++",
         f"import grpc",
-        f"import grpcio_cython",
+        f"import grpc_cython",
         f"from libc.stdlib cimport malloc, free\n",
         f"# Import C++ Headers from the PXD",
         f"from {proto_file.name.replace('.proto', '_cython_pb2')} cimport {service.name}Base"
@@ -61,7 +67,7 @@ cdef extern from "grpcio_native/handler.h":
     content.append("    cdef grpcio_cython_invoke_fn invoke_fn\n")
     content.append("    def __init__(self, channel):")
     content.append("        self.c_chan = <void*>channel._channel")
-    content.append("        self.invoke_fn = <grpcio_cython_invoke_fn>grpcio_cython.get_c_core_invoke_fn_addr()\n")
+    content.append("        self.invoke_fn = <grpcio_cython_invoke_fn>grpc_cython.get_c_core_invoke_fn_addr()\n")
     
     for method in service.method:
         # Generate the Python-facing method wrapper
