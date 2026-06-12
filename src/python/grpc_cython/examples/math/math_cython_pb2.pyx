@@ -18,6 +18,21 @@ cdef class MathServiceBase:
     cdef int ComputeMatrix(self, MathRequest* req, MathResponse* resp) nogil:
         pass
 
+    def _native_Dispatch_ComputeMatrix(self, bytes req_bytes):
+        cdef MathRequest req
+        cdef MathResponse resp
+        cdef const char* req_data = req_bytes
+        req.ParseFromArray(req_data, len(req_bytes))
+        cdef int rc
+        with nogil:
+            rc = self.ComputeMatrix(&req, &resp)
+        cdef int size = resp.ByteSizeLong()
+        cdef char* out_buf = <char*>malloc(size)
+        resp.SerializeToArray(out_buf, size)
+        cdef bytes out_bytes = out_buf[:size]
+        free(out_buf)
+        return out_bytes
+
 cdef class MathServiceFastStub:
     cdef void* c_chan
     cdef grpcio_cython_invoke_fn invoke_fn
@@ -27,15 +42,25 @@ cdef class MathServiceFastStub:
         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
 
     def ComputeMatrix(self, **kwargs):
-        cdef grpc_native_client_call call
-        call.method = b"/mypackage.MathService/ComputeMatrix"
-        # TODO: Auto-Serialization of kwargs into C++ Protobuf happens here
-        cdef int rc
-        with nogil:
-            rc = self.invoke_fn(self.c_chan, &call, 5000)
-        if rc != 0: raise RuntimeError('RPC Failed')
-        # TODO: Auto-Deserialization of call.resp_data happens here
-        return dict()  # Return the unwrapped output
+        cdef MathRequest req
+        cdef MathResponse resp
+        if 'matrix_a' in kwargs:
+            for item in kwargs['matrix_a']:
+                req.add_matrix_a(item)
+        if 'matrix_b' in kwargs:
+            for item in kwargs['matrix_b']:
+                req.add_matrix_b(item)
+        cdef size_t size = req.ByteSizeLong()
+        cdef char* buf = <char*>malloc(size)
+        req.SerializeToArray(buf, size)
+        cdef bytes req_bytes = buf[:size]
+        free(buf)
+        cdef object call = self.channel.unary_unary(
+            '/mypackage.MathService/ComputeMatrix',
+            request_serializer=None, response_deserializer=None
+        )
+        cdef bytes res_bytes = call(req_bytes)
+        return res_bytes
 
 def add_MathServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {

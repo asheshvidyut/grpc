@@ -37,6 +37,7 @@ def generate_pxd_content(proto_file, service):
                             content.append(f'        {c_type}* mutable_{field.name} "mutable_{field.name}()->mutable_data"() nogil')
                             content.append(f'        int {field.name}_size() nogil')
                             content.append(f'        void resize_{field.name} "mutable_{field.name}()->Resize"(int, {c_type}) nogil')
+                            content.append(f'        void add_{field.name}({c_type}) nogil')
                         else:
                             # Singular fields (stub implementation)
                             c_type = "float"
@@ -87,12 +88,29 @@ ctypedef int (*grpcio_cython_invoke_fn)(void* c_channel, grpc_native_client_call
         out_type = method.output_type.split('.')[-1]
         content.append(f"    cdef int {method.name}(self, {in_type}* req, {out_type}* resp) nogil:")
         content.append(f"        pass\n")
+        
+        content.append(f"    def _native_Dispatch_{method.name}(self, bytes req_bytes):")
+        content.append(f"        cdef {in_type} req")
+        content.append(f"        cdef {out_type} resp")
+        content.append(f"        cdef const char* req_data = req_bytes")
+        content.append(f"        req.ParseFromArray(req_data, len(req_bytes))")
+        content.append(f"        cdef int rc")
+        content.append(f"        with nogil:")
+        content.append(f"            rc = self.{method.name}(&req, &resp)")
+        content.append(f"        cdef int size = resp.ByteSizeLong()")
+        content.append(f"        cdef char* out_buf = <char*>malloc(size)")
+        content.append(f"        resp.SerializeToArray(out_buf, size)")
+        content.append(f"        cdef bytes out_bytes = out_buf[:size]")
+        content.append(f"        free(out_buf)")
+        content.append(f"        return out_bytes\n")
 
     # Generate the Client Stub
     content.append(f"cdef class {service.name}FastStub:")
+    content.append("    cdef object channel")
     content.append("    cdef void* c_chan")
     content.append("    cdef grpcio_cython_invoke_fn invoke_fn\n")
     content.append("    def __init__(self, channel):")
+    content.append("        self.channel = channel")
     content.append("        self.c_chan = <void*>channel._channel")
     content.append("        self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()\n")
     
@@ -101,15 +119,31 @@ ctypedef int (*grpcio_cython_invoke_fn)(void* c_channel, grpc_native_client_call
         # In a full implementation, we'd introspect the Protobuf descriptor 
         # to generate memoryview mappings, but we use kwargs for the PoC.
         content.append(f"    def {method.name}(self, **kwargs):")
-        content.append(f"        cdef grpc_native_client_call call")
-        content.append(f'        call.method = b"/{proto_file.package}.{service.name}/{method.name}"')
-        content.append(f"        # TODO: Auto-Serialization of kwargs into C++ Protobuf happens here")
-        content.append(f"        cdef int rc")
-        content.append(f"        with nogil:")
-        content.append(f"            rc = self.invoke_fn(self.c_chan, &call, 5000)")
-        content.append(f"        if rc != 0: raise RuntimeError('RPC Failed')")
-        content.append(f"        # TODO: Auto-Deserialization of call.resp_data happens here")
-        content.append(f"        return dict()  # Return the unwrapped output\n")
+        content.append(f"        cdef {in_type} req")
+        content.append(f"        cdef {out_type} resp")
+        
+        # Dynamically map kwargs to the C++ Protobuf request
+        in_message = next(m for m in proto_file.message_type if m.name == in_type)
+        for field in in_message.field:
+            if field.label == 3: # LABEL_REPEATED
+                content.append(f"        if '{field.name}' in kwargs:")
+                content.append(f"            for item in kwargs['{field.name}']:")
+                content.append(f"                req.add_{field.name}(item)")
+            else:
+                content.append(f"        if '{field.name}' in kwargs:")
+                content.append(f"            req.set_{field.name}(kwargs['{field.name}'])")
+
+        content.append(f"        cdef size_t size = req.ByteSizeLong()")
+        content.append(f"        cdef char* buf = <char*>malloc(size)")
+        content.append(f"        req.SerializeToArray(buf, size)")
+        content.append(f"        cdef bytes req_bytes = buf[:size]")
+        content.append(f"        free(buf)")
+        content.append(f"        cdef object call = self.channel.unary_unary(")
+        content.append(f"            '/{proto_file.package}.{service.name}/{method.name}',")
+        content.append(f"            request_serializer=None, response_deserializer=None")
+        content.append(f"        )")
+        content.append(f"        cdef bytes res_bytes = call(req_bytes)")
+        content.append(f"        return res_bytes\n")
 
     content.append(f"def add_{service.name}Servicer_to_server(servicer, server):")
     content.append(f"    rpc_method_handlers = {{")

@@ -33,8 +33,8 @@ class PurePythonMathService:
         # 3. Ctypes Delegation (Fast C execution)
         math_lib.compute_matrix_c(c_a, c_b, c_out, size)
             
-        # 4. Serialize back to Python Protobuf
-        return math_cython_pb2.MathResponse(result_matrix=list(c_out))
+        import math_pb2
+        return math_pb2.MathResponse(result_matrix=list(c_out))
 
 # ==========================================
 # 2. Benchmark Harness
@@ -52,8 +52,10 @@ def measure_throughput(target, payload_a, payload_b, threads=8, duration_s=3.0):
                 try:
                     client.ComputeMatrix(matrix_a=payload_a, matrix_b=payload_b)
                     local += 1
-                except:
-                    pass # Ignore if server isn't fully booted in this dummy script
+                except Exception as e:
+                    print("Error:", e)
+                    import traceback; traceback.print_exc()
+                    break
             counts[idx] = local
 
     workers = [threading.Thread(target=worker, args=(i,)) for i in range(threads)]

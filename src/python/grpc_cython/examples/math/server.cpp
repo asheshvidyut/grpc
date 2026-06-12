@@ -6,6 +6,9 @@
         "depends": [
             "math.pb.h"
         ],
+        "extra_link_args": [
+            "-lprotobuf"
+        ],
         "language": "c++",
         "name": "server",
         "sources": [
@@ -1515,7 +1518,7 @@ static const char* const __pyx_f[] = {
 struct __pyx_obj_15math_cython_pb2_MathServiceBase;
 struct __pyx_obj_6server_FastMathService;
 
-/* "math_cython_pb2.pxd":27
+/* "math_cython_pb2.pxd":30
  *         bint ParseFromArray(const void* data, int size) nogil
  * 
  * cdef class MathServiceBase:             # <<<<<<<<<<<<<<
@@ -1540,7 +1543,7 @@ struct __pyx_obj_6server_FastMathService {
 
 
 
-/* "math_cython_pb2.pxd":27
+/* "math_cython_pb2.pxd":30
  *         bint ParseFromArray(const void* data, int size) nogil
  * 
  * cdef class MathServiceBase:             # <<<<<<<<<<<<<<
