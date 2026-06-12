@@ -64,27 +64,74 @@ def measure_throughput(target, payload_a, payload_b, threads=8, duration_s=3.0):
     elapsed = time.perf_counter() - start
     return sum(counts) / elapsed
 
+def measure_throughput_pure(target, payload_a, payload_b, threads=8, duration_s=3.0):
+    import math_pb2_grpc
+    import math_pb2
+    stop_at = time.perf_counter() + duration_s
+    counts = [0] * threads
+
+    def worker(idx):
+        with grpc.insecure_channel(target) as channel:
+            client = math_pb2_grpc.MathServiceStub(channel)
+            req = math_pb2.MathRequest(matrix_a=payload_a, matrix_b=payload_b)
+            local = 0
+            while time.perf_counter() < stop_at:
+                client.ComputeMatrix(req)
+                local += 1
+            counts[idx] = local
+
+    workers = [threading.Thread(target=worker, args=(i,)) for i in range(threads)]
+    start = time.perf_counter()
+    for w in workers: w.start()
+    for w in workers: w.join()
+    
+    elapsed = time.perf_counter() - start
+    return sum(counts) / elapsed
+
 def main():
     print("=== Zero-GIL Protoc Generation vs Pure Python Benchmark ===")
     
-    # We would normally start the two servers here:
-    # 1. Pure Python server on port 50051
-    # 2. Cython FastMathService on port 50052
+    from concurrent import futures
+    import math_pb2_grpc
     
-    import numpy as np
-    matrix_a = np.ones(1024, dtype=np.float32)
-    matrix_b = np.full(1024, 2.5, dtype=np.float32)
+    try:
+        from server import FastMathService
+        from math_cython_pb2 import add_MathServiceServicer_to_server
+    except ImportError:
+        print("Please compile the cython extension first: python3 setup.py build_ext --inplace")
+        return
+        
+    # 1. Start Pure Python Server
+    py_server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
+    math_pb2_grpc.add_MathServiceServicer_to_server(PurePythonMathService(), py_server)
+    py_server.add_insecure_port("[::]:50051")
+    py_server.start()
     
-    print("Running Pure Python test... (Simulated)")
-    # py_rps = measure_throughput("localhost:50051", matrix_a, matrix_b)
+    # 2. Start Cython Fast Server
+    cy_server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
+    add_MathServiceServicer_to_server(FastMathService(), cy_server)
+    cy_server.add_insecure_port("[::]:50052")
+    cy_server.start()
     
-    print("Running Cython Generated Fast-Path... (Simulated)")
-    # cy_rps = measure_throughput("localhost:50052", matrix_a, matrix_b)
-    
-    print("\nResults:")
-    print(f"Pure Python: 53 QPS")
-    print(f"Cython Fast-Path: 2,298 QPS")
-    print(f"Speedup: ~43x")
+    try:
+        import numpy as np
+        matrix_a = np.ones(1024, dtype=np.float32)
+        matrix_b = np.full(1024, 2.5, dtype=np.float32)
+        
+        print("Running Pure Python (ctypes delegation) test...")
+        py_rps = measure_throughput_pure("localhost:50051", matrix_a, matrix_b)
+        
+        print("Running Cython Generated Fast-Path test...")
+        cy_rps = measure_throughput("localhost:50052", matrix_a, matrix_b)
+        
+        print("\nResults:")
+        print(f"Pure Python (ctypes): {py_rps:,.0f} QPS")
+        print(f"Cython Fast-Path:     {cy_rps:,.0f} QPS")
+        if py_rps > 0:
+            print(f"Speedup:              {cy_rps/py_rps:.2f}x")
+    finally:
+        py_server.stop(0)
+        cy_server.stop(0)
 
 if __name__ == '__main__':
     main()
