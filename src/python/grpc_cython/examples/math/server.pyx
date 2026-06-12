@@ -13,7 +13,7 @@ cdef class FastMathService(MathServiceBase):
         cdef int size = req.matrix_a_size()
         
         # 2. Get raw C-pointer to the outgoing Protobuf data
-        # Note: In real Protobuf C++, we would do resp.mutable_result_matrix()->Resize(size)
+        resp.resize_result_matrix(size, 0.0)
         cdef float* out_ptr = resp.mutable_result_matrix()
         
         # 3. Perform compute-heavy math directly in C (e.g. SIMD vector multiplication)

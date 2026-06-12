@@ -6,10 +6,12 @@ def generate_pxd_content(proto_file, service):
     """Generates the C++ bindings and Server Base interface."""
     content = [
         f"# distutils: language = c++\n",
+        f"from libc.stddef cimport size_t\n",
         f'cdef extern from "{proto_file.name.replace(".proto", ".pb.h")}" namespace "{proto_file.package}":'
     ]
     
     # 1. Map all messages used in the service
+    message_dict = {m.name: m for m in proto_file.message_type}
     messages_seen = set()
     for method in service.method:
         for msg in (method.input_type, method.output_type):
@@ -17,16 +19,36 @@ def generate_pxd_content(proto_file, service):
             if msg_name not in messages_seen:
                 messages_seen.add(msg_name)
                 content.append(f"    cdef cppclass {msg_name}:")
-                content.append(f"        {msg_name}()")
-                content.append(f"        float* mutable_matrix_a()")
-                content.append(f"        int matrix_a_size()")
-                content.append(f"        float* mutable_matrix_b()")
-                content.append(f"        int matrix_b_size()")
-                content.append(f"        float* mutable_result_matrix()")
-                content.append(f"        int result_matrix_size()")
-                content.append(f"        size_t ByteSizeLong()")
-                content.append(f"        bint SerializeToArray(void* data, int size)")
-                content.append(f"        bint ParseFromArray(const void* data, int size)\n")
+                content.append(f'        {msg_name}() nogil')
+                
+                # Dynamically generate field accessors
+                if msg_name in message_dict:
+                    msg_desc = message_dict[msg_name]
+                    for field in msg_desc.field:
+                        # 3 == LABEL_REPEATED
+                        if field.label == 3:
+                            # Map Protobuf field types to C types (1=double, 2=float, 3=int64, 4=uint64, 5=int32, etc.)
+                            c_type = "float"
+                            if field.type == 1: c_type = "double"
+                            elif field.type == 2: c_type = "float"
+                            elif field.type == 5: c_type = "int"
+                            elif field.type == 3: c_type = "long"
+                            
+                            content.append(f'        {c_type}* mutable_{field.name} "mutable_{field.name}()->mutable_data"() nogil')
+                            content.append(f'        int {field.name}_size() nogil')
+                            content.append(f'        void resize_{field.name} "mutable_{field.name}()->Resize"(int, {c_type}) nogil')
+                        else:
+                            # Singular fields (stub implementation)
+                            c_type = "float"
+                            if field.type == 1: c_type = "double"
+                            elif field.type == 2: c_type = "float"
+                            elif field.type == 5: c_type = "int"
+                            content.append(f'        {c_type} {field.name}() nogil')
+                            content.append(f'        void set_{field.name}({c_type} value) nogil')
+
+                content.append(f'        size_t ByteSizeLong() nogil')
+                content.append(f'        bint SerializeToArray(void* data, int size) nogil')
+                content.append(f'        bint ParseFromArray(const void* data, int size) nogil\n')
 
     # 2. Generate the Server Base Class definition
     content.append(f"cdef class {service.name}Base:")
@@ -34,7 +56,6 @@ def generate_pxd_content(proto_file, service):
         in_type = method.input_type.split('.')[-1]
         out_type = method.output_type.split('.')[-1]
         content.append(f"    cdef int {method.name}(self, {in_type}* req, {out_type}* resp) nogil")
-        
     return "\n".join(content)
 
 def generate_pyx_content(proto_file, service):
@@ -43,23 +64,29 @@ def generate_pyx_content(proto_file, service):
         f"# distutils: language = c++",
         f"import grpc",
         f"import grpc_cython",
-        f"from libc.stdlib cimport malloc, free\n",
-        f"# Import C++ Headers from the PXD",
-        f"from {proto_file.name.replace('.proto', '_cython_pb2')} cimport {service.name}Base"
+        f"from libc.stdlib cimport malloc, free",
+        f"from libc.stdint cimport uintptr_t\n",
     ]
     
     # Append the struct ABI
     content.append("""
-cdef extern from "grpcio_native/handler.h":
-    ctypedef struct grpc_native_client_call:
-        const char* method
-        const char* req_data
-        size_t req_len
-        char* resp_data
-        size_t resp_len
-        int status
-    ctypedef int (*grpcio_cython_invoke_fn)(void* c_channel, grpc_native_client_call* call, int timeout) nogil
+ctypedef struct grpc_native_client_call:
+    const char* method
+    const char* req_data
+    size_t req_len
+    char* resp_data
+    size_t resp_len
+    int status
+ctypedef int (*grpcio_cython_invoke_fn)(void* c_channel, grpc_native_client_call* call, int timeout) nogil
 """)
+
+    # 2. Provide a dummy implementation for the Base Class
+    content.append(f"cdef class {service.name}Base:")
+    for method in service.method:
+        in_type = method.input_type.split('.')[-1]
+        out_type = method.output_type.split('.')[-1]
+        content.append(f"    cdef int {method.name}(self, {in_type}* req, {out_type}* resp) nogil:")
+        content.append(f"        pass\n")
 
     # Generate the Client Stub
     content.append(f"cdef class {service.name}FastStub:")
@@ -67,7 +94,7 @@ cdef extern from "grpcio_native/handler.h":
     content.append("    cdef grpcio_cython_invoke_fn invoke_fn\n")
     content.append("    def __init__(self, channel):")
     content.append("        self.c_chan = <void*>channel._channel")
-    content.append("        self.invoke_fn = <grpcio_cython_invoke_fn>grpc_cython.get_c_core_invoke_fn_addr()\n")
+    content.append("        self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()\n")
     
     for method in service.method:
         # Generate the Python-facing method wrapper

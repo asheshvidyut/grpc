@@ -11,7 +11,40 @@
 from libc.stdint cimport uint32_t, int64_t
 from libc.stddef cimport size_t
 
-cdef extern from "src/python/grpcio_native/include/grpcio_native/handler.h":
+cdef extern from *:
+    """
+    typedef enum grpc_native_status {
+        grpc_native_status_ok = 0
+    } grpc_native_status;
+
+    typedef struct grpc_native_context grpc_native_context;
+
+    typedef struct grpc_native_unary_call {
+        grpc_native_context* context;
+        const char* req_data;
+        size_t req_len;
+        char* resp_data;
+        size_t resp_len;
+        grpc_native_status status;
+        char* err_msg;
+        size_t err_msg_len;
+    } grpc_native_unary_call;
+
+    typedef struct grpc_native_client_call {
+        const char* method;
+        const char* req_data;
+        size_t req_len;
+        char* resp_data;
+        size_t resp_len;
+        grpc_native_status status;
+        char* err_msg;
+        size_t err_msg_len;
+    } grpc_native_client_call;
+
+    typedef int (*grpc_native_unary_unary_fn)(grpc_native_unary_call* call);
+    typedef uint32_t (*grpcio_native_abi_version_fn)();
+    """
+
     # ---- Status Enum ----
     ctypedef enum grpc_native_status "grpc_native_status":
         pass
