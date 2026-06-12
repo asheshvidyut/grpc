@@ -23,7 +23,8 @@ def main():
         # Pass the arrays directly into the stub
         # The stub drops the GIL and does all heavy lifting in C++
         response = client.ComputeMatrix(matrix_a=matrix_a, matrix_b=matrix_b)
-        print(f"Success! Native execution completed. Response object: {response}")
+        res_len = len(response.get('result_matrix', []))
+        print(f"Success! Native execution completed. Received {res_len} elements in response.")
     except Exception as e:
         print(f"Call finished with expected failure (since no backend is actually listening): {e}")
 
