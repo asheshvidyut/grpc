@@ -1575,11 +1575,12 @@ struct __pyx_obj_15math_cython_pb2_MathServiceBase {
  *         return out_bytes
  * 
  * cdef class MathServiceFastStub:             # <<<<<<<<<<<<<<
+ *     cdef object channel
  *     cdef void* c_chan
- *     cdef grpcio_cython_invoke_fn invoke_fn
 */
 struct __pyx_obj_15math_cython_pb2_MathServiceFastStub {
   PyObject_HEAD
+  PyObject *channel;
   void *c_chan;
   __pyx_t_15math_cython_pb2_grpcio_cython_invoke_fn invoke_fn;
 };
@@ -2065,6 +2066,13 @@ static PyObject *__Pyx_GetItemInt_Generic(PyObject *o, PyObject* j);
 static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Fast(PyObject *o, Py_ssize_t i,
                                                      int is_list, int wraparound, int boundscheck);
 
+/* CallTypeTraverse.proto */
+#if !CYTHON_USE_TYPE_SPECS || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX < 0x03090000)
+#define __Pyx_call_type_traverse(o, always_call, visit, arg) 0
+#else
+static int __Pyx_call_type_traverse(PyObject *o, int always_call, visitproc visit, void *arg);
+#endif
+
 /* FixUpExtensionType.proto */
 static CYTHON_INLINE int __Pyx_fix_up_extension_type_from_spec(PyType_Spec *spec, PyTypeObject *type);
 
@@ -2125,13 +2133,6 @@ static CYTHON_INLINE PyObject *__Pyx_PyDict_SetDefault(PyObject *d, PyObject *ke
 
 /* FetchCommonType.proto */
 static PyTypeObject* __Pyx_FetchCommonTypeFromSpec(PyObject *module, PyType_Spec *spec, PyObject *bases);
-
-/* CallTypeTraverse.proto */
-#if !CYTHON_USE_TYPE_SPECS || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX < 0x03090000)
-#define __Pyx_call_type_traverse(o, always_call, visit, arg) 0
-#else
-static int __Pyx_call_type_traverse(PyObject *o, int always_call, visitproc visit, void *arg);
-#endif
 
 /* PyMethodNew.proto */
 static PyObject *__Pyx_PyMethod_New(PyObject *func, PyObject *self, PyObject *typ);
@@ -2435,6 +2436,7 @@ static const char __pyx_k_reduce[] = "__reduce__";
 static const char __pyx_k_server[] = "server";
 static const char __pyx_k_update[] = "update";
 static const char __pyx_k_channel[] = "channel";
+static const char __pyx_k_context[] = "context";
 static const char __pyx_k_disable[] = "disable";
 static const char __pyx_k_out_buf[] = "out_buf";
 static const char __pyx_k_J_a_d_2Q[] = "\200\001\330\004\005\330\010\031\230\033\320$J\310!\330\014\036\230a\330\014\030\230\001\360\006\000\005\027\220d\320\032:\270!\330\010!\240\021\340\004\n\320\n#\2402\240Q";
@@ -2505,7 +2507,7 @@ static const char __pyx_k_add_MathServiceServicer_to_serve[] = "add_MathServiceS
 static const char __pyx_k_native_unary_unary_rpc_method_ha[] = "native_unary_unary_rpc_method_handler";
 static const char __pyx_k_self_c_chan_self_invoke_fn_canno[] = "self.c_chan,self.invoke_fn cannot be converted to a Python object for pickling";
 /* #### Code section: decls ### */
-static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_ComputeMatrix(struct __pyx_obj_15math_cython_pb2_MathServiceBase *__pyx_v_self, PyObject *__pyx_v_req_bytes); /* proto */
+static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_ComputeMatrix(struct __pyx_obj_15math_cython_pb2_MathServiceBase *__pyx_v_self, PyObject *__pyx_v_req_bytes, CYTHON_UNUSED PyObject *__pyx_v_context); /* proto */
 static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase_2__reduce_cython__(struct __pyx_obj_15math_cython_pb2_MathServiceBase *__pyx_v_self); /* proto */
 static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase_4__setstate_cython__(struct __pyx_obj_15math_cython_pb2_MathServiceBase *__pyx_v_self, PyObject *__pyx_v___pyx_state); /* proto */
 static int __pyx_pf_15math_cython_pb2_19MathServiceFastStub___init__(struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *__pyx_v_self, PyObject *__pyx_v_channel); /* proto */
@@ -2561,7 +2563,7 @@ typedef struct {
   __Pyx_CachedCFunction __pyx_umethod_PyDict_Type_pop;
   PyObject *__pyx_tuple[1];
   PyObject *__pyx_codeobj_tab[8];
-  PyObject *__pyx_string_tab[94];
+  PyObject *__pyx_string_tab[95];
   PyObject *__pyx_int_222419149;
   PyObject *__pyx_int_228825662;
   PyObject *__pyx_int_238750788;
@@ -2623,76 +2625,77 @@ static __pyx_mstatetype * const __pyx_mstate_global = &__pyx_mstate_global_stati
 #define __pyx_n_u_channel __pyx_string_tab[21]
 #define __pyx_n_u_channel_2 __pyx_string_tab[22]
 #define __pyx_n_u_cline_in_traceback __pyx_string_tab[23]
-#define __pyx_n_u_dict __pyx_string_tab[24]
-#define __pyx_n_u_dict_2 __pyx_string_tab[25]
-#define __pyx_kp_u_disable __pyx_string_tab[26]
-#define __pyx_kp_u_enable __pyx_string_tab[27]
-#define __pyx_n_u_func __pyx_string_tab[28]
-#define __pyx_kp_u_gc __pyx_string_tab[29]
-#define __pyx_n_u_generic_handler __pyx_string_tab[30]
-#define __pyx_n_u_get_c_core_invoke_fn_addr __pyx_string_tab[31]
-#define __pyx_n_u_getstate __pyx_string_tab[32]
-#define __pyx_n_u_grpc __pyx_string_tab[33]
-#define __pyx_n_u_grpc_cython __pyx_string_tab[34]
-#define __pyx_n_u_initializing __pyx_string_tab[35]
-#define __pyx_n_u_is_coroutine __pyx_string_tab[36]
-#define __pyx_kp_u_isenabled __pyx_string_tab[37]
-#define __pyx_n_u_item __pyx_string_tab[38]
-#define __pyx_n_u_kwargs __pyx_string_tab[39]
-#define __pyx_n_u_main __pyx_string_tab[40]
-#define __pyx_n_u_math_cython_pb2 __pyx_string_tab[41]
-#define __pyx_kp_u_math_cython_pb2_pyx __pyx_string_tab[42]
-#define __pyx_n_u_matrix_a __pyx_string_tab[43]
-#define __pyx_n_u_matrix_b __pyx_string_tab[44]
-#define __pyx_n_u_method_handlers_generic_handler __pyx_string_tab[45]
-#define __pyx_n_u_method_name __pyx_string_tab[46]
-#define __pyx_n_u_module __pyx_string_tab[47]
-#define __pyx_kp_u_mypackage_MathService __pyx_string_tab[48]
-#define __pyx_kp_u_mypackage_MathService_ComputeMa __pyx_string_tab[49]
-#define __pyx_n_u_name __pyx_string_tab[50]
-#define __pyx_n_u_native_Dispatch_ComputeMatrix __pyx_string_tab[51]
-#define __pyx_n_u_native_unary_unary_rpc_method_ha __pyx_string_tab[52]
-#define __pyx_n_u_new __pyx_string_tab[53]
-#define __pyx_n_u_out_buf __pyx_string_tab[54]
-#define __pyx_n_u_out_bytes __pyx_string_tab[55]
-#define __pyx_n_u_pickle __pyx_string_tab[56]
-#define __pyx_n_u_pop __pyx_string_tab[57]
-#define __pyx_n_u_pyx_PickleError __pyx_string_tab[58]
-#define __pyx_n_u_pyx_checksum __pyx_string_tab[59]
-#define __pyx_n_u_pyx_result __pyx_string_tab[60]
-#define __pyx_n_u_pyx_state __pyx_string_tab[61]
-#define __pyx_n_u_pyx_type __pyx_string_tab[62]
-#define __pyx_n_u_pyx_unpickle_MathServiceBase __pyx_string_tab[63]
-#define __pyx_n_u_pyx_vtable __pyx_string_tab[64]
-#define __pyx_n_u_qualname __pyx_string_tab[65]
-#define __pyx_n_u_rc __pyx_string_tab[66]
-#define __pyx_n_u_reduce __pyx_string_tab[67]
-#define __pyx_n_u_reduce_cython __pyx_string_tab[68]
-#define __pyx_n_u_reduce_ex __pyx_string_tab[69]
-#define __pyx_n_u_req __pyx_string_tab[70]
-#define __pyx_n_u_req_bytes __pyx_string_tab[71]
-#define __pyx_n_u_req_data __pyx_string_tab[72]
-#define __pyx_n_u_request_serializer __pyx_string_tab[73]
-#define __pyx_n_u_res_bytes __pyx_string_tab[74]
-#define __pyx_n_u_resp __pyx_string_tab[75]
-#define __pyx_n_u_response_deserializer __pyx_string_tab[76]
-#define __pyx_n_u_rpc_method_handlers __pyx_string_tab[77]
-#define __pyx_n_u_self __pyx_string_tab[78]
-#define __pyx_kp_u_self_c_chan_self_invoke_fn_canno __pyx_string_tab[79]
-#define __pyx_n_u_server __pyx_string_tab[80]
-#define __pyx_n_u_servicer __pyx_string_tab[81]
-#define __pyx_n_u_servicer_instance __pyx_string_tab[82]
-#define __pyx_n_u_set_name __pyx_string_tab[83]
-#define __pyx_n_u_setstate __pyx_string_tab[84]
-#define __pyx_n_u_setstate_cython __pyx_string_tab[85]
-#define __pyx_n_u_size __pyx_string_tab[86]
-#define __pyx_n_u_spec __pyx_string_tab[87]
-#define __pyx_n_u_state __pyx_string_tab[88]
-#define __pyx_kp_u_stringsource __pyx_string_tab[89]
-#define __pyx_n_u_test __pyx_string_tab[90]
-#define __pyx_n_u_unary_unary __pyx_string_tab[91]
-#define __pyx_n_u_update __pyx_string_tab[92]
-#define __pyx_n_u_use_setstate __pyx_string_tab[93]
+#define __pyx_n_u_context __pyx_string_tab[24]
+#define __pyx_n_u_dict __pyx_string_tab[25]
+#define __pyx_n_u_dict_2 __pyx_string_tab[26]
+#define __pyx_kp_u_disable __pyx_string_tab[27]
+#define __pyx_kp_u_enable __pyx_string_tab[28]
+#define __pyx_n_u_func __pyx_string_tab[29]
+#define __pyx_kp_u_gc __pyx_string_tab[30]
+#define __pyx_n_u_generic_handler __pyx_string_tab[31]
+#define __pyx_n_u_get_c_core_invoke_fn_addr __pyx_string_tab[32]
+#define __pyx_n_u_getstate __pyx_string_tab[33]
+#define __pyx_n_u_grpc __pyx_string_tab[34]
+#define __pyx_n_u_grpc_cython __pyx_string_tab[35]
+#define __pyx_n_u_initializing __pyx_string_tab[36]
+#define __pyx_n_u_is_coroutine __pyx_string_tab[37]
+#define __pyx_kp_u_isenabled __pyx_string_tab[38]
+#define __pyx_n_u_item __pyx_string_tab[39]
+#define __pyx_n_u_kwargs __pyx_string_tab[40]
+#define __pyx_n_u_main __pyx_string_tab[41]
+#define __pyx_n_u_math_cython_pb2 __pyx_string_tab[42]
+#define __pyx_kp_u_math_cython_pb2_pyx __pyx_string_tab[43]
+#define __pyx_n_u_matrix_a __pyx_string_tab[44]
+#define __pyx_n_u_matrix_b __pyx_string_tab[45]
+#define __pyx_n_u_method_handlers_generic_handler __pyx_string_tab[46]
+#define __pyx_n_u_method_name __pyx_string_tab[47]
+#define __pyx_n_u_module __pyx_string_tab[48]
+#define __pyx_kp_u_mypackage_MathService __pyx_string_tab[49]
+#define __pyx_kp_u_mypackage_MathService_ComputeMa __pyx_string_tab[50]
+#define __pyx_n_u_name __pyx_string_tab[51]
+#define __pyx_n_u_native_Dispatch_ComputeMatrix __pyx_string_tab[52]
+#define __pyx_n_u_native_unary_unary_rpc_method_ha __pyx_string_tab[53]
+#define __pyx_n_u_new __pyx_string_tab[54]
+#define __pyx_n_u_out_buf __pyx_string_tab[55]
+#define __pyx_n_u_out_bytes __pyx_string_tab[56]
+#define __pyx_n_u_pickle __pyx_string_tab[57]
+#define __pyx_n_u_pop __pyx_string_tab[58]
+#define __pyx_n_u_pyx_PickleError __pyx_string_tab[59]
+#define __pyx_n_u_pyx_checksum __pyx_string_tab[60]
+#define __pyx_n_u_pyx_result __pyx_string_tab[61]
+#define __pyx_n_u_pyx_state __pyx_string_tab[62]
+#define __pyx_n_u_pyx_type __pyx_string_tab[63]
+#define __pyx_n_u_pyx_unpickle_MathServiceBase __pyx_string_tab[64]
+#define __pyx_n_u_pyx_vtable __pyx_string_tab[65]
+#define __pyx_n_u_qualname __pyx_string_tab[66]
+#define __pyx_n_u_rc __pyx_string_tab[67]
+#define __pyx_n_u_reduce __pyx_string_tab[68]
+#define __pyx_n_u_reduce_cython __pyx_string_tab[69]
+#define __pyx_n_u_reduce_ex __pyx_string_tab[70]
+#define __pyx_n_u_req __pyx_string_tab[71]
+#define __pyx_n_u_req_bytes __pyx_string_tab[72]
+#define __pyx_n_u_req_data __pyx_string_tab[73]
+#define __pyx_n_u_request_serializer __pyx_string_tab[74]
+#define __pyx_n_u_res_bytes __pyx_string_tab[75]
+#define __pyx_n_u_resp __pyx_string_tab[76]
+#define __pyx_n_u_response_deserializer __pyx_string_tab[77]
+#define __pyx_n_u_rpc_method_handlers __pyx_string_tab[78]
+#define __pyx_n_u_self __pyx_string_tab[79]
+#define __pyx_kp_u_self_c_chan_self_invoke_fn_canno __pyx_string_tab[80]
+#define __pyx_n_u_server __pyx_string_tab[81]
+#define __pyx_n_u_servicer __pyx_string_tab[82]
+#define __pyx_n_u_servicer_instance __pyx_string_tab[83]
+#define __pyx_n_u_set_name __pyx_string_tab[84]
+#define __pyx_n_u_setstate __pyx_string_tab[85]
+#define __pyx_n_u_setstate_cython __pyx_string_tab[86]
+#define __pyx_n_u_size __pyx_string_tab[87]
+#define __pyx_n_u_spec __pyx_string_tab[88]
+#define __pyx_n_u_state __pyx_string_tab[89]
+#define __pyx_kp_u_stringsource __pyx_string_tab[90]
+#define __pyx_n_u_test __pyx_string_tab[91]
+#define __pyx_n_u_unary_unary __pyx_string_tab[92]
+#define __pyx_n_u_update __pyx_string_tab[93]
+#define __pyx_n_u_use_setstate __pyx_string_tab[94]
 /* #### Code section: module_state_clear ### */
 #if CYTHON_USE_MODULE_STATE
 static CYTHON_SMALL_CODE int __pyx_m_clear(PyObject *m) {
@@ -2719,7 +2722,7 @@ static CYTHON_SMALL_CODE int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_type_15math_cython_pb2_MathServiceFastStub);
   for (int i=0; i<1; ++i) { Py_CLEAR(clear_module_state->__pyx_tuple[i]); }
   for (int i=0; i<8; ++i) { Py_CLEAR(clear_module_state->__pyx_codeobj_tab[i]); }
-  for (int i=0; i<94; ++i) { Py_CLEAR(clear_module_state->__pyx_string_tab[i]); }
+  for (int i=0; i<95; ++i) { Py_CLEAR(clear_module_state->__pyx_string_tab[i]); }
   Py_CLEAR(clear_module_state->__pyx_int_222419149);
   Py_CLEAR(clear_module_state->__pyx_int_228825662);
   Py_CLEAR(clear_module_state->__pyx_int_238750788);
@@ -2749,7 +2752,7 @@ static CYTHON_SMALL_CODE int __pyx_m_traverse(PyObject *m, visitproc visit, void
   Py_VISIT(traverse_module_state->__pyx_type_15math_cython_pb2_MathServiceFastStub);
   for (int i=0; i<1; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_tuple[i]); }
   for (int i=0; i<8; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_codeobj_tab[i]); }
-  for (int i=0; i<94; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_string_tab[i]); }
+  for (int i=0; i<95; ++i) { __Pyx_VISIT_CONST(traverse_module_state->__pyx_string_tab[i]); }
   __Pyx_VISIT_CONST(traverse_module_state->__pyx_int_222419149);
   __Pyx_VISIT_CONST(traverse_module_state->__pyx_int_228825662);
   __Pyx_VISIT_CONST(traverse_module_state->__pyx_int_238750788);
@@ -2777,7 +2780,7 @@ static int __pyx_f_15math_cython_pb2_15MathServiceBase_ComputeMatrix(CYTHON_UNUS
 /* "math_cython_pb2.pyx":21
  *         pass
  * 
- *     def _native_Dispatch_ComputeMatrix(self, bytes req_bytes):             # <<<<<<<<<<<<<<
+ *     def _native_Dispatch_ComputeMatrix(self, bytes req_bytes, object context):             # <<<<<<<<<<<<<<
  *         cdef MathRequest req
  *         cdef MathResponse resp
 */
@@ -2799,11 +2802,12 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 #endif
 ) {
   PyObject *__pyx_v_req_bytes = 0;
+  CYTHON_UNUSED PyObject *__pyx_v_context = 0;
   #if !CYTHON_METH_FASTCALL
   CYTHON_UNUSED Py_ssize_t __pyx_nargs;
   #endif
   CYTHON_UNUSED PyObject *const *__pyx_kwvalues;
-  PyObject* values[1] = {0};
+  PyObject* values[2] = {0,0};
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
@@ -2819,11 +2823,15 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   #endif
   __pyx_kwvalues = __Pyx_KwValues_FASTCALL(__pyx_args, __pyx_nargs);
   {
-    PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_req_bytes,0};
+    PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_req_bytes,&__pyx_mstate_global->__pyx_n_u_context,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
     if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 21, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
+        case  2:
+        values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 21, __pyx_L3_error)
+        CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
         if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 21, __pyx_L3_error)
@@ -2833,20 +2841,23 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
       if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "_native_Dispatch_ComputeMatrix", 0) < 0) __PYX_ERR(0, 21, __pyx_L3_error)
-      for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("_native_Dispatch_ComputeMatrix", 1, 1, 1, i); __PYX_ERR(0, 21, __pyx_L3_error) }
+      for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("_native_Dispatch_ComputeMatrix", 1, 2, 2, i); __PYX_ERR(0, 21, __pyx_L3_error) }
       }
-    } else if (unlikely(__pyx_nargs != 1)) {
+    } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
       if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 21, __pyx_L3_error)
+      values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 21, __pyx_L3_error)
     }
     __pyx_v_req_bytes = ((PyObject*)values[0]);
+    __pyx_v_context = values[1];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("_native_Dispatch_ComputeMatrix", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 21, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("_native_Dispatch_ComputeMatrix", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 21, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -2858,7 +2869,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   return NULL;
   __pyx_L4_argument_unpacking_done:;
   if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_req_bytes), (&PyBytes_Type), 1, "req_bytes", 1))) __PYX_ERR(0, 21, __pyx_L1_error)
-  __pyx_r = __pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_ComputeMatrix(((struct __pyx_obj_15math_cython_pb2_MathServiceBase *)__pyx_v_self), __pyx_v_req_bytes);
+  __pyx_r = __pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_ComputeMatrix(((struct __pyx_obj_15math_cython_pb2_MathServiceBase *)__pyx_v_self), __pyx_v_req_bytes, __pyx_v_context);
 
   /* function exit code */
   goto __pyx_L0;
@@ -2877,7 +2888,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_ComputeMatrix(struct __pyx_obj_15math_cython_pb2_MathServiceBase *__pyx_v_self, PyObject *__pyx_v_req_bytes) {
+static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_ComputeMatrix(struct __pyx_obj_15math_cython_pb2_MathServiceBase *__pyx_v_self, PyObject *__pyx_v_req_bytes, CYTHON_UNUSED PyObject *__pyx_v_context) {
   mypackage::MathRequest __pyx_v_req;
   mypackage::MathResponse __pyx_v_resp;
   char const *__pyx_v_req_data;
@@ -3034,7 +3045,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase__native_Dispatch_C
   /* "math_cython_pb2.pyx":21
  *         pass
  * 
- *     def _native_Dispatch_ComputeMatrix(self, bytes req_bytes):             # <<<<<<<<<<<<<<
+ *     def _native_Dispatch_ComputeMatrix(self, bytes req_bytes, object context):             # <<<<<<<<<<<<<<
  *         cdef MathRequest req
  *         cdef MathResponse resp
 */
@@ -3436,12 +3447,12 @@ static PyObject *__pyx_pf_15math_cython_pb2_15MathServiceBase_4__setstate_cython
   return __pyx_r;
 }
 
-/* "math_cython_pb2.pyx":40
+/* "math_cython_pb2.pyx":41
  *     cdef grpcio_cython_invoke_fn invoke_fn
  * 
  *     def __init__(self, channel):             # <<<<<<<<<<<<<<
+ *         self.channel = channel
  *         self.c_chan = <void*>channel._channel
- *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
 */
 
 /* Python wrapper */
@@ -3466,32 +3477,32 @@ static int __pyx_pw_15math_cython_pb2_19MathServiceFastStub_1__init__(PyObject *
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_channel,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_VARARGS(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 40, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 41, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  1:
         values[0] = __Pyx_ArgRef_VARARGS(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 40, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 41, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "__init__", 0) < 0) __PYX_ERR(0, 40, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "__init__", 0) < 0) __PYX_ERR(0, 41, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 1; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("__init__", 1, 1, 1, i); __PYX_ERR(0, 40, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("__init__", 1, 1, 1, i); __PYX_ERR(0, 41, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 1)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_VARARGS(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 40, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 41, __pyx_L3_error)
     }
     __pyx_v_channel = values[0];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("__init__", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 40, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("__init__", 1, 1, 1, __pyx_nargs); __PYX_ERR(0, 41, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -3526,29 +3537,42 @@ static int __pyx_pf_15math_cython_pb2_19MathServiceFastStub___init__(struct __py
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("__init__", 0);
 
-  /* "math_cython_pb2.pyx":41
+  /* "math_cython_pb2.pyx":42
  * 
  *     def __init__(self, channel):
+ *         self.channel = channel             # <<<<<<<<<<<<<<
+ *         self.c_chan = <void*>channel._channel
+ *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
+*/
+  __Pyx_INCREF(__pyx_v_channel);
+  __Pyx_GIVEREF(__pyx_v_channel);
+  __Pyx_GOTREF(__pyx_v_self->channel);
+  __Pyx_DECREF(__pyx_v_self->channel);
+  __pyx_v_self->channel = __pyx_v_channel;
+
+  /* "math_cython_pb2.pyx":43
+ *     def __init__(self, channel):
+ *         self.channel = channel
  *         self.c_chan = <void*>channel._channel             # <<<<<<<<<<<<<<
  *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
  * 
 */
-  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_channel, __pyx_mstate_global->__pyx_n_u_channel_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 41, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyObject_GetAttrStr(__pyx_v_channel, __pyx_mstate_global->__pyx_n_u_channel_2); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 43, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_v_self->c_chan = ((void *)__pyx_t_1);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "math_cython_pb2.pyx":42
- *     def __init__(self, channel):
+  /* "math_cython_pb2.pyx":44
+ *         self.channel = channel
  *         self.c_chan = <void*>channel._channel
  *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()             # <<<<<<<<<<<<<<
  * 
  *     def ComputeMatrix(self, **kwargs):
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_grpc_cython); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 42, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_grpc_cython); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 44, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_get_c_core_invoke_fn_addr); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 42, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_3, __pyx_mstate_global->__pyx_n_u_get_c_core_invoke_fn_addr); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 44, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
   __pyx_t_5 = 1;
@@ -3568,19 +3592,19 @@ static int __pyx_pf_15math_cython_pb2_19MathServiceFastStub___init__(struct __py
     __pyx_t_1 = __Pyx_PyObject_FastCall(__pyx_t_4, __pyx_callargs+__pyx_t_5, (1-__pyx_t_5) | (__pyx_t_5*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 42, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 44, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
-  __pyx_t_6 = __Pyx_PyLong_As_size_t(__pyx_t_1); if (unlikely((__pyx_t_6 == ((uintptr_t)-1)) && PyErr_Occurred())) __PYX_ERR(0, 42, __pyx_L1_error)
+  __pyx_t_6 = __Pyx_PyLong_As_size_t(__pyx_t_1); if (unlikely((__pyx_t_6 == ((uintptr_t)-1)) && PyErr_Occurred())) __PYX_ERR(0, 44, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
   __pyx_v_self->invoke_fn = ((__pyx_t_15math_cython_pb2_grpcio_cython_invoke_fn)((uintptr_t)__pyx_t_6));
 
-  /* "math_cython_pb2.pyx":40
+  /* "math_cython_pb2.pyx":41
  *     cdef grpcio_cython_invoke_fn invoke_fn
  * 
  *     def __init__(self, channel):             # <<<<<<<<<<<<<<
+ *         self.channel = channel
  *         self.c_chan = <void*>channel._channel
- *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
 */
 
   /* function exit code */
@@ -3598,7 +3622,7 @@ static int __pyx_pf_15math_cython_pb2_19MathServiceFastStub___init__(struct __py
   return __pyx_r;
 }
 
-/* "math_cython_pb2.pyx":44
+/* "math_cython_pb2.pyx":46
  *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
  * 
  *     def ComputeMatrix(self, **kwargs):             # <<<<<<<<<<<<<<
@@ -3675,41 +3699,40 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
   Py_ssize_t __pyx_t_4;
   PyObject *(*__pyx_t_5)(PyObject *);
   float __pyx_t_6;
-  PyObject *__pyx_t_7 = NULL;
-  size_t __pyx_t_8;
-  PyObject *__pyx_t_9 = NULL;
+  size_t __pyx_t_7;
+  PyObject *__pyx_t_8 = NULL;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("ComputeMatrix", 0);
 
-  /* "math_cython_pb2.pyx":47
+  /* "math_cython_pb2.pyx":49
  *         cdef MathRequest req
  *         cdef MathResponse resp
  *         if 'matrix_a' in kwargs:             # <<<<<<<<<<<<<<
  *             for item in kwargs['matrix_a']:
  *                 req.add_matrix_a(item)
 */
-  __pyx_t_1 = (__Pyx_PyDict_ContainsTF(__pyx_mstate_global->__pyx_n_u_matrix_a, __pyx_v_kwargs, Py_EQ)); if (unlikely((__pyx_t_1 < 0))) __PYX_ERR(0, 47, __pyx_L1_error)
+  __pyx_t_1 = (__Pyx_PyDict_ContainsTF(__pyx_mstate_global->__pyx_n_u_matrix_a, __pyx_v_kwargs, Py_EQ)); if (unlikely((__pyx_t_1 < 0))) __PYX_ERR(0, 49, __pyx_L1_error)
   if (__pyx_t_1) {
 
-    /* "math_cython_pb2.pyx":48
+    /* "math_cython_pb2.pyx":50
  *         cdef MathResponse resp
  *         if 'matrix_a' in kwargs:
  *             for item in kwargs['matrix_a']:             # <<<<<<<<<<<<<<
  *                 req.add_matrix_a(item)
  *         if 'matrix_b' in kwargs:
 */
-    __pyx_t_2 = __Pyx_PyDict_GetItem(__pyx_v_kwargs, __pyx_mstate_global->__pyx_n_u_matrix_a); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyDict_GetItem(__pyx_v_kwargs, __pyx_mstate_global->__pyx_n_u_matrix_a); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 50, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     if (likely(PyList_CheckExact(__pyx_t_2)) || PyTuple_CheckExact(__pyx_t_2)) {
       __pyx_t_3 = __pyx_t_2; __Pyx_INCREF(__pyx_t_3);
       __pyx_t_4 = 0;
       __pyx_t_5 = NULL;
     } else {
-      __pyx_t_4 = -1; __pyx_t_3 = PyObject_GetIter(__pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 48, __pyx_L1_error)
+      __pyx_t_4 = -1; __pyx_t_3 = PyObject_GetIter(__pyx_t_2); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 50, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_3);
-      __pyx_t_5 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_3); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 48, __pyx_L1_error)
+      __pyx_t_5 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_3); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 50, __pyx_L1_error)
     }
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
     for (;;) {
@@ -3718,7 +3741,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
           {
             Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_3);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 48, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 50, __pyx_L1_error)
             #endif
             if (__pyx_t_4 >= __pyx_temp) break;
           }
@@ -3728,7 +3751,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
           {
             Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_3);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 48, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 50, __pyx_L1_error)
             #endif
             if (__pyx_t_4 >= __pyx_temp) break;
           }
@@ -3739,13 +3762,13 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
           #endif
           ++__pyx_t_4;
         }
-        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 48, __pyx_L1_error)
+        if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 50, __pyx_L1_error)
       } else {
         __pyx_t_2 = __pyx_t_5(__pyx_t_3);
         if (unlikely(!__pyx_t_2)) {
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
-            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 48, __pyx_L1_error)
+            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 50, __pyx_L1_error)
             PyErr_Clear();
           }
           break;
@@ -3755,17 +3778,17 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
       __Pyx_XDECREF_SET(__pyx_v_item, __pyx_t_2);
       __pyx_t_2 = 0;
 
-      /* "math_cython_pb2.pyx":49
+      /* "math_cython_pb2.pyx":51
  *         if 'matrix_a' in kwargs:
  *             for item in kwargs['matrix_a']:
  *                 req.add_matrix_a(item)             # <<<<<<<<<<<<<<
  *         if 'matrix_b' in kwargs:
  *             for item in kwargs['matrix_b']:
 */
-      __pyx_t_6 = __Pyx_PyFloat_AsFloat(__pyx_v_item); if (unlikely((__pyx_t_6 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 49, __pyx_L1_error)
+      __pyx_t_6 = __Pyx_PyFloat_AsFloat(__pyx_v_item); if (unlikely((__pyx_t_6 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 51, __pyx_L1_error)
       __pyx_v_req.add_matrix_a(__pyx_t_6);
 
-      /* "math_cython_pb2.pyx":48
+      /* "math_cython_pb2.pyx":50
  *         cdef MathResponse resp
  *         if 'matrix_a' in kwargs:
  *             for item in kwargs['matrix_a']:             # <<<<<<<<<<<<<<
@@ -3775,7 +3798,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
     }
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-    /* "math_cython_pb2.pyx":47
+    /* "math_cython_pb2.pyx":49
  *         cdef MathRequest req
  *         cdef MathResponse resp
  *         if 'matrix_a' in kwargs:             # <<<<<<<<<<<<<<
@@ -3784,33 +3807,33 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
 */
   }
 
-  /* "math_cython_pb2.pyx":50
+  /* "math_cython_pb2.pyx":52
  *             for item in kwargs['matrix_a']:
  *                 req.add_matrix_a(item)
  *         if 'matrix_b' in kwargs:             # <<<<<<<<<<<<<<
  *             for item in kwargs['matrix_b']:
  *                 req.add_matrix_b(item)
 */
-  __pyx_t_1 = (__Pyx_PyDict_ContainsTF(__pyx_mstate_global->__pyx_n_u_matrix_b, __pyx_v_kwargs, Py_EQ)); if (unlikely((__pyx_t_1 < 0))) __PYX_ERR(0, 50, __pyx_L1_error)
+  __pyx_t_1 = (__Pyx_PyDict_ContainsTF(__pyx_mstate_global->__pyx_n_u_matrix_b, __pyx_v_kwargs, Py_EQ)); if (unlikely((__pyx_t_1 < 0))) __PYX_ERR(0, 52, __pyx_L1_error)
   if (__pyx_t_1) {
 
-    /* "math_cython_pb2.pyx":51
+    /* "math_cython_pb2.pyx":53
  *                 req.add_matrix_a(item)
  *         if 'matrix_b' in kwargs:
  *             for item in kwargs['matrix_b']:             # <<<<<<<<<<<<<<
  *                 req.add_matrix_b(item)
  *         cdef size_t size = req.ByteSizeLong()
 */
-    __pyx_t_3 = __Pyx_PyDict_GetItem(__pyx_v_kwargs, __pyx_mstate_global->__pyx_n_u_matrix_b); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 51, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PyDict_GetItem(__pyx_v_kwargs, __pyx_mstate_global->__pyx_n_u_matrix_b); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 53, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     if (likely(PyList_CheckExact(__pyx_t_3)) || PyTuple_CheckExact(__pyx_t_3)) {
       __pyx_t_2 = __pyx_t_3; __Pyx_INCREF(__pyx_t_2);
       __pyx_t_4 = 0;
       __pyx_t_5 = NULL;
     } else {
-      __pyx_t_4 = -1; __pyx_t_2 = PyObject_GetIter(__pyx_t_3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 51, __pyx_L1_error)
+      __pyx_t_4 = -1; __pyx_t_2 = PyObject_GetIter(__pyx_t_3); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 53, __pyx_L1_error)
       __Pyx_GOTREF(__pyx_t_2);
-      __pyx_t_5 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 51, __pyx_L1_error)
+      __pyx_t_5 = (CYTHON_COMPILING_IN_LIMITED_API) ? PyIter_Next : __Pyx_PyObject_GetIterNextFunc(__pyx_t_2); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 53, __pyx_L1_error)
     }
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     for (;;) {
@@ -3819,7 +3842,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
           {
             Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_2);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 51, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 53, __pyx_L1_error)
             #endif
             if (__pyx_t_4 >= __pyx_temp) break;
           }
@@ -3829,7 +3852,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
           {
             Py_ssize_t __pyx_temp = __Pyx_PyTuple_GET_SIZE(__pyx_t_2);
             #if !CYTHON_ASSUME_SAFE_SIZE
-            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 51, __pyx_L1_error)
+            if (unlikely((__pyx_temp < 0))) __PYX_ERR(0, 53, __pyx_L1_error)
             #endif
             if (__pyx_t_4 >= __pyx_temp) break;
           }
@@ -3840,13 +3863,13 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
           #endif
           ++__pyx_t_4;
         }
-        if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 51, __pyx_L1_error)
+        if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 53, __pyx_L1_error)
       } else {
         __pyx_t_3 = __pyx_t_5(__pyx_t_2);
         if (unlikely(!__pyx_t_3)) {
           PyObject* exc_type = PyErr_Occurred();
           if (exc_type) {
-            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 51, __pyx_L1_error)
+            if (unlikely(!__Pyx_PyErr_GivenExceptionMatches(exc_type, PyExc_StopIteration))) __PYX_ERR(0, 53, __pyx_L1_error)
             PyErr_Clear();
           }
           break;
@@ -3856,17 +3879,17 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
       __Pyx_XDECREF_SET(__pyx_v_item, __pyx_t_3);
       __pyx_t_3 = 0;
 
-      /* "math_cython_pb2.pyx":52
+      /* "math_cython_pb2.pyx":54
  *         if 'matrix_b' in kwargs:
  *             for item in kwargs['matrix_b']:
  *                 req.add_matrix_b(item)             # <<<<<<<<<<<<<<
  *         cdef size_t size = req.ByteSizeLong()
  *         cdef char* buf = <char*>malloc(size)
 */
-      __pyx_t_6 = __Pyx_PyFloat_AsFloat(__pyx_v_item); if (unlikely((__pyx_t_6 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 52, __pyx_L1_error)
+      __pyx_t_6 = __Pyx_PyFloat_AsFloat(__pyx_v_item); if (unlikely((__pyx_t_6 == (float)-1) && PyErr_Occurred())) __PYX_ERR(0, 54, __pyx_L1_error)
       __pyx_v_req.add_matrix_b(__pyx_t_6);
 
-      /* "math_cython_pb2.pyx":51
+      /* "math_cython_pb2.pyx":53
  *                 req.add_matrix_a(item)
  *         if 'matrix_b' in kwargs:
  *             for item in kwargs['matrix_b']:             # <<<<<<<<<<<<<<
@@ -3876,7 +3899,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
     }
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-    /* "math_cython_pb2.pyx":50
+    /* "math_cython_pb2.pyx":52
  *             for item in kwargs['matrix_a']:
  *                 req.add_matrix_a(item)
  *         if 'matrix_b' in kwargs:             # <<<<<<<<<<<<<<
@@ -3885,7 +3908,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
 */
   }
 
-  /* "math_cython_pb2.pyx":53
+  /* "math_cython_pb2.pyx":55
  *             for item in kwargs['matrix_b']:
  *                 req.add_matrix_b(item)
  *         cdef size_t size = req.ByteSizeLong()             # <<<<<<<<<<<<<<
@@ -3894,7 +3917,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
 */
   __pyx_v_size = __pyx_v_req.ByteSizeLong();
 
-  /* "math_cython_pb2.pyx":54
+  /* "math_cython_pb2.pyx":56
  *                 req.add_matrix_b(item)
  *         cdef size_t size = req.ByteSizeLong()
  *         cdef char* buf = <char*>malloc(size)             # <<<<<<<<<<<<<<
@@ -3903,7 +3926,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
 */
   __pyx_v_buf = ((char *)malloc(__pyx_v_size));
 
-  /* "math_cython_pb2.pyx":55
+  /* "math_cython_pb2.pyx":57
  *         cdef size_t size = req.ByteSizeLong()
  *         cdef char* buf = <char*>malloc(size)
  *         req.SerializeToArray(buf, size)             # <<<<<<<<<<<<<<
@@ -3912,19 +3935,19 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
 */
   (void)(__pyx_v_req.SerializeToArray(__pyx_v_buf, __pyx_v_size));
 
-  /* "math_cython_pb2.pyx":56
+  /* "math_cython_pb2.pyx":58
  *         cdef char* buf = <char*>malloc(size)
  *         req.SerializeToArray(buf, size)
  *         cdef bytes req_bytes = buf[:size]             # <<<<<<<<<<<<<<
  *         free(buf)
  *         cdef object call = self.channel.unary_unary(
 */
-  __pyx_t_2 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_buf + 0, __pyx_v_size - 0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 56, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_buf + 0, __pyx_v_size - 0); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __pyx_v_req_bytes = ((PyObject*)__pyx_t_2);
   __pyx_t_2 = 0;
 
-  /* "math_cython_pb2.pyx":57
+  /* "math_cython_pb2.pyx":59
  *         req.SerializeToArray(buf, size)
  *         cdef bytes req_bytes = buf[:size]
  *         free(buf)             # <<<<<<<<<<<<<<
@@ -3933,77 +3956,74 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
 */
   free(__pyx_v_buf);
 
-  /* "math_cython_pb2.pyx":58
+  /* "math_cython_pb2.pyx":60
  *         cdef bytes req_bytes = buf[:size]
  *         free(buf)
  *         cdef object call = self.channel.unary_unary(             # <<<<<<<<<<<<<<
  *             '/mypackage.MathService/ComputeMatrix',
  *             request_serializer=None, response_deserializer=None
 */
-  __pyx_t_7 = __Pyx_PyObject_GetAttrStr(((PyObject *)__pyx_v_self), __pyx_mstate_global->__pyx_n_u_channel); if (unlikely(!__pyx_t_7)) __PYX_ERR(0, 58, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_7);
-  __pyx_t_3 = __pyx_t_7;
+  __pyx_t_3 = __pyx_v_self->channel;
   __Pyx_INCREF(__pyx_t_3);
 
-  /* "math_cython_pb2.pyx":60
+  /* "math_cython_pb2.pyx":62
  *         cdef object call = self.channel.unary_unary(
  *             '/mypackage.MathService/ComputeMatrix',
  *             request_serializer=None, response_deserializer=None             # <<<<<<<<<<<<<<
  *         )
  *         cdef bytes res_bytes = call(req_bytes)
 */
-  __pyx_t_8 = 0;
+  __pyx_t_7 = 0;
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 2 : 0)] = {__pyx_t_3, __pyx_mstate_global->__pyx_kp_u_mypackage_MathService_ComputeMa};
-    __pyx_t_9 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_9)) __PYX_ERR(0, 58, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_9);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_request_serializer, Py_None, __pyx_t_9, __pyx_callargs+2, 0) < 0) __PYX_ERR(0, 58, __pyx_L1_error)
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_response_deserializer, Py_None, __pyx_t_9, __pyx_callargs+2, 1) < 0) __PYX_ERR(0, 58, __pyx_L1_error)
-    __pyx_t_2 = __Pyx_Object_VectorcallMethod_CallFromBuilder(__pyx_mstate_global->__pyx_n_u_unary_unary, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_9);
+    __pyx_t_8 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_8)) __PYX_ERR(0, 60, __pyx_L1_error)
+    __Pyx_GOTREF(__pyx_t_8);
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_request_serializer, Py_None, __pyx_t_8, __pyx_callargs+2, 0) < 0) __PYX_ERR(0, 60, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_response_deserializer, Py_None, __pyx_t_8, __pyx_callargs+2, 1) < 0) __PYX_ERR(0, 60, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_Object_VectorcallMethod_CallFromBuilder(__pyx_mstate_global->__pyx_n_u_unary_unary, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_8);
     __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
-    __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 58, __pyx_L1_error)
+    __Pyx_DECREF(__pyx_t_8); __pyx_t_8 = 0;
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 60, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
   __pyx_v_call = __pyx_t_2;
   __pyx_t_2 = 0;
 
-  /* "math_cython_pb2.pyx":62
+  /* "math_cython_pb2.pyx":64
  *             request_serializer=None, response_deserializer=None
  *         )
  *         cdef bytes res_bytes = call(req_bytes)             # <<<<<<<<<<<<<<
  *         return res_bytes
  * 
 */
-  __pyx_t_7 = NULL;
+  __pyx_t_8 = NULL;
   __Pyx_INCREF(__pyx_v_call);
-  __pyx_t_9 = __pyx_v_call; 
-  __pyx_t_8 = 1;
+  __pyx_t_3 = __pyx_v_call; 
+  __pyx_t_7 = 1;
   #if CYTHON_UNPACK_METHODS
-  if (unlikely(PyMethod_Check(__pyx_t_9))) {
-    __pyx_t_7 = PyMethod_GET_SELF(__pyx_t_9);
-    assert(__pyx_t_7);
-    PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_9);
-    __Pyx_INCREF(__pyx_t_7);
+  if (unlikely(PyMethod_Check(__pyx_t_3))) {
+    __pyx_t_8 = PyMethod_GET_SELF(__pyx_t_3);
+    assert(__pyx_t_8);
+    PyObject* __pyx__function = PyMethod_GET_FUNCTION(__pyx_t_3);
+    __Pyx_INCREF(__pyx_t_8);
     __Pyx_INCREF(__pyx__function);
-    __Pyx_DECREF_SET(__pyx_t_9, __pyx__function);
-    __pyx_t_8 = 0;
+    __Pyx_DECREF_SET(__pyx_t_3, __pyx__function);
+    __pyx_t_7 = 0;
   }
   #endif
   {
-    PyObject *__pyx_callargs[2] = {__pyx_t_7, __pyx_v_req_bytes};
-    __pyx_t_2 = __Pyx_PyObject_FastCall(__pyx_t_9, __pyx_callargs+__pyx_t_8, (2-__pyx_t_8) | (__pyx_t_8*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
-    __Pyx_XDECREF(__pyx_t_7); __pyx_t_7 = 0;
-    __Pyx_DECREF(__pyx_t_9); __pyx_t_9 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 62, __pyx_L1_error)
+    PyObject *__pyx_callargs[2] = {__pyx_t_8, __pyx_v_req_bytes};
+    __pyx_t_2 = __Pyx_PyObject_FastCall(__pyx_t_3, __pyx_callargs+__pyx_t_7, (2-__pyx_t_7) | (__pyx_t_7*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
+    __Pyx_XDECREF(__pyx_t_8); __pyx_t_8 = 0;
+    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 64, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
-  if (!(likely(PyBytes_CheckExact(__pyx_t_2))||((__pyx_t_2) == Py_None) || __Pyx_RaiseUnexpectedTypeError("bytes", __pyx_t_2))) __PYX_ERR(0, 62, __pyx_L1_error)
+  if (!(likely(PyBytes_CheckExact(__pyx_t_2))||((__pyx_t_2) == Py_None) || __Pyx_RaiseUnexpectedTypeError("bytes", __pyx_t_2))) __PYX_ERR(0, 64, __pyx_L1_error)
   __pyx_v_res_bytes = ((PyObject*)__pyx_t_2);
   __pyx_t_2 = 0;
 
-  /* "math_cython_pb2.pyx":63
+  /* "math_cython_pb2.pyx":65
  *         )
  *         cdef bytes res_bytes = call(req_bytes)
  *         return res_bytes             # <<<<<<<<<<<<<<
@@ -4015,7 +4035,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
   __pyx_r = __pyx_v_res_bytes;
   goto __pyx_L0;
 
-  /* "math_cython_pb2.pyx":44
+  /* "math_cython_pb2.pyx":46
  *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
  * 
  *     def ComputeMatrix(self, **kwargs):             # <<<<<<<<<<<<<<
@@ -4027,8 +4047,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_2ComputeMatrix
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_2);
   __Pyx_XDECREF(__pyx_t_3);
-  __Pyx_XDECREF(__pyx_t_7);
-  __Pyx_XDECREF(__pyx_t_9);
+  __Pyx_XDECREF(__pyx_t_8);
   __Pyx_AddTraceback("math_cython_pb2.MathServiceFastStub.ComputeMatrix", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
@@ -4245,7 +4264,7 @@ static PyObject *__pyx_pf_15math_cython_pb2_19MathServiceFastStub_6__setstate_cy
   return __pyx_r;
 }
 
-/* "math_cython_pb2.pyx":65
+/* "math_cython_pb2.pyx":67
  *         return res_bytes
  * 
  * def add_MathServiceServicer_to_server(servicer, server):             # <<<<<<<<<<<<<<
@@ -4293,39 +4312,39 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   {
     PyObject ** const __pyx_pyargnames[] = {&__pyx_mstate_global->__pyx_n_u_servicer,&__pyx_mstate_global->__pyx_n_u_server,0};
     const Py_ssize_t __pyx_kwds_len = (__pyx_kwds) ? __Pyx_NumKwargs_FASTCALL(__pyx_kwds) : 0;
-    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 65, __pyx_L3_error)
+    if (unlikely(__pyx_kwds_len) < 0) __PYX_ERR(0, 67, __pyx_L3_error)
     if (__pyx_kwds_len > 0) {
       switch (__pyx_nargs) {
         case  2:
         values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 65, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 67, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  1:
         values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 65, __pyx_L3_error)
+        if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 67, __pyx_L3_error)
         CYTHON_FALLTHROUGH;
         case  0: break;
         default: goto __pyx_L5_argtuple_error;
       }
       const Py_ssize_t kwd_pos_args = __pyx_nargs;
-      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "add_MathServiceServicer_to_server", 0) < 0) __PYX_ERR(0, 65, __pyx_L3_error)
+      if (__Pyx_ParseKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values, kwd_pos_args, __pyx_kwds_len, "add_MathServiceServicer_to_server", 0) < 0) __PYX_ERR(0, 67, __pyx_L3_error)
       for (Py_ssize_t i = __pyx_nargs; i < 2; i++) {
-        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("add_MathServiceServicer_to_server", 1, 2, 2, i); __PYX_ERR(0, 65, __pyx_L3_error) }
+        if (unlikely(!values[i])) { __Pyx_RaiseArgtupleInvalid("add_MathServiceServicer_to_server", 1, 2, 2, i); __PYX_ERR(0, 67, __pyx_L3_error) }
       }
     } else if (unlikely(__pyx_nargs != 2)) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = __Pyx_ArgRef_FASTCALL(__pyx_args, 0);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 65, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[0])) __PYX_ERR(0, 67, __pyx_L3_error)
       values[1] = __Pyx_ArgRef_FASTCALL(__pyx_args, 1);
-      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 65, __pyx_L3_error)
+      if (!CYTHON_ASSUME_SAFE_MACROS && unlikely(!values[1])) __PYX_ERR(0, 67, __pyx_L3_error)
     }
     __pyx_v_servicer = values[0];
     __pyx_v_server = values[1];
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("add_MathServiceServicer_to_server", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 65, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("add_MathServiceServicer_to_server", 1, 2, 2, __pyx_nargs); __PYX_ERR(0, 67, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -4362,23 +4381,23 @@ static PyObject *__pyx_pf_15math_cython_pb2_add_MathServiceServicer_to_server(CY
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("add_MathServiceServicer_to_server", 0);
 
-  /* "math_cython_pb2.pyx":67
+  /* "math_cython_pb2.pyx":69
  * def add_MathServiceServicer_to_server(servicer, server):
  *     rpc_method_handlers = {
  *         'ComputeMatrix': grpc_cython.native_unary_unary_rpc_method_handler(             # <<<<<<<<<<<<<<
  *             servicer_instance=servicer,
  *             method_name='ComputeMatrix'
 */
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 67, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(1); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 69, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_t_3 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_grpc_cython); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 67, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_grpc_cython); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 69, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
-  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_native_unary_unary_rpc_method_ha); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 67, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_PyObject_GetAttrStr(__pyx_t_4, __pyx_mstate_global->__pyx_n_u_native_unary_unary_rpc_method_ha); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 69, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
 
-  /* "math_cython_pb2.pyx":68
+  /* "math_cython_pb2.pyx":70
  *     rpc_method_handlers = {
  *         'ComputeMatrix': grpc_cython.native_unary_unary_rpc_method_handler(
  *             servicer_instance=servicer,             # <<<<<<<<<<<<<<
@@ -4399,23 +4418,23 @@ static PyObject *__pyx_pf_15math_cython_pb2_add_MathServiceServicer_to_server(CY
   #endif
   {
     PyObject *__pyx_callargs[2 + ((CYTHON_VECTORCALL) ? 2 : 0)] = {__pyx_t_3, NULL};
-    __pyx_t_4 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 67, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_MakeVectorcallBuilderKwds(2); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 69, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_servicer_instance, __pyx_v_servicer, __pyx_t_4, __pyx_callargs+1, 0) < 0) __PYX_ERR(0, 67, __pyx_L1_error)
-    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_method_name, __pyx_mstate_global->__pyx_n_u_ComputeMatrix, __pyx_t_4, __pyx_callargs+1, 1) < 0) __PYX_ERR(0, 67, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_servicer_instance, __pyx_v_servicer, __pyx_t_4, __pyx_callargs+1, 0) < 0) __PYX_ERR(0, 69, __pyx_L1_error)
+    if (__Pyx_VectorcallBuilder_AddArg(__pyx_mstate_global->__pyx_n_u_method_name, __pyx_mstate_global->__pyx_n_u_ComputeMatrix, __pyx_t_4, __pyx_callargs+1, 1) < 0) __PYX_ERR(0, 69, __pyx_L1_error)
     __pyx_t_2 = __Pyx_Object_Vectorcall_CallFromBuilder(__pyx_t_5, __pyx_callargs+__pyx_t_6, (1-__pyx_t_6) | (__pyx_t_6*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET), __pyx_t_4);
     __Pyx_XDECREF(__pyx_t_3); __pyx_t_3 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 67, __pyx_L1_error)
+    if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 69, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
   }
-  if (PyDict_SetItem(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_ComputeMatrix, __pyx_t_2) < 0) __PYX_ERR(0, 67, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_1, __pyx_mstate_global->__pyx_n_u_ComputeMatrix, __pyx_t_2) < 0) __PYX_ERR(0, 69, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __pyx_v_rpc_method_handlers = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
-  /* "math_cython_pb2.pyx":72
+  /* "math_cython_pb2.pyx":74
  *         ),
  *     }
  *     generic_handler = grpc.method_handlers_generic_handler(             # <<<<<<<<<<<<<<
@@ -4423,13 +4442,13 @@ static PyObject *__pyx_pf_15math_cython_pb2_add_MathServiceServicer_to_server(CY
  *     )
 */
   __pyx_t_2 = NULL;
-  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_grpc); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 72, __pyx_L1_error)
+  __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_grpc); if (unlikely(!__pyx_t_5)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
-  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_method_handlers_generic_handler); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 72, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_mstate_global->__pyx_n_u_method_handlers_generic_handler); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
 
-  /* "math_cython_pb2.pyx":73
+  /* "math_cython_pb2.pyx":75
  *     }
  *     generic_handler = grpc.method_handlers_generic_handler(
  *         'mypackage.MathService', rpc_method_handlers             # <<<<<<<<<<<<<<
@@ -4453,36 +4472,36 @@ static PyObject *__pyx_pf_15math_cython_pb2_add_MathServiceServicer_to_server(CY
     __pyx_t_1 = __Pyx_PyObject_FastCall(__pyx_t_4, __pyx_callargs+__pyx_t_6, (3-__pyx_t_6) | (__pyx_t_6*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_2); __pyx_t_2 = 0;
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 72, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 74, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __pyx_v_generic_handler = __pyx_t_1;
   __pyx_t_1 = 0;
 
-  /* "math_cython_pb2.pyx":75
+  /* "math_cython_pb2.pyx":77
  *         'mypackage.MathService', rpc_method_handlers
  *     )
  *     server.add_generic_rpc_handlers((generic_handler,))             # <<<<<<<<<<<<<<
 */
   __pyx_t_4 = __pyx_v_server;
   __Pyx_INCREF(__pyx_t_4);
-  __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 75, __pyx_L1_error)
+  __pyx_t_2 = PyTuple_New(1); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 77, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_INCREF(__pyx_v_generic_handler);
   __Pyx_GIVEREF(__pyx_v_generic_handler);
-  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_v_generic_handler) != (0)) __PYX_ERR(0, 75, __pyx_L1_error);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_2, 0, __pyx_v_generic_handler) != (0)) __PYX_ERR(0, 77, __pyx_L1_error);
   __pyx_t_6 = 0;
   {
     PyObject *__pyx_callargs[2] = {__pyx_t_4, __pyx_t_2};
     __pyx_t_1 = __Pyx_PyObject_FastCallMethod(__pyx_mstate_global->__pyx_n_u_add_generic_rpc_handlers, __pyx_callargs+__pyx_t_6, (2-__pyx_t_6) | (1*__Pyx_PY_VECTORCALL_ARGUMENTS_OFFSET));
     __Pyx_XDECREF(__pyx_t_4); __pyx_t_4 = 0;
     __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 75, __pyx_L1_error)
+    if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 77, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_1);
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "math_cython_pb2.pyx":65
+  /* "math_cython_pb2.pyx":67
  *         return res_bytes
  * 
  * def add_MathServiceServicer_to_server(servicer, server):             # <<<<<<<<<<<<<<
@@ -5018,6 +5037,7 @@ static PyTypeObject __pyx_type_15math_cython_pb2_MathServiceBase = {
 #endif
 
 static PyObject *__pyx_tp_new_15math_cython_pb2_MathServiceFastStub(PyTypeObject *t, CYTHON_UNUSED PyObject *a, CYTHON_UNUSED PyObject *k) {
+  struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *p;
   PyObject *o;
   #if CYTHON_COMPILING_IN_LIMITED_API
   allocfunc alloc_func = (allocfunc)PyType_GetSlot(t, Py_tp_alloc);
@@ -5030,17 +5050,22 @@ static PyObject *__pyx_tp_new_15math_cython_pb2_MathServiceFastStub(PyTypeObject
   }
   if (unlikely(!o)) return 0;
   #endif
+  p = ((struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *)o);
+  p->channel = Py_None; Py_INCREF(Py_None);
   return o;
 }
 
 static void __pyx_tp_dealloc_15math_cython_pb2_MathServiceFastStub(PyObject *o) {
+  struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *p = (struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *)o;
   #if CYTHON_USE_TP_FINALIZE
-  if (unlikely((PY_VERSION_HEX >= 0x03080000 || __Pyx_PyType_HasFeature(Py_TYPE(o), Py_TPFLAGS_HAVE_FINALIZE)) && __Pyx_PyObject_GetSlot(o, tp_finalize, destructor)) && (!PyType_IS_GC(Py_TYPE(o)) || !__Pyx_PyObject_GC_IsFinalized(o))) {
+  if (unlikely((PY_VERSION_HEX >= 0x03080000 || __Pyx_PyType_HasFeature(Py_TYPE(o), Py_TPFLAGS_HAVE_FINALIZE)) && __Pyx_PyObject_GetSlot(o, tp_finalize, destructor)) && !__Pyx_PyObject_GC_IsFinalized(o)) {
     if (__Pyx_PyObject_GetSlot(o, tp_dealloc, destructor) == __pyx_tp_dealloc_15math_cython_pb2_MathServiceFastStub) {
       if (PyObject_CallFinalizerFromDealloc(o)) return;
     }
   }
   #endif
+  PyObject_GC_UnTrack(o);
+  Py_CLEAR(p->channel);
   #if CYTHON_USE_TYPE_SLOTS
   (*Py_TYPE(o)->tp_free)(o);
   #else
@@ -5049,6 +5074,28 @@ static void __pyx_tp_dealloc_15math_cython_pb2_MathServiceFastStub(PyObject *o) 
     if (tp_free) tp_free(o);
   }
   #endif
+}
+
+static int __pyx_tp_traverse_15math_cython_pb2_MathServiceFastStub(PyObject *o, visitproc v, void *a) {
+  int e;
+  struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *p = (struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *)o;
+  {
+    e = __Pyx_call_type_traverse(o, 1, v, a);
+    if (e) return e;
+  }
+  if (p->channel) {
+    e = (*v)(p->channel, a); if (e) return e;
+  }
+  return 0;
+}
+
+static int __pyx_tp_clear_15math_cython_pb2_MathServiceFastStub(PyObject *o) {
+  PyObject* tmp;
+  struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *p = (struct __pyx_obj_15math_cython_pb2_MathServiceFastStub *)o;
+  tmp = ((PyObject*)p->channel);
+  p->channel = Py_None; Py_INCREF(Py_None);
+  Py_XDECREF(tmp);
+  return 0;
 }
 
 static PyMethodDef __pyx_methods_15math_cython_pb2_MathServiceFastStub[] = {
@@ -5060,6 +5107,8 @@ static PyMethodDef __pyx_methods_15math_cython_pb2_MathServiceFastStub[] = {
 #if CYTHON_USE_TYPE_SPECS
 static PyType_Slot __pyx_type_15math_cython_pb2_MathServiceFastStub_slots[] = {
   {Py_tp_dealloc, (void *)__pyx_tp_dealloc_15math_cython_pb2_MathServiceFastStub},
+  {Py_tp_traverse, (void *)__pyx_tp_traverse_15math_cython_pb2_MathServiceFastStub},
+  {Py_tp_clear, (void *)__pyx_tp_clear_15math_cython_pb2_MathServiceFastStub},
   {Py_tp_methods, (void *)__pyx_methods_15math_cython_pb2_MathServiceFastStub},
   {Py_tp_init, (void *)__pyx_pw_15math_cython_pb2_19MathServiceFastStub_1__init__},
   {Py_tp_new, (void *)__pyx_tp_new_15math_cython_pb2_MathServiceFastStub},
@@ -5069,7 +5118,7 @@ static PyType_Spec __pyx_type_15math_cython_pb2_MathServiceFastStub_spec = {
   "math_cython_pb2.MathServiceFastStub",
   sizeof(struct __pyx_obj_15math_cython_pb2_MathServiceFastStub),
   0,
-  Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE,
+  Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE|Py_TPFLAGS_HAVE_GC,
   __pyx_type_15math_cython_pb2_MathServiceFastStub_slots,
 };
 #else
@@ -5099,10 +5148,10 @@ static PyTypeObject __pyx_type_15math_cython_pb2_MathServiceFastStub = {
   0, /*tp_getattro*/
   0, /*tp_setattro*/
   0, /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE, /*tp_flags*/
+  Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_CHECKTYPES|Py_TPFLAGS_HAVE_NEWBUFFER|Py_TPFLAGS_BASETYPE|Py_TPFLAGS_HAVE_GC, /*tp_flags*/
   0, /*tp_doc*/
-  0, /*tp_traverse*/
-  0, /*tp_clear*/
+  __pyx_tp_traverse_15math_cython_pb2_MathServiceFastStub, /*tp_traverse*/
+  __pyx_tp_clear_15math_cython_pb2_MathServiceFastStub, /*tp_clear*/
   0, /*tp_richcompare*/
   0, /*tp_weaklistoffset*/
   0, /*tp_iter*/
@@ -5584,7 +5633,7 @@ __Pyx_RefNannySetupContext("PyInit_math_cython_pb2", 0);
   /* "math_cython_pb2.pyx":21
  *         pass
  * 
- *     def _native_Dispatch_ComputeMatrix(self, bytes req_bytes):             # <<<<<<<<<<<<<<
+ *     def _native_Dispatch_ComputeMatrix(self, bytes req_bytes, object context):             # <<<<<<<<<<<<<<
  *         cdef MathRequest req
  *         cdef MathResponse resp
 */
@@ -5614,16 +5663,16 @@ __Pyx_RefNannySetupContext("PyInit_math_cython_pb2", 0);
   if (__Pyx_SetItemOnTypeDict(__pyx_mstate_global->__pyx_ptype_15math_cython_pb2_MathServiceBase, __pyx_mstate_global->__pyx_n_u_setstate_cython, __pyx_t_2) < 0) __PYX_ERR(1, 16, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "math_cython_pb2.pyx":44
+  /* "math_cython_pb2.pyx":46
  *         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
  * 
  *     def ComputeMatrix(self, **kwargs):             # <<<<<<<<<<<<<<
  *         cdef MathRequest req
  *         cdef MathResponse resp
 */
-  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_15math_cython_pb2_19MathServiceFastStub_3ComputeMatrix, __Pyx_CYFUNCTION_CCLASS, __pyx_mstate_global->__pyx_n_u_MathServiceFastStub_ComputeMatri, NULL, __pyx_mstate_global->__pyx_n_u_math_cython_pb2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 44, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_15math_cython_pb2_19MathServiceFastStub_3ComputeMatrix, __Pyx_CYFUNCTION_CCLASS, __pyx_mstate_global->__pyx_n_u_MathServiceFastStub_ComputeMatri, NULL, __pyx_mstate_global->__pyx_n_u_math_cython_pb2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[3])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 46, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (__Pyx_SetItemOnTypeDict(__pyx_mstate_global->__pyx_ptype_15math_cython_pb2_MathServiceFastStub, __pyx_mstate_global->__pyx_n_u_ComputeMatrix, __pyx_t_2) < 0) __PYX_ERR(0, 44, __pyx_L1_error)
+  if (__Pyx_SetItemOnTypeDict(__pyx_mstate_global->__pyx_ptype_15math_cython_pb2_MathServiceFastStub, __pyx_mstate_global->__pyx_n_u_ComputeMatrix, __pyx_t_2) < 0) __PYX_ERR(0, 46, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "(tree fragment)":1
@@ -5647,16 +5696,16 @@ __Pyx_RefNannySetupContext("PyInit_math_cython_pb2", 0);
   if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_setstate_cython, __pyx_t_2) < 0) __PYX_ERR(1, 3, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "math_cython_pb2.pyx":65
+  /* "math_cython_pb2.pyx":67
  *         return res_bytes
  * 
  * def add_MathServiceServicer_to_server(servicer, server):             # <<<<<<<<<<<<<<
  *     rpc_method_handlers = {
  *         'ComputeMatrix': grpc_cython.native_unary_unary_rpc_method_handler(
 */
-  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_15math_cython_pb2_1add_MathServiceServicer_to_server, 0, __pyx_mstate_global->__pyx_n_u_add_MathServiceServicer_to_serve, NULL, __pyx_mstate_global->__pyx_n_u_math_cython_pb2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[6])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 65, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_CyFunction_New(&__pyx_mdef_15math_cython_pb2_1add_MathServiceServicer_to_server, 0, __pyx_mstate_global->__pyx_n_u_add_MathServiceServicer_to_serve, NULL, __pyx_mstate_global->__pyx_n_u_math_cython_pb2, __pyx_mstate_global->__pyx_d, ((PyObject *)__pyx_mstate_global->__pyx_codeobj_tab[6])); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 67, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_add_MathServiceServicer_to_serve, __pyx_t_2) < 0) __PYX_ERR(0, 65, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_mstate_global->__pyx_d, __pyx_mstate_global->__pyx_n_u_add_MathServiceServicer_to_serve, __pyx_t_2) < 0) __PYX_ERR(0, 67, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "(tree fragment)":1
@@ -5761,6 +5810,7 @@ static const __Pyx_StringTabEntry __pyx_string_tab[] = {
   {__pyx_k_channel, sizeof(__pyx_k_channel), 0, 1, 1}, /* PyObject cname: __pyx_n_u_channel */
   {__pyx_k_channel_2, sizeof(__pyx_k_channel_2), 0, 1, 1}, /* PyObject cname: __pyx_n_u_channel_2 */
   {__pyx_k_cline_in_traceback, sizeof(__pyx_k_cline_in_traceback), 0, 1, 1}, /* PyObject cname: __pyx_n_u_cline_in_traceback */
+  {__pyx_k_context, sizeof(__pyx_k_context), 0, 1, 1}, /* PyObject cname: __pyx_n_u_context */
   {__pyx_k_dict, sizeof(__pyx_k_dict), 0, 1, 1}, /* PyObject cname: __pyx_n_u_dict */
   {__pyx_k_dict_2, sizeof(__pyx_k_dict_2), 0, 1, 1}, /* PyObject cname: __pyx_n_u_dict_2 */
   {__pyx_k_disable, sizeof(__pyx_k_disable), 0, 1, 0}, /* PyObject cname: __pyx_kp_u_disable */
@@ -5908,8 +5958,8 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
   PyObject* tuple_dedup_map = PyDict_New();
   if (unlikely(!tuple_dedup_map)) return -1;
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 9, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 21, 97};
-    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_req_bytes, __pyx_mstate->__pyx_n_u_req, __pyx_mstate->__pyx_n_u_resp, __pyx_mstate->__pyx_n_u_req_data, __pyx_mstate->__pyx_n_u_rc, __pyx_mstate->__pyx_n_u_size, __pyx_mstate->__pyx_n_u_out_buf, __pyx_mstate->__pyx_n_u_out_bytes};
+    const __Pyx_PyCode_New_function_description descr = {3, 0, 0, 10, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 21, 97};
+    PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_req_bytes, __pyx_mstate->__pyx_n_u_context, __pyx_mstate->__pyx_n_u_req, __pyx_mstate->__pyx_n_u_resp, __pyx_mstate->__pyx_n_u_req_data, __pyx_mstate->__pyx_n_u_rc, __pyx_mstate->__pyx_n_u_size, __pyx_mstate->__pyx_n_u_out_buf, __pyx_mstate->__pyx_n_u_out_bytes};
     __pyx_mstate_global->__pyx_codeobj_tab[0] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_math_cython_pb2_pyx, __pyx_mstate->__pyx_n_u_native_Dispatch_ComputeMatrix, __pyx_k_A_A_S_1AU_1_M_WF_1_Qiq_wb_AQ_q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[0])) goto bad;
   }
   {
@@ -5923,7 +5973,7 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
     __pyx_mstate_global->__pyx_codeobj_tab[2] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_stringsource, __pyx_mstate->__pyx_n_u_setstate_cython, __pyx_k_QfA, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[2])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 10, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS|CO_VARKEYWORDS), 44, 148};
+    const __Pyx_PyCode_New_function_description descr = {1, 0, 0, 10, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS|CO_VARKEYWORDS), 46, 148};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_self, __pyx_mstate->__pyx_n_u_kwargs, __pyx_mstate->__pyx_n_u_req, __pyx_mstate->__pyx_n_u_resp, __pyx_mstate->__pyx_n_u_item, __pyx_mstate->__pyx_n_u_size, __pyx_mstate->__pyx_n_u_buf, __pyx_mstate->__pyx_n_u_req_bytes, __pyx_mstate->__pyx_n_u_call, __pyx_mstate->__pyx_n_u_res_bytes};
     __pyx_mstate_global->__pyx_codeobj_tab[3] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_math_cython_pb2_pyx, __pyx_mstate->__pyx_n_u_ComputeMatrix, __pyx_k_A_c_aq_c_aq_3m1_aq_AU_s_A_AQ_4x, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[3])) goto bad;
   }
@@ -5938,7 +5988,7 @@ static int __Pyx_CreateCodeObjects(__pyx_mstatetype *__pyx_mstate) {
     __pyx_mstate_global->__pyx_codeobj_tab[5] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_stringsource, __pyx_mstate->__pyx_n_u_setstate_cython, __pyx_k_Q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[5])) goto bad;
   }
   {
-    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 4, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 65, 52};
+    const __Pyx_PyCode_New_function_description descr = {2, 0, 0, 4, (unsigned int)(CO_OPTIMIZED|CO_NEWLOCALS), 67, 52};
     PyObject* const varnames[] = {__pyx_mstate->__pyx_n_u_servicer, __pyx_mstate->__pyx_n_u_server, __pyx_mstate->__pyx_n_u_rpc_method_handlers, __pyx_mstate->__pyx_n_u_generic_handler};
     __pyx_mstate_global->__pyx_codeobj_tab[6] = __Pyx_PyCode_New(descr, varnames, __pyx_mstate->__pyx_kp_u_math_cython_pb2_pyx, __pyx_mstate->__pyx_n_u_add_MathServiceServicer_to_serve, __pyx_k_J_a_d_2Q, tuple_dedup_map); if (unlikely(!__pyx_mstate_global->__pyx_codeobj_tab[6])) goto bad;
   }
@@ -7787,6 +7837,25 @@ static CYTHON_INLINE PyObject *__Pyx_GetItemInt_Fast(PyObject *o, Py_ssize_t i, 
     return __Pyx_GetItemInt_Generic(o, PyLong_FromSsize_t(i));
 }
 
+/* CallTypeTraverse */
+#if !CYTHON_USE_TYPE_SPECS || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX < 0x03090000)
+#else
+static int __Pyx_call_type_traverse(PyObject *o, int always_call, visitproc visit, void *arg) {
+    #if CYTHON_COMPILING_IN_LIMITED_API && __PYX_LIMITED_VERSION_HEX < 0x03090000
+    if (__Pyx_get_runtime_version() < 0x03090000) return 0;
+    #endif
+    if (!always_call) {
+        PyTypeObject *base = __Pyx_PyObject_GetSlot(o, tp_base, PyTypeObject*);
+        unsigned long flags = PyType_GetFlags(base);
+        if (flags & Py_TPFLAGS_HEAPTYPE) {
+            return 0;
+        }
+    }
+    Py_VISIT((PyObject*)Py_TYPE(o));
+    return 0;
+}
+#endif
+
 /* FixUpExtensionType */
 static int __Pyx_fix_up_extension_type_from_spec(PyType_Spec *spec, PyTypeObject *type) {
 #if PY_VERSION_HEX > 0x030900B1 || CYTHON_COMPILING_IN_LIMITED_API
@@ -8677,25 +8746,6 @@ bad:
     cached_type = NULL;
     goto done;
 }
-
-/* CallTypeTraverse */
-#if !CYTHON_USE_TYPE_SPECS || (!CYTHON_COMPILING_IN_LIMITED_API && PY_VERSION_HEX < 0x03090000)
-#else
-static int __Pyx_call_type_traverse(PyObject *o, int always_call, visitproc visit, void *arg) {
-    #if CYTHON_COMPILING_IN_LIMITED_API && __PYX_LIMITED_VERSION_HEX < 0x03090000
-    if (__Pyx_get_runtime_version() < 0x03090000) return 0;
-    #endif
-    if (!always_call) {
-        PyTypeObject *base = __Pyx_PyObject_GetSlot(o, tp_base, PyTypeObject*);
-        unsigned long flags = PyType_GetFlags(base);
-        if (flags & Py_TPFLAGS_HEAPTYPE) {
-            return 0;
-        }
-    }
-    Py_VISIT((PyObject*)Py_TYPE(o));
-    return 0;
-}
-#endif
 
 /* PyMethodNew */
 #if CYTHON_COMPILING_IN_LIMITED_API

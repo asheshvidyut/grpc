@@ -89,7 +89,7 @@ ctypedef int (*grpcio_cython_invoke_fn)(void* c_channel, grpc_native_client_call
         content.append(f"    cdef int {method.name}(self, {in_type}* req, {out_type}* resp) nogil:")
         content.append(f"        pass\n")
         
-        content.append(f"    def _native_Dispatch_{method.name}(self, bytes req_bytes):")
+        content.append(f"    def _native_Dispatch_{method.name}(self, bytes req_bytes, object context):")
         content.append(f"        cdef {in_type} req")
         content.append(f"        cdef {out_type} resp")
         content.append(f"        cdef const char* req_data = req_bytes")

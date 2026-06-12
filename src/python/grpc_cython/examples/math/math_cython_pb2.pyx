@@ -18,7 +18,7 @@ cdef class MathServiceBase:
     cdef int ComputeMatrix(self, MathRequest* req, MathResponse* resp) nogil:
         pass
 
-    def _native_Dispatch_ComputeMatrix(self, bytes req_bytes):
+    def _native_Dispatch_ComputeMatrix(self, bytes req_bytes, object context):
         cdef MathRequest req
         cdef MathResponse resp
         cdef const char* req_data = req_bytes
@@ -34,10 +34,12 @@ cdef class MathServiceBase:
         return out_bytes
 
 cdef class MathServiceFastStub:
+    cdef object channel
     cdef void* c_chan
     cdef grpcio_cython_invoke_fn invoke_fn
 
     def __init__(self, channel):
+        self.channel = channel
         self.c_chan = <void*>channel._channel
         self.invoke_fn = <grpcio_cython_invoke_fn><uintptr_t>grpc_cython.get_c_core_invoke_fn_addr()
 
