@@ -62,7 +62,17 @@ cdef class MathServiceFastStub:
             request_serializer=None, response_deserializer=None
         )
         cdef bytes res_bytes = call(req_bytes)
-        return res_bytes
+        cdef const char* res_data = res_bytes
+        resp.ParseFromArray(res_data, len(res_bytes))
+        res_dict = {}
+        cdef int result_matrix_len = resp.result_matrix_size()
+        cdef list result_matrix_list = []
+        cdef int i_result_matrix
+        cdef float* result_matrix_ptr = resp.mutable_result_matrix()
+        for i_result_matrix in range(result_matrix_len):
+            result_matrix_list.append(result_matrix_ptr[i_result_matrix])
+        res_dict['result_matrix'] = result_matrix_list
+        return res_dict
 
 def add_MathServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {

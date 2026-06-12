@@ -143,7 +143,28 @@ ctypedef int (*grpcio_cython_invoke_fn)(void* c_channel, grpc_native_client_call
         content.append(f"            request_serializer=None, response_deserializer=None")
         content.append(f"        )")
         content.append(f"        cdef bytes res_bytes = call(req_bytes)")
-        content.append(f"        return res_bytes\n")
+        content.append(f"        cdef const char* res_data = res_bytes")
+        content.append(f"        resp.ParseFromArray(res_data, len(res_bytes))")
+        content.append(f"        res_dict = {{}}")
+        out_message = next(m for m in proto_file.message_type if m.name == out_type)
+        for field in out_message.field:
+            if field.label == 3: # LABEL_REPEATED
+                c_type = "float"
+                if field.type == 1: c_type = "double"
+                elif field.type == 2: c_type = "float"
+                elif field.type == 5: c_type = "int"
+                elif field.type == 3: c_type = "long"
+                
+                content.append(f"        cdef int {field.name}_len = resp.{field.name}_size()")
+                content.append(f"        cdef list {field.name}_list = []")
+                content.append(f"        cdef int i_{field.name}")
+                content.append(f"        cdef {c_type}* {field.name}_ptr = resp.mutable_{field.name}()")
+                content.append(f"        for i_{field.name} in range({field.name}_len):")
+                content.append(f"            {field.name}_list.append({field.name}_ptr[i_{field.name}])")
+                content.append(f"        res_dict['{field.name}'] = {field.name}_list")
+            else:
+                content.append(f"        res_dict['{field.name}'] = resp.{field.name}()")
+        content.append(f"        return res_dict\n")
 
     content.append(f"def add_{service.name}Servicer_to_server(servicer, server):")
     content.append(f"    rpc_method_handlers = {{")
