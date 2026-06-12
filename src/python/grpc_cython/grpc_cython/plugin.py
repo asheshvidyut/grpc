@@ -84,6 +84,20 @@ cdef extern from "grpcio_native/handler.h":
         content.append(f"        # TODO: Auto-Deserialization of call.resp_data happens here")
         content.append(f"        return dict()  # Return the unwrapped output\n")
 
+    content.append(f"def add_{service.name}Servicer_to_server(servicer, server):")
+    content.append(f"    rpc_method_handlers = {{")
+    for method in service.method:
+        content.append(f"        '{method.name}': grpc_cython.native_unary_unary_rpc_method_handler(")
+        content.append(f"            servicer_instance=servicer,")
+        content.append(f"            method_name='{method.name}'")
+        content.append(f"        ),")
+    content.append(f"    }}")
+    content.append(f"    generic_handler = grpc.method_handlers_generic_handler(")
+    content.append(f"        '{proto_file.package}.{service.name}', rpc_method_handlers")
+    content.append(f"    )")
+    content.append(f"    server.add_generic_rpc_handlers((generic_handler,))")
+    content.append(f"")
+
     return "\n".join(content)
 
 def main():

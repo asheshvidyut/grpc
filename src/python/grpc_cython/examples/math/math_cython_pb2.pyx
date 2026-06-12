@@ -3,8 +3,16 @@ import grpc
 import grpc_cython
 from libc.stdlib cimport malloc, free
 
-# Import C++ Headers from the PXD
-from math_cython_pb2 cimport MathServiceBase
+cdef class MathServiceBase:
+    # Python entry point for the custom gRPC handler (called with raw bytes)
+    def _native_Dispatch_ComputeMatrix(self, bytes request_bytes, context):
+        # TODO: C++ Protobuf ParseFromArray(request_bytes) -> MathRequest
+        # rc = self.ComputeMatrix(&req, &resp)
+        # TODO: C++ Protobuf SerializeToArray(&resp) -> bytes
+        return b"" # Returns raw serialized bytes to gRPC
+        
+    cdef int ComputeMatrix(self, MathRequest* req, MathResponse* resp) nogil:
+        pass
 
 cdef extern from "grpcio_native/handler.h":
     ctypedef struct grpc_native_client_call:
@@ -34,3 +42,17 @@ cdef class MathServiceFastStub:
         if rc != 0: raise RuntimeError('RPC Failed')
         # TODO: Auto-Deserialization of call.resp_data happens here
         return dict()  # Return the unwrapped output
+
+def add_MathServiceServicer_to_server(servicer, server):
+    # This automatically bypasses Python protobuf deserialization
+    # and routes raw C-Core bytes directly to your Cython FastMathService
+    rpc_method_handlers = {
+        "ComputeMatrix": grpc_cython.native_unary_unary_rpc_method_handler(
+            servicer_instance=servicer,
+            method_name="ComputeMatrix"
+        )
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+        "mypackage.MathService", rpc_method_handlers
+    )
+    server.add_generic_rpc_handlers((generic_handler,))
