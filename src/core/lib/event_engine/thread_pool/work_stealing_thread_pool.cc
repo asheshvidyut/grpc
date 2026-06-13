@@ -15,9 +15,9 @@
 // limitations under the License.
 //
 //
-#include <absl/log/log.h>
 #include "src/core/lib/event_engine/thread_pool/work_stealing_thread_pool.h"
 
+#include <absl/log/log.h>
 #include <grpc/support/port_platform.h>
 #include <grpc/support/thd_id.h>
 #include <inttypes.h>
@@ -229,7 +229,9 @@ WorkStealingThreadPool::WorkStealingThreadPoolImpl::WorkStealingThreadPoolImpl(
     : reserve_threads_(reserve_threads), queue_(this) {}
 
 void WorkStealingThreadPool::WorkStealingThreadPoolImpl::Start() {
-  LOG(ERROR) << "WorkStealingThreadPool::WorkStealingThreadPoolImpl::Start: spawning with reserve_threads_=" << reserve_threads_;
+  LOG(ERROR) << "WorkStealingThreadPool::WorkStealingThreadPoolImpl::Start: "
+                "spawning with reserve_threads_="
+             << reserve_threads_;
   for (size_t i = 0; i < reserve_threads_; i++) {
     StartThread();
   }
