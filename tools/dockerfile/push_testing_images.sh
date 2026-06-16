@@ -77,8 +77,6 @@ EXCLUDE_DIRS=(
   tools/dockerfile/distribtest/csharp_dotnet5_x64
   tools/dockerfile/interoptest/grpc_interop_go1.8
   tools/dockerfile/interoptest/grpc_interop_go1.11
-  tools/dockerfile/test/cxx_gcc_7_x64
-  tools/dockerfile/test/cxx_gcc_8_x64
 )
 
 # a list of docker directories that are based on ARM64 base images
@@ -290,6 +288,7 @@ do
   fi
 
   DOCKER_IMAGE_NAME=$(basename "$DOCKERFILE_DIR")
+
   LOG_FILE="reports/${DOCKERFILE_DIR}/sponge_log.log"
 
   mkdir -p "reports/${DOCKERFILE_DIR}"
