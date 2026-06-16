@@ -173,7 +173,9 @@ async def start_test_server(
 
     server.add_generic_rpc_handlers((_create_extra_generic_handler(servicer),))
 
-    bind_addr = "127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "[::]:%d"
+    bind_addr = (
+        "127.0.0.1:%d" if __import__("sys").platform == "darwin" else "[::]:%d"
+    )
     if secure:
         if server_credentials is None:
             server_credentials = grpc.ssl_server_credentials(
@@ -186,5 +188,9 @@ async def start_test_server(
     await server.start()
 
     # NOTE(lidizheng) returning the server to prevent it from deallocation
-    target_addr = "127.0.0.1:%d" if __import__('sys').platform == 'darwin' else "localhost:%d"
+    target_addr = (
+        "127.0.0.1:%d"
+        if __import__("sys").platform == "darwin"
+        else "localhost:%d"
+    )
     return target_addr % port, server

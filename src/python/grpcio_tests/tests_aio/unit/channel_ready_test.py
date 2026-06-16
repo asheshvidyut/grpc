@@ -32,11 +32,15 @@ from tests_aio.unit._test_server import start_test_server
 
 class TestChannelReady(AioTestBase):
     async def setUp(self):
-        address = "127.0.0.1" if __import__('sys').platform == 'darwin' else "localhost"
+        address = (
+            "127.0.0.1"
+            if __import__("sys").platform == "darwin"
+            else "localhost"
+        )
         _, self._port, self._socket = get_socket(
             bind_address=address,
             listen=False,
-            sock_options=(socket.SO_REUSEADDR,)
+            sock_options=(socket.SO_REUSEADDR,),
         )
         self._channel = aio.insecure_channel(f"{address}:{self._port}")
         self._socket.close()

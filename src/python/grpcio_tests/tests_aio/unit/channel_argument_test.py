@@ -69,12 +69,20 @@ _INVALID_TEST_CHANNEL_ARGS = [
 
 
 async def test_if_reuse_port_enabled(server: aio.Server):
-    port = server.add_insecure_port("127.0.0.1:0" if __import__('sys').platform == 'darwin' else "localhost:0")
+    port = server.add_insecure_port(
+        "127.0.0.1:0"
+        if __import__("sys").platform == "darwin"
+        else "localhost:0"
+    )
     await server.start()
 
     try:
         with common.bound_socket(
-            bind_address=("127.0.0.1" if __import__('sys').platform == 'darwin' else "localhost"),
+            bind_address=(
+                "127.0.0.1"
+                if __import__("sys").platform == "darwin"
+                else "localhost"
+            ),
             port=port,
             listen=False,
         ) as (unused_host, bound_port):
