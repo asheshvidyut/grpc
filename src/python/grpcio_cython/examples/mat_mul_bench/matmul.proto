@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package matmul;
+
+service MatMulService {
+  rpc MatMul (MatMulRequest) returns (MatMulResponse);
+}
+
+message MatMulRequest {
+  int32 n = 1;
+  repeated float a = 2;
+  repeated float b = 3;
+}
+
+message MatMulResponse {
+  repeated float c = 1;
+}

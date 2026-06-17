@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package echo;
+
+service EchoService {
+    rpc Echo(EchoRequest) returns (EchoResponse);
+    rpc MatMul(MatMulRequest) returns (MatMulResponse);
+}
+
+message EchoRequest {
+    string message = 1;
+}
+
+message EchoResponse {
+    string message = 2;
+}
+
+message MatMulRequest {
+    int32 n = 1;
+    repeated float a = 2;
+    repeated float b = 3;
+}
+
+message MatMulResponse {
+    repeated float c = 4;
+}
