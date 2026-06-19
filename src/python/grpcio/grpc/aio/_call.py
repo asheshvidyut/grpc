@@ -189,7 +189,7 @@ def _create_rpc_error(
     )
 
 
-class Call:
+class Call(Generic[RequestType, ResponseType]):
     """Base implementation of client RPC Call object.
 
     Implements logic around final status, metadata and cancellation.
@@ -199,15 +199,15 @@ class Call:
     _code: grpc.StatusCode
     _cython_call: cygrpc._AioCall
     _metadata: Tuple[MetadatumType, ...]
-    _request_serializer: Optional[SerializingFunction]
-    _response_deserializer: Optional[DeserializingFunction]
+    _request_serializer: Optional[SerializingFunction[RequestType]]
+    _response_deserializer: Optional[DeserializingFunction[ResponseType]]
 
     def __init__(
         self,
         cython_call: cygrpc._AioCall,
         metadata: Metadata,
-        request_serializer: Optional[SerializingFunction],
-        response_deserializer: Optional[DeserializingFunction],
+        request_serializer: Optional[SerializingFunction[RequestType]],
+        response_deserializer: Optional[DeserializingFunction[ResponseType]],
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         self._loop = loop
@@ -260,10 +260,10 @@ class Call:
         cygrpc_code = (await self._cython_call.status()).code()
         return _common.CYGRPC_STATUS_CODE_TO_STATUS_CODE[cygrpc_code]
 
-    async def details(self) -> str:
+    async def details(self) -> Optional[str]:
         return (await self._cython_call.status()).details()
 
-    async def debug_error_string(self) -> str:
+    async def debug_error_string(self) -> Optional[str]:
         return (await self._cython_call.status()).debug_error_string()
 
     async def _raise_for_status(self) -> None:
@@ -292,10 +292,12 @@ class _APIStyle(enum.IntEnum):
     READER_WRITER = 2
 
 
-class _UnaryResponseMixin(Call, Generic[ResponseType]):
-    _call_response: asyncio.Task
+class _UnaryResponseMixin(Call[Any, ResponseType], Generic[ResponseType]):
+    _call_response: asyncio.Task[ResponseType]
 
-    def _init_unary_response_mixin(self, response_task: asyncio.Task):
+    def _init_unary_response_mixin(
+        self, response_task: asyncio.Task[ResponseType]
+    ):
         self._call_response = response_task
 
     def cancel(self) -> bool:
@@ -334,12 +336,14 @@ class _UnaryResponseMixin(Call, Generic[ResponseType]):
             return response
 
 
-class _StreamResponseMixin(Call, Generic[ResponseType]):
+class _StreamResponseMixin(Call[Any, ResponseType], Generic[ResponseType]):
     _message_aiter: Optional[AsyncIterator[ResponseType]]
-    _preparation: asyncio.Task
+    _preparation: asyncio.Task[Optional[AsyncIterator[ResponseType]]]
     _response_style: _APIStyle
 
-    def _init_stream_response_mixin(self, preparation: asyncio.Task):
+    def _init_stream_response_mixin(
+        self, preparation: asyncio.Task[Optional[AsyncIterator[ResponseType]]]
+    ):
         self._message_aiter = None
         self._preparation = preparation
         self._response_style = _APIStyle.UNKNOWN
@@ -401,14 +405,14 @@ class _StreamResponseMixin(Call, Generic[ResponseType]):
         return response_message
 
 
-class _StreamRequestMixin(Call, Generic[RequestType]):
+class _StreamRequestMixin(Call[RequestType, Any], Generic[RequestType]):
     _metadata_sent: asyncio.Event
     _done_writing_flag: bool
-    _async_request_poller: Optional[asyncio.Task]
+    _async_request_poller: Optional[asyncio.Task[None]]
     _request_style: _APIStyle
 
     def _init_stream_request_mixin(
-        self, request_iterator: Optional[RequestIterableType]
+        self, request_iterator: Optional[RequestIterableType[RequestType]]
     ):
         self._metadata_sent = asyncio.Event()
         self._done_writing_flag = False
@@ -438,7 +442,7 @@ class _StreamRequestMixin(Call, Generic[RequestType]):
         self._metadata_sent.set()
 
     async def _consume_request_iterator(
-        self, request_iterator: RequestIterableType
+        self, request_iterator: RequestIterableType[RequestType]
     ) -> None:
         try:
             if isinstance(request_iterator, AsyncIterable):
@@ -542,7 +546,7 @@ class _StreamRequestMixin(Call, Generic[RequestType]):
 
 class UnaryUnaryCall(
     _UnaryResponseMixin[ResponseType],
-    Call,
+    Call[RequestType, ResponseType],
     _base_call.UnaryUnaryCall[RequestType, ResponseType],
 ):
     """Object for managing unary-unary RPC calls.
@@ -551,7 +555,7 @@ class UnaryUnaryCall(
     """
 
     _request: RequestType
-    _invocation_task: asyncio.Task
+    _invocation_task: asyncio.Task[ResponseType]
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -563,8 +567,8 @@ class UnaryUnaryCall(
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
         method: bytes,
-        request_serializer: Optional[SerializingFunction],
-        response_deserializer: Optional[DeserializingFunction],
+        request_serializer: Optional[SerializingFunction[RequestType]],
+        response_deserializer: Optional[DeserializingFunction[ResponseType]],
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         super().__init__(
@@ -609,7 +613,7 @@ class UnaryUnaryCall(
 
 class UnaryStreamCall(
     _StreamResponseMixin[ResponseType],
-    Call,
+    Call[RequestType, ResponseType],
     _base_call.UnaryStreamCall[RequestType, ResponseType],
 ):
     """Object for managing unary-stream RPC calls.
@@ -618,7 +622,7 @@ class UnaryStreamCall(
     """
 
     _request: RequestType
-    _send_unary_request_task: asyncio.Task
+    _send_unary_request_task: asyncio.Task[None]
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -630,8 +634,8 @@ class UnaryStreamCall(
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
         method: bytes,
-        request_serializer: Optional[SerializingFunction],
-        response_deserializer: Optional[DeserializingFunction],
+        request_serializer: Optional[SerializingFunction[RequestType]],
+        response_deserializer: Optional[DeserializingFunction[ResponseType]],
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         super().__init__(
@@ -671,7 +675,7 @@ class UnaryStreamCall(
 class StreamUnaryCall(
     _StreamRequestMixin[RequestType],
     _UnaryResponseMixin[ResponseType],
-    Call,
+    Call[RequestType, ResponseType],
     _base_call.StreamUnaryCall[RequestType, ResponseType],
 ):
     """Object for managing stream-unary RPC calls.
@@ -682,15 +686,15 @@ class StreamUnaryCall(
     # pylint: disable=too-many-arguments
     def __init__(
         self,
-        request_iterator: Optional[RequestIterableType],
+        request_iterator: Optional[RequestIterableType[RequestType]],
         deadline: Optional[float],
         metadata: Metadata,
         credentials: Optional[grpc.CallCredentials],
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
         method: bytes,
-        request_serializer: Optional[SerializingFunction],
-        response_deserializer: Optional[DeserializingFunction],
+        request_serializer: Optional[SerializingFunction[RequestType]],
+        response_deserializer: Optional[DeserializingFunction[ResponseType]],
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         super().__init__(
@@ -725,7 +729,7 @@ class StreamUnaryCall(
 class StreamStreamCall(
     _StreamRequestMixin[RequestType],
     _StreamResponseMixin[ResponseType],
-    Call,
+    Call[RequestType, ResponseType],
     _base_call.StreamStreamCall[RequestType, ResponseType],
 ):
     """Object for managing stream-stream RPC calls.
@@ -733,20 +737,20 @@ class StreamStreamCall(
     Returned when an instance of `StreamStreamMultiCallable` object is called.
     """
 
-    _initializer: asyncio.Task
+    _initializer: asyncio.Task[None]
 
     # pylint: disable=too-many-arguments
     def __init__(
         self,
-        request_iterator: Optional[RequestIterableType],
+        request_iterator: Optional[RequestIterableType[RequestType]],
         deadline: Optional[float],
         metadata: Metadata,
         credentials: Optional[grpc.CallCredentials],
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
         method: bytes,
-        request_serializer: Optional[SerializingFunction],
-        response_deserializer: Optional[DeserializingFunction],
+        request_serializer: Optional[SerializingFunction[RequestType]],
+        response_deserializer: Optional[DeserializingFunction[ResponseType]],
         loop: asyncio.AbstractEventLoop,
     ) -> None:
         super().__init__(
