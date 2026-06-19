@@ -38,8 +38,8 @@ from ._metadata import MetadatumType
 
 RequestType = TypeVar("RequestType")
 ResponseType = TypeVar("ResponseType")
-SerializingFunction = Callable[[Any], bytes]
-DeserializingFunction = Callable[[bytes], Any]
+SerializingFunction = Callable[[RequestType], bytes]
+DeserializingFunction = Callable[[bytes], ResponseType]
 ChannelArgumentType = Sequence[Tuple[str, Any]]
 EOFType: TypeAlias = type(EOF)
 DoneCallbackType = Callable[[Any], None]
