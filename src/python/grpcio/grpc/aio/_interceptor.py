@@ -131,7 +131,8 @@ class UnaryUnaryClientInterceptor(ClientInterceptor, metaclass=ABCMeta):
     async def intercept_unary_unary(
         self,
         continuation: Callable[
-            [ClientCallDetails, RequestType], UnaryUnaryCall[RequestType, ResponseType]
+            [ClientCallDetails, RequestType],
+            UnaryUnaryCall[RequestType, ResponseType],
         ],
         client_call_details: ClientCallDetails,
         request: RequestType,
@@ -167,11 +168,15 @@ class UnaryStreamClientInterceptor(ClientInterceptor, metaclass=ABCMeta):
     async def intercept_unary_stream(
         self,
         continuation: Callable[
-            [ClientCallDetails, RequestType], UnaryStreamCall[RequestType, ResponseType]
+            [ClientCallDetails, RequestType],
+            UnaryStreamCall[RequestType, ResponseType],
         ],
         client_call_details: ClientCallDetails,
         request: RequestType,
-    ) -> Union[ResponseIterableType[ResponseType], UnaryStreamCall[RequestType, ResponseType]]:
+    ) -> Union[
+        ResponseIterableType[ResponseType],
+        UnaryStreamCall[RequestType, ResponseType],
+    ]:
         """Intercepts a unary-stream invocation asynchronously.
 
         The function could return the call object or an asynchronous
@@ -207,7 +212,8 @@ class StreamUnaryClientInterceptor(ClientInterceptor, metaclass=ABCMeta):
     async def intercept_stream_unary(
         self,
         continuation: Callable[
-            [ClientCallDetails, RequestType], StreamUnaryCall[RequestType, ResponseType]
+            [ClientCallDetails, RequestType],
+            StreamUnaryCall[RequestType, ResponseType],
         ],
         client_call_details: ClientCallDetails,
         request_iterator: RequestIterableType[RequestType],
