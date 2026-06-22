@@ -154,12 +154,16 @@ class ChannelzServicerTest(AioTestBase):
         return resp.server[0]
 
     async def _send_successful_unary_unary(self, pair):
-        call = pair.channel.unary_unary(_SUCCESSFUL_UNARY_UNARY)(_REQUEST)
+        call = pair.channel.unary_unary(_SUCCESSFUL_UNARY_UNARY)(
+            _REQUEST, wait_for_ready=True
+        )
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def _send_failed_unary_unary(self, pair):
         try:
-            await pair.channel.unary_unary(_FAILED_UNARY_UNARY)(_REQUEST)
+            await pair.channel.unary_unary(_FAILED_UNARY_UNARY)(
+                _REQUEST, wait_for_ready=True
+            )
         except grpc.RpcError:
             return
         else:
@@ -167,7 +171,8 @@ class ChannelzServicerTest(AioTestBase):
 
     async def _send_successful_stream_stream(self, pair):
         call = pair.channel.stream_stream(_SUCCESSFUL_STREAM_STREAM)(
-            iter([_REQUEST] * test_constants.STREAM_LENGTH)
+            iter([_REQUEST] * test_constants.STREAM_LENGTH),
+            wait_for_ready=True,
         )
         cnt = 0
         async for _ in call:
