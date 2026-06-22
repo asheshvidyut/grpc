@@ -234,7 +234,6 @@ def _unary_unary_client(channel, multicallable_kwargs, message):
         grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
         _registered_method=True,
     )
-    multicallable_kwargs["wait_for_ready"] = True
     response = multi_callable(message, **multicallable_kwargs)
     if response != message:
         raise RuntimeError(
@@ -247,7 +246,6 @@ def _unary_stream_client(channel, multicallable_kwargs, message):
         grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_STREAM),
         _registered_method=True,
     )
-    multicallable_kwargs["wait_for_ready"] = True
     response_iterator = multi_callable(message, **multicallable_kwargs)
     for response in response_iterator:
         if response != message:
@@ -262,7 +260,6 @@ def _stream_unary_client(channel, multicallable_kwargs, message):
         _registered_method=True,
     )
     requests = (_REQUEST for _ in range(_STREAM_LENGTH))
-    multicallable_kwargs["wait_for_ready"] = True
     response = multi_callable(requests, **multicallable_kwargs)
     if response != message:
         raise RuntimeError(
@@ -279,7 +276,6 @@ def _stream_stream_client(channel, multicallable_kwargs, message):
     requests = (
         request_prefix + str(i).encode("ascii") for i in range(_STREAM_LENGTH)
     )
-    multicallable_kwargs["wait_for_ready"] = True
     response_iterator = multi_callable(requests, **multicallable_kwargs)
     for i, response in enumerate(response_iterator):
         if int(response.decode("ascii")) != i:
