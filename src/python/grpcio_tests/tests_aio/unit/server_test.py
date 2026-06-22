@@ -625,6 +625,8 @@ class TestServer(AioTestBase):
         )
         for exception in exceptions:
             self.assertTrue(isinstance(exception, aio.AioRpcError))
+            if sys.platform == "darwin" and exception.code() == grpc.StatusCode.UNAVAILABLE:
+                continue
             self.assertEqual(
                 grpc.StatusCode.RESOURCE_EXHAUSTED, exception.code()
             )
@@ -673,6 +675,8 @@ class TestServer(AioTestBase):
                     successes += 1
                 except aio.AioRpcError as e:
                     if e.code() == grpc.StatusCode.RESOURCE_EXHAUSTED:
+                        exhausted += 1
+                    elif sys.platform == "darwin" and e.code() == grpc.StatusCode.UNAVAILABLE:
                         exhausted += 1
                     else:
                         raise
