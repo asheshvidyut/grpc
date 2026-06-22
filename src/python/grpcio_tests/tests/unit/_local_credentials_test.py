@@ -67,8 +67,8 @@ class LocalCredentialsTest(unittest.TestCase):
     def test_uds(self):
         # Use a per-test-run temp dir so parallel test invocations
         # (e.g. --runs_per_test) don't fight over the same UDS path.
-        import tempfile
         import shutil
+        import tempfile
 
         temp_dir = tempfile.mkdtemp()
         server_addr = "unix:{}".format(os.path.join(temp_dir, "grpc_uds.sock"))

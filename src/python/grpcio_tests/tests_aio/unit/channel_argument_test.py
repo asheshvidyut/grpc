@@ -98,7 +98,9 @@ class TestChannelArgument(AioTestBase):
         "SO_REUSEPORT only available in Linux-like OS.",
     )
     @unittest.skipIf(
-        any(arch in platform.machine().lower() for arch in ("aarch64", "arm64")),
+        any(
+            arch in platform.machine().lower() for arch in ("aarch64", "arm64")
+        ),
         "SO_REUSEPORT needs to be enabled in Core's port.h.",
     )
     async def test_server_so_reuse_port_is_set_properly(self):

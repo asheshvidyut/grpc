@@ -164,11 +164,10 @@ def _instrumented_client_server_pair(
     channel_kwargs, server_kwargs, server_handler
 ):
     import sys
+
     server_options = ()
     if sys.platform == "darwin":
-        server_options = (
-            ('grpc.so_reuseport', 0),
-        )
+        server_options = (("grpc.so_reuseport", 0),)
     server = grpc.server(
         futures.ThreadPoolExecutor(), options=server_options, **server_kwargs
     )
@@ -195,7 +194,9 @@ def _get_byte_counts(
     message,
 ):
     import sys
+
     import grpc
+
     if sys.platform == "darwin":
         for attempt in range(5):
             try:
@@ -203,11 +204,14 @@ def _get_byte_counts(
                     channel_kwargs, server_kwargs, server_handler
                 ) as pipeline:
                     client_channel, proxy, server = pipeline
-                    client_function(client_channel, multicallable_kwargs, message)
+                    client_function(
+                        client_channel, multicallable_kwargs, message
+                    )
                     return proxy.get_byte_count()
             except grpc.RpcError as e:
                 if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 4:
                     import time
+
                     time.sleep(0.5)
                     continue
                 raise
