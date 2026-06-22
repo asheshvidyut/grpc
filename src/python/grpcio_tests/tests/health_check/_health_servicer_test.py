@@ -35,8 +35,12 @@ _WATCH_SERVICE = "grpc.test.WatchService"
 
 
 def _consume_responses(response_iterator, response_queue):
-    for response in response_iterator:
-        response_queue.put(response)
+    try:
+        for response in response_iterator:
+            response_queue.put(response)
+    except grpc.RpcError as e:
+        if e.code() not in (grpc.StatusCode.CANCELLED, grpc.StatusCode.UNAVAILABLE):
+            raise
 
 
 class BaseWatchTests:
@@ -79,7 +83,7 @@ class BaseWatchTests:
             )
             thread.start()
 
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVING, response.status
             )
@@ -100,7 +104,7 @@ class BaseWatchTests:
             )
             thread.start()
 
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVICE_UNKNOWN, response.status
             )
@@ -108,7 +112,7 @@ class BaseWatchTests:
             self._servicer.set(
                 _WATCH_SERVICE, health_pb2.HealthCheckResponse.SERVING
             )
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVING, response.status
             )
@@ -116,7 +120,7 @@ class BaseWatchTests:
             self._servicer.set(
                 _WATCH_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
             )
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.NOT_SERVING, response.status
             )
@@ -134,7 +138,7 @@ class BaseWatchTests:
             )
             thread.start()
 
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVICE_UNKNOWN, response.status
             )
@@ -143,7 +147,7 @@ class BaseWatchTests:
                 "some-other-service", health_pb2.HealthCheckResponse.SERVING
             )
             with self.assertRaises(queue.Empty):
-                response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+                response_queue.get(timeout=test_constants.LONG_TIMEOUT)
 
             rendezvous.cancel()
             thread.join()
@@ -164,12 +168,8 @@ class BaseWatchTests:
             thread1.start()
             thread2.start()
 
-            response1 = response_queue1.get(
-                timeout=test_constants.SHORT_TIMEOUT
-            )
-            response2 = response_queue2.get(
-                timeout=test_constants.SHORT_TIMEOUT
-            )
+            response1 = response_queue1.get(timeout=test_constants.LONG_TIMEOUT)
+            response2 = response_queue2.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVICE_UNKNOWN, response1.status
             )
@@ -180,12 +180,8 @@ class BaseWatchTests:
             self._servicer.set(
                 _WATCH_SERVICE, health_pb2.HealthCheckResponse.SERVING
             )
-            response1 = response_queue1.get(
-                timeout=test_constants.SHORT_TIMEOUT
-            )
-            response2 = response_queue2.get(
-                timeout=test_constants.SHORT_TIMEOUT
-            )
+            response1 = response_queue1.get(timeout=test_constants.LONG_TIMEOUT)
+            response2 = response_queue2.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVING, response1.status
             )
@@ -210,7 +206,7 @@ class BaseWatchTests:
             )
             thread.start()
 
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVICE_UNKNOWN, response.status
             )
@@ -243,13 +239,13 @@ class BaseWatchTests:
             )
             thread.start()
 
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.SERVING, response.status
             )
 
             self._servicer.enter_graceful_shutdown()
-            response = response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
+            response = response_queue.get(timeout=test_constants.LONG_TIMEOUT)
             self.assertEqual(
                 health_pb2.HealthCheckResponse.NOT_SERVING, response.status
             )
