@@ -73,6 +73,7 @@ python_bazel_tests/bazel_wrapper \
   --output_base=.bazel_rbe \
   --bazelrc=tools/remote_build/mac.bazelrc \
   test \
+  --local_test_jobs=4 \
   --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   ${BAZEL_FLAGS} \
@@ -86,6 +87,7 @@ python_bazel_tests_single_threaded_unary_streams/bazel_wrapper \
   --output_base=.bazel_rbe \
   --bazelrc=tools/remote_build/mac.bazelrc \
   test \
+  --local_test_jobs=4 \
   --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   --config=python_single_threaded_unary_stream \
@@ -101,6 +103,7 @@ python_bazel_tests_fork_support/bazel_wrapper \
   --output_base=.bazel_rbe \
   --bazelrc=tools/remote_build/mac.bazelrc \
   test \
+  --local_test_jobs=4 \
   --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   --config=fork_support \
