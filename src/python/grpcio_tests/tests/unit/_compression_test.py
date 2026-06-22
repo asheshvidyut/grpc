@@ -194,8 +194,10 @@ def _get_byte_counts(
                 client_channel, proxy, server = pipeline
                 client_function(client_channel, multicallable_kwargs, message)
                 return proxy.get_byte_count()
-        except grpc.RpcError as e:
-            if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 9:
+        except (grpc.RpcError, TimeoutError, ConnectionError) as e:
+            if isinstance(e, grpc.RpcError) and e.code() != grpc.StatusCode.UNAVAILABLE:
+                raise
+            if attempt < 9:
                 import time
 
                 time.sleep(0.1)
