@@ -81,7 +81,7 @@ class TcpProxy:
                     data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
                 except ConnectionResetError:
                     data = b""
-                
+
                 if not data:
                     self._stop_event.set()
                     continue

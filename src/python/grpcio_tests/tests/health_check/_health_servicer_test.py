@@ -39,7 +39,10 @@ def _consume_responses(response_iterator, response_queue):
         for response in response_iterator:
             response_queue.put(response)
     except grpc.RpcError as e:
-        if e.code() not in (grpc.StatusCode.CANCELLED, grpc.StatusCode.UNAVAILABLE):
+        if e.code() not in (
+            grpc.StatusCode.CANCELLED,
+            grpc.StatusCode.UNAVAILABLE,
+        ):
             raise
 
 
