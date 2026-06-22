@@ -197,6 +197,7 @@ def _get_byte_counts(
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 9:
                 import time
+
                 time.sleep(0.1)
                 continue
             raise
