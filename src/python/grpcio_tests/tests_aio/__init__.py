@@ -22,16 +22,16 @@ if sys.platform == "darwin":
     except RuntimeError:
         pass
 
-from grpc.experimental import aio
-_original_aio_server = aio.server
-def _aio_server(*args, **kwargs):
-    options = kwargs.get('options', None)
-    options = list(options) if options else []
-    if not any(k == 'grpc.so_reuseport' for k, v in options):
-        options.append(('grpc.so_reuseport', 0))
-    kwargs['options'] = tuple(options)
-    return _original_aio_server(*args, **kwargs)
-aio.server = _aio_server
+    from grpc.experimental import aio
+    _original_aio_server = aio.server
+    def _aio_server(*args, **kwargs):
+        options = kwargs.get('options', None)
+        options = list(options) if options else []
+        if not any(k == 'grpc.so_reuseport' for k, v in options):
+            options.append(('grpc.so_reuseport', 0))
+        kwargs['options'] = tuple(options)
+        return _original_aio_server(*args, **kwargs)
+    aio.server = _aio_server
 
 Loader = _loader.Loader
 Runner = _runner.Runner
