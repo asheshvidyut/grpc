@@ -477,7 +477,10 @@ class ChannelzServicerTest(AioTestBase):
         pairs = await _create_channel_server_pairs(1, self._channelz_stub)
 
         resp = await self._get_server_by_ref_id(pairs[0].server_ref_id)
-        self.assertEqual(len(resp.listen_socket), 1)
+        if sys.platform == "darwin":
+            self.assertEqual(len(resp.listen_socket), 2)
+        else:
+            self.assertEqual(len(resp.listen_socket), 1)
 
         gs_resp: channelz_pb2.GetSocketResponse = (
             await self._channelz_stub.GetSocket(
