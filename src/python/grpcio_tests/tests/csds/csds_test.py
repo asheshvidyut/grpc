@@ -92,7 +92,13 @@ class TestCsds(unittest.TestCase):
 
         # The resource request will fail with DOES_NOT_EXIST (after 15s)
         while True:
-            resp = self.get_xds_config_dump()
+            try:
+                resp = self.get_xds_config_dump()
+            except grpc.RpcError as e:
+                if e.code() == grpc.StatusCode.UNAVAILABLE:
+                    time.sleep(1)
+                    continue
+                raise
             # Check node is setup in the CSDS response
             self.assertEqual(1, len(resp.config))
             self.assertEqual("python_test_csds", resp.config[0].node.id)

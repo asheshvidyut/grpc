@@ -81,6 +81,11 @@ class TcpProxy:
                     data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
                 except ConnectionResetError:
                     data = b""
+                
+                if not data:
+                    self._stop_event.set()
+                    continue
+
                 with self._byte_count_lock:
                     self._received_byte_count += len(data)
                 self._northbound_data += data
@@ -102,11 +107,17 @@ class TcpProxy:
         for socket_to_write in sockets_to_write:
             if socket_to_write is self._proxy_socket:
                 if self._southbound_data:
-                    self._proxy_socket.sendall(self._southbound_data)
+                    try:
+                        self._proxy_socket.sendall(self._southbound_data)
+                    except (ConnectionResetError, BrokenPipeError):
+                        pass
                     self._southbound_data = b""
             elif socket_to_write in self._client_sockets:
                 if self._northbound_data:
-                    socket_to_write.sendall(self._northbound_data)
+                    try:
+                        socket_to_write.sendall(self._northbound_data)
+                    except (ConnectionResetError, BrokenPipeError):
+                        pass
                     self._northbound_data = b""
 
     def _run_proxy(self):
