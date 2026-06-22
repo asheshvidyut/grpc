@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import multiprocessing
+
 from tests import _loader
 from tests import _runner
-import multiprocessing
+
 try:
     multiprocessing.set_start_method("fork", force=True)
 except RuntimeError:
