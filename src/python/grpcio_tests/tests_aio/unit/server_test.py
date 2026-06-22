@@ -442,7 +442,7 @@ class TestServer(AioTestBase):
         if sys.platform == "darwin":
             self.assertIn(
                 exception_context.exception.code(),
-                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED)
+                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
             )
         else:
             self.assertEqual(
@@ -485,7 +485,7 @@ class TestServer(AioTestBase):
         if sys.platform == "darwin":
             self.assertIn(
                 exception_context.exception.code(),
-                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED)
+                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
             )
         else:
             self.assertEqual(
@@ -520,7 +520,7 @@ class TestServer(AioTestBase):
         if sys.platform == "darwin":
             self.assertIn(
                 await call.code(),
-                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED)
+                (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
             )
         else:
             self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
