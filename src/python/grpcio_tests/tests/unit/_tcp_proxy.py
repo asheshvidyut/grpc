@@ -77,12 +77,18 @@ class TcpProxy:
                 client_socket, client_address = socket_to_read.accept()
                 self._client_sockets.append(client_socket)
             elif socket_to_read is self._proxy_socket:
-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                try:
+                    data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                except ConnectionResetError:
+                    data = b""
                 with self._byte_count_lock:
                     self._received_byte_count += len(data)
                 self._northbound_data += data
             elif socket_to_read in self._client_sockets:
-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                try:
+                    data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                except ConnectionResetError:
+                    data = b""
                 if data:
                     with self._byte_count_lock:
                         self._sent_byte_count += len(data)
