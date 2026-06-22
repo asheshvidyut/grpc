@@ -20,7 +20,7 @@ import sys
 
 _DEFAULT_SOCK_OPTIONS = (
     (socket.SO_REUSEADDR, socket.SO_REUSEPORT)
-    if os.name != "nt" and sys.platform != "darwin"
+    if os.name != "nt"
     else (socket.SO_REUSEADDR,)
 )
 _UNRECOVERABLE_ERRNOS = (errno.EADDRINUSE, errno.ENOSR)

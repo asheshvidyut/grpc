@@ -14,6 +14,11 @@
 
 from tests import _loader
 from tests import _runner
+import multiprocessing
+try:
+    multiprocessing.set_start_method("fork", force=True)
+except RuntimeError:
+    pass
 
 Loader = _loader.Loader
 Runner = _runner.Runner
