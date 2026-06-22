@@ -100,6 +100,7 @@ class TcpProxy:
                     self._southbound_data += data
                 else:
                     self._client_sockets.remove(socket_to_read)
+                    socket_to_read.close()
             else:
                 raise RuntimeError("Unidentified socket appeared in read set.")
 
@@ -136,12 +137,15 @@ class TcpProxy:
             self._handle_writes(sockets_to_write)
         for client_socket in self._client_sockets:
             client_socket.close()
+        self._client_sockets.clear()
+        if self._listen_socket:
+            self._listen_socket.close()
+        if self._proxy_socket:
+            self._proxy_socket.close()
 
     def stop(self):
         self._stop_event.set()
         self._thread.join()
-        self._listen_socket.close()
-        self._proxy_socket.close()
 
     def get_byte_count(self):
         with self._byte_count_lock:

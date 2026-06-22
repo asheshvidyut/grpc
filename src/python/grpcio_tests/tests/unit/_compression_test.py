@@ -186,12 +186,20 @@ def _get_byte_counts(
     server_handler,
     message,
 ):
-    with _instrumented_client_server_pair(
-        channel_kwargs, server_kwargs, server_handler
-    ) as pipeline:
-        client_channel, proxy, server = pipeline
-        client_function(client_channel, multicallable_kwargs, message)
-        return proxy.get_byte_count()
+    for attempt in range(10):
+        try:
+            with _instrumented_client_server_pair(
+                channel_kwargs, server_kwargs, server_handler
+            ) as pipeline:
+                client_channel, proxy, server = pipeline
+                client_function(client_channel, multicallable_kwargs, message)
+                return proxy.get_byte_count()
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 9:
+                import time
+                time.sleep(0.1)
+                continue
+            raise
 
 
 def _get_compression_ratios(
