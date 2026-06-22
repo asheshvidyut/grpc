@@ -27,55 +27,73 @@ _UNRECOVERABLE_ERRNOS = (errno.EADDRINUSE, errno.ENOSR)
 
 if sys.platform == "darwin":
     import grpc
+
     _original_grpc_server = grpc.server
+
     def _grpc_server(*args, **kwargs):
-        options = kwargs.get('options', None)
+        options = kwargs.get("options", None)
         options = list(options) if options else []
-        if not any(k == 'grpc.so_reuseport' for k, v in options):
-            options.append(('grpc.so_reuseport', 0))
-        kwargs['options'] = tuple(options)
+        if not any(k == "grpc.so_reuseport" for k, v in options):
+            options.append(("grpc.so_reuseport", 0))
+        kwargs["options"] = tuple(options)
         srv = _original_grpc_server(*args, **kwargs)
-        
+
         _orig_add_insecure = srv.add_insecure_port
+
         def _add_insecure(addr):
-            if addr.startswith("[::]:"): addr = "localhost:" + addr.split(":")[-1]
+            if addr.startswith("[::]:"):
+                addr = "localhost:" + addr.split(":")[-1]
             return _orig_add_insecure(addr)
+
         srv.add_insecure_port = _add_insecure
-        
+
         _orig_add_secure = srv.add_secure_port
+
         def _add_secure(addr, creds):
-            if addr.startswith("[::]:"): addr = "localhost:" + addr.split(":")[-1]
+            if addr.startswith("[::]:"):
+                addr = "localhost:" + addr.split(":")[-1]
             return _orig_add_secure(addr, creds)
+
         srv.add_secure_port = _add_secure
-            
+
         return srv
+
     grpc.server = _grpc_server
 
 if sys.platform == "darwin":
     try:
         from grpc.experimental import aio
+
         _original_aio_server = aio.server
+
         def _aio_server(*args, **kwargs):
-            options = kwargs.get('options', None)
+            options = kwargs.get("options", None)
             options = list(options) if options else []
-            if not any(k == 'grpc.so_reuseport' for k, v in options):
-                options.append(('grpc.so_reuseport', 0))
-            kwargs['options'] = tuple(options)
+            if not any(k == "grpc.so_reuseport" for k, v in options):
+                options.append(("grpc.so_reuseport", 0))
+            kwargs["options"] = tuple(options)
             srv = _original_aio_server(*args, **kwargs)
-            
+
             _orig_add_insecure = srv.add_insecure_port
+
             def _add_insecure(addr):
-                if addr.startswith("[::]:"): addr = "localhost:" + addr.split(":")[-1]
+                if addr.startswith("[::]:"):
+                    addr = "localhost:" + addr.split(":")[-1]
                 return _orig_add_insecure(addr)
+
             srv.add_insecure_port = _add_insecure
-                
+
             _orig_add_secure = srv.add_secure_port
+
             def _add_secure(addr, creds):
-                if addr.startswith("[::]:"): addr = "localhost:" + addr.split(":")[-1]
+                if addr.startswith("[::]:"):
+                    addr = "localhost:" + addr.split(":")[-1]
                 return _orig_add_secure(addr, creds)
+
             srv.add_secure_port = _add_secure
-                
+
             return srv
+
         aio.server = _aio_server
     except ImportError:
         pass
