@@ -96,14 +96,14 @@ class EmptyMessageTest(unittest.TestCase):
         response = self._channel.unary_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
             _registered_method=True,
-        )(_REQUEST)
+        )(_REQUEST, wait_for_ready=True)
         self.assertEqual(_RESPONSE, response)
 
     def testUnaryStream(self):
         response_iterator = self._channel.unary_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_STREAM),
             _registered_method=True,
-        )(_REQUEST)
+        )(_REQUEST, wait_for_ready=True)
         self.assertSequenceEqual(
             [_RESPONSE] * test_constants.STREAM_LENGTH, list(response_iterator)
         )
@@ -112,14 +112,14 @@ class EmptyMessageTest(unittest.TestCase):
         response = self._channel.stream_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_UNARY),
             _registered_method=True,
-        )(iter([_REQUEST] * test_constants.STREAM_LENGTH))
+        )(iter([_REQUEST] * test_constants.STREAM_LENGTH), wait_for_ready=True)
         self.assertEqual(_RESPONSE, response)
 
     def testStreamStream(self):
         response_iterator = self._channel.stream_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_STREAM),
             _registered_method=True,
-        )(iter([_REQUEST] * test_constants.STREAM_LENGTH))
+        )(iter([_REQUEST] * test_constants.STREAM_LENGTH), wait_for_ready=True)
         self.assertSequenceEqual(
             [_RESPONSE] * test_constants.STREAM_LENGTH, list(response_iterator)
         )
