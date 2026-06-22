@@ -15,10 +15,23 @@
 from tests import _loader
 from tests import _runner
 import multiprocessing
-try:
-    multiprocessing.set_start_method("fork", force=True)
-except RuntimeError:
-    pass
+import sys
+if sys.platform == "darwin":
+    try:
+        multiprocessing.set_start_method("fork", force=True)
+    except RuntimeError:
+        pass
+
+import grpc
+_original_grpc_server = grpc.server
+def _grpc_server(*args, **kwargs):
+    options = kwargs.get('options', None)
+    options = list(options) if options else []
+    if not any(k == 'grpc.so_reuseport' for k, v in options):
+        options.append(('grpc.so_reuseport', 0))
+    kwargs['options'] = tuple(options)
+    return _original_grpc_server(*args, **kwargs)
+grpc.server = _grpc_server
 
 Loader = _loader.Loader
 Runner = _runner.Runner
