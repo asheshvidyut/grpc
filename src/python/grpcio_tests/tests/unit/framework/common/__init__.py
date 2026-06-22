@@ -26,26 +26,38 @@ _DEFAULT_SOCK_OPTIONS = (
 _UNRECOVERABLE_ERRNOS = (errno.EADDRINUSE, errno.ENOSR)
 
 import grpc
+
 _original_grpc_server = grpc.server
+
+
 def _grpc_server(*args, **kwargs):
-    options = kwargs.get('options', None)
+    options = kwargs.get("options", None)
     options = list(options) if options else []
-    if sys.platform == "darwin" and not any(k == 'grpc.so_reuseport' for k, v in options):
-        options.append(('grpc.so_reuseport', 0))
-    kwargs['options'] = tuple(options)
+    if sys.platform == "darwin" and not any(
+        k == "grpc.so_reuseport" for k, v in options
+    ):
+        options.append(("grpc.so_reuseport", 0))
+    kwargs["options"] = tuple(options)
     return _original_grpc_server(*args, **kwargs)
+
+
 grpc.server = _grpc_server
 
 try:
     from grpc.experimental import aio
+
     _original_aio_server = aio.server
+
     def _aio_server(*args, **kwargs):
-        options = kwargs.get('options', None)
+        options = kwargs.get("options", None)
         options = list(options) if options else []
-        if sys.platform == "darwin" and not any(k == 'grpc.so_reuseport' for k, v in options):
-            options.append(('grpc.so_reuseport', 0))
-        kwargs['options'] = tuple(options)
+        if sys.platform == "darwin" and not any(
+            k == "grpc.so_reuseport" for k, v in options
+        ):
+            options.append(("grpc.so_reuseport", 0))
+        kwargs["options"] = tuple(options)
         return _original_aio_server(*args, **kwargs)
+
     aio.server = _aio_server
 except ImportError:
     pass
