@@ -150,7 +150,7 @@ class BaseWatchTests:
                 "some-other-service", health_pb2.HealthCheckResponse.SERVING
             )
             with self.assertRaises(queue.Empty):
-                response_queue.get(timeout=test_constants.LONG_TIMEOUT)
+                response_queue.get(timeout=test_constants.SHORT_TIMEOUT)
 
             rendezvous.cancel()
             thread.join()
