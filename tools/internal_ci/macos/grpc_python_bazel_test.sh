@@ -23,6 +23,11 @@ cd $(dirname $0)/../../..
 
 source tools/internal_ci/helper_scripts/prepare_build_macos_rc
 
+# Increase macOS ephemeral port range and file descriptor limits
+# This prevents 'Operation timed out' and EMFILE errors when Bazel runs highly concurrent test suites
+sudo sysctl -w net.inet.ip.portrange.first=32768 || true
+ulimit -n 65536 || true
+
 # make sure bazel is available
 tools/bazel version
 
