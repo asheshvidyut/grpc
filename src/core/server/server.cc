@@ -578,7 +578,11 @@ struct Server::RequestedCall {
 class Server::RealRequestMatcher : public RequestMatcherInterface {
  public:
   explicit RealRequestMatcher(Server* server)
-      : server_(server), requests_per_cq_(server->cqs_.size()) {}
+      : server_(server), requests_per_cq_(server->cqs_.size()) {
+    LOG(ERROR) << "RealRequestMatcher constructor: server->cqs_.size()="
+               << server->cqs_.size()
+               << ", requests_per_cq_.size()=" << requests_per_cq_.size();
+  }
 
   ~RealRequestMatcher() override {
     for (LockedMultiProducerSingleConsumerQueue& queue : requests_per_cq_) {
@@ -680,6 +684,14 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
 
   void MatchOrQueue(size_t start_request_queue_index,
                     CallData* calld) override {
+    LOG(ERROR) << "MatchOrQueue: start_request_queue_index="
+               << start_request_queue_index
+               << ", requests_per_cq_.size()=" << requests_per_cq_.size();
+    if (requests_per_cq_.empty()) {
+      calld->SetState(CallData::CallState::PENDING);
+      pending_filter_stack_.push(PendingCallFilterStack{calld});
+      return;
+    }
     for (size_t i = 0; i < requests_per_cq_.size(); i++) {
       size_t cq_idx = (start_request_queue_index + i) % requests_per_cq_.size();
       RequestedCall* rc =
@@ -720,6 +732,12 @@ class Server::RealRequestMatcher : public RequestMatcherInterface {
 
   ArenaPromise<absl::StatusOr<MatchResult>> MatchRequest(
       size_t start_request_queue_index) override {
+    LOG(ERROR) << "MatchRequest: start_request_queue_index="
+               << start_request_queue_index
+               << ", requests_per_cq_.size()=" << requests_per_cq_.size();
+    if (requests_per_cq_.empty()) {
+      return Immediate(absl::InternalError("Server closed"));
+    }
     for (size_t i = 0; i < requests_per_cq_.size(); i++) {
       size_t cq_idx = (start_request_queue_index + i) % requests_per_cq_.size();
       RequestedCall* rc =
