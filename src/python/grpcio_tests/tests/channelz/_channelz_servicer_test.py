@@ -497,6 +497,7 @@ class ChannelzServicerTest(unittest.TestCase):
             channelz_pb2.GetServersRequest(start_server_id=0)
         )
         self.assertEqual(len(gss_resp.server), 1)
+        import sys
         if sys.platform == "darwin":
             self.assertEqual(len(gss_resp.server[0].listen_socket), 2)
         else:
