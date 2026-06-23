@@ -80,8 +80,8 @@ class _ChannelServerPair:
     async def start(self):
         # Server will enable channelz service
         self.server = aio.server(options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ)
-        port = self.server.add_insecure_port("[::]:0")
-        self.address = "localhost:%d" % port
+        port = self.server.add_insecure_port("127.0.0.1:0")
+        self.address = "127.0.0.1:%d" % port
         self.server.add_generic_rpc_handlers((_GenericHandler(),))
         await self.server.start()
 
@@ -130,14 +130,14 @@ class ChannelzServicerTest(AioTestBase):
         self._server = aio.server(
             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         channelz.add_channelz_servicer(self._server)
         await self._server.start()
 
         # This channel is used to fetch Channelz info only
         # Channelz should not be enabled
         self._channel = aio.insecure_channel(
-            "localhost:%d" % port, options=_DISABLE_CHANNELZ
+            "127.0.0.1:%d" % port, options=_DISABLE_CHANNELZ
         )
         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
 
@@ -482,12 +482,7 @@ class ChannelzServicerTest(AioTestBase):
         pairs = await _create_channel_server_pairs(1, self._channelz_stub)
 
         resp = await self._get_server_by_ref_id(pairs[0].server_ref_id)
-        import sys
-
-        if sys.platform == "darwin":
-            self.assertEqual(len(resp.listen_socket), 2)
-        else:
-            self.assertEqual(len(resp.listen_socket), 1)
+        self.assertEqual(len(resp.listen_socket), 1)
 
         gs_resp: channelz_pb2.GetSocketResponse = (
             await self._channelz_stub.GetSocket(
