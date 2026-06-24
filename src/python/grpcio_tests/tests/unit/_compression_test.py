@@ -195,7 +195,10 @@ def _get_byte_counts(
                 client_function(client_channel, multicallable_kwargs, message)
                 return proxy.get_byte_count()
         except (grpc.RpcError, TimeoutError, ConnectionError) as e:
-            if isinstance(e, grpc.RpcError) and e.code() != grpc.StatusCode.UNAVAILABLE:
+            if (
+                isinstance(e, grpc.RpcError)
+                and e.code() != grpc.StatusCode.UNAVAILABLE
+            ):
                 raise
             if attempt < 9:
                 import time
