@@ -76,6 +76,8 @@ if sys.platform == "darwin":
                 target = "127.0.0.1:" + target.split(":")[-1]
             elif target.startswith("localhost:"):
                 target = "127.0.0.1:" + target.split(":", 1)[1]
-        return _original_secure_channel(target, credentials, options, compression)
+        return _original_secure_channel(
+            target, credentials, options, compression
+        )
 
     grpc.secure_channel = _secure_channel

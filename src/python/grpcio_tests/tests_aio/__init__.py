@@ -71,13 +71,17 @@ if sys.platform == "darwin":
 
         _original_aio_secure_channel = aio.secure_channel
 
-        def _aio_secure_channel(target, credentials, options=None, compression=None):
+        def _aio_secure_channel(
+            target, credentials, options=None, compression=None
+        ):
             if isinstance(target, str):
                 if target.startswith("[::]:"):
                     target = "127.0.0.1:" + target.split(":")[-1]
                 elif target.startswith("localhost:"):
                     target = "127.0.0.1:" + target.split(":", 1)[1]
-            return _original_aio_secure_channel(target, credentials, options, compression)
+            return _original_aio_secure_channel(
+                target, credentials, options, compression
+            )
 
         aio.secure_channel = _aio_secure_channel
     except ImportError:
