@@ -30,6 +30,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
+#ifdef GPR_APPLE
+#include <sys/sysctl.h>
+#endif
 
 #include <string>
 
@@ -53,6 +56,17 @@ static int s_max_accept_queue_size;
 static void init_max_accept_queue_size(void) {
   int n = SOMAXCONN;
   char buf[64];
+#ifdef GPR_APPLE
+  // Apple's <sys/socket.h> hardcodes SOMAXCONN to 128. Since macOS does not
+  // have a /proc filesystem, we must dynamically query the true kernel limit
+  // via sysctlbyname to avoid artificially capping the listen backlog and
+  // dropping connections under high concurrency testing.
+  size_t len = sizeof(n);
+  if (sysctlbyname("kern.ipc.somaxconn", &n, &len, nullptr, 0) == 0) {
+    s_max_accept_queue_size = n;
+    return;
+  }
+#endif
   FILE* fp = fopen("/proc/sys/net/core/somaxconn", "r");
   if (fp == nullptr) {
     // 2.4 kernel.

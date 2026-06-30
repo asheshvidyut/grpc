@@ -504,7 +504,11 @@ class TestServer(AioTestBase):
         await call.write(_REQUEST)
         await self._server.stop(None)
 
-        self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
+        # Under extreme concurrency, server.stop(None) can race between:
+        # 1. Closing the socket instantly (client sees UNAVAILABLE)
+        # 2. Flushing CANCELLED HTTP/2 trailers before socket closes (client sees CANCELLED)
+        # This test was originally added strictly to ensure "No segfault" (commit 80d7acff7c).
+        self.assertIn(await call.code(), (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED))
         # No segfault
 
     async def test_error_in_stream_stream(self):

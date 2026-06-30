@@ -16,12 +16,12 @@
 set -ex
 
 # Increase macOS ephemeral ports and file descriptor limits to prevent test flakiness
-sudo sysctl -w net.inet.ip.portrange.first=32768 || true
-sudo sysctl -w net.inet.ip.portrange.hifirst=32768 || true
+sudo sysctl -w net.inet.ip.portrange.first=16384 || true
+sudo sysctl -w net.inet.ip.portrange.hifirst=16384 || true
 sudo sysctl -w kern.maxfiles=1048576 || true
 sudo sysctl -w kern.maxfilesperproc=1048576 || true
 ulimit -n 1048576 || true
-sudo sysctl -w net.inet.tcp.msl=1000 || true
+sudo sysctl -w net.inet.tcp.msl=10 || true
 sudo sysctl -w kern.ipc.somaxconn=2048 || true
 sudo launchctl limit maxfiles 524288 524288 || true
 # avoid slow finalization after the script has exited.
