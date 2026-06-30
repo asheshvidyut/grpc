@@ -504,7 +504,10 @@ class TestServer(AioTestBase):
         await call.write(_REQUEST)
         await self._server.stop(None)
 
-        self.assertIn(await call.code(), (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED))
+        self.assertIn(
+            await call.code(),
+            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
+        )
         # No segfault
 
     async def test_error_in_stream_stream(self):
@@ -574,7 +577,10 @@ class TestServer(AioTestBase):
             return await awaitable
 
         # Build the server with concurrent rpc argument
-        server = aio.server(maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS, options=(("grpc.so_reuseport", 0),))
+        server = aio.server(
+            maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS,
+            options=(("grpc.so_reuseport", 0),),
+        )
         port = server.add_insecure_port("127.0.0.1:0")
         bind_address = "127.0.0.1:%d" % port
         server.add_generic_rpc_handlers((_GenericHandler(),))
@@ -629,7 +635,10 @@ class TestServer(AioTestBase):
 
         # Use a limit of 1 to make the test deterministic
         max_concurrent = 1
-        server = aio.server(maximum_concurrent_rpcs=max_concurrent, options=(("grpc.so_reuseport", 0),))
+        server = aio.server(
+            maximum_concurrent_rpcs=max_concurrent,
+            options=(("grpc.so_reuseport", 0),),
+        )
         port = server.add_insecure_port("127.0.0.1:0")
         bind_address = f"127.0.0.1:{port}"
         server.add_generic_rpc_handlers((_GenericHandler(),))

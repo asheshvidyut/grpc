@@ -200,8 +200,11 @@ def _get_byte_counts(
                 return proxy.get_byte_count()
         except grpc.RpcError as e:
             if e.code() == grpc.StatusCode.UNAVAILABLE and attempt < 4:
-                logging.warning("Retrying compression test due to UNAVAILABLE: %s", e)
+                logging.warning(
+                    "Retrying compression test due to UNAVAILABLE: %s", e
+                )
                 import time
+
                 time.sleep(1)
             else:
                 raise
