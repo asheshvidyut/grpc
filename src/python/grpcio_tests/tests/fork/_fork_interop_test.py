@@ -56,7 +56,7 @@ _CLIENT_FORK_SCRIPT_TEMPLATE = """if True:
     cygrpc._GRPC_ENABLE_FORK_SUPPORT = True
     os.environ['GRPC_ENABLE_FORK_SUPPORT'] = 'true'
     methods.TestCase.%s.run_test({
-      'server_host': 'localhost',
+      'server_host': '127.0.0.1',
       'server_port': %d,
       'use_tls': False
     })

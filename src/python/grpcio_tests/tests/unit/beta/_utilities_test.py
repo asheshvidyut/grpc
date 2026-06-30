@@ -63,7 +63,7 @@ class ChannelConnectivityTest(unittest.TestCase):
 
     def test_immediately_connectable_channel_connectivity(self):
         server = implementations.server({})
-        port = server.add_insecure_port("[::]:0")
+        port = server.add_insecure_port("127.0.0.1:0")
         server.start()
         channel = implementations.insecure_channel("127.0.0.1", port)
         callback = _Callback()

@@ -86,7 +86,7 @@ try:
             message_size=message_size, response_count=response_count
         )
         with grpc.insecure_channel(
-            "[::]:{}".format(_PORT), options=_GRPC_CHANNEL_OPTIONS
+            "127.0.0.1:{}".format(_PORT), options=_GRPC_CHANNEL_OPTIONS
         ) as channel:
             stub = (
                 unary_stream_benchmark_pb2_grpc.UnaryStreamBenchmarkServiceStub(

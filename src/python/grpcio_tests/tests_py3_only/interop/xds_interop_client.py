@@ -557,7 +557,7 @@ def _run(
         channel_configs[method] = channel_config
         method_handles.append(_MethodHandle(args.num_channels, channel_config))
     _global_server = grpc.server(concurrent.futures.ThreadPoolExecutor())
-    _global_server.add_insecure_port(f"0.0.0.0:{args.stats_port}")
+    _global_server.add_insecure_port(f"127.0.0.1:{args.stats_port}")
     test_pb2_grpc.add_LoadBalancerStatsServiceServicer_to_server(
         _LoadBalancerStatsServicer(), _global_server
     )
@@ -647,7 +647,7 @@ if __name__ == "__main__":
         help="The per-RPC timeout in seconds.",
     )
     parser.add_argument(
-        "--server", default="localhost:50051", help="The address of the server."
+        "--server", default="127.0.0.1:50051", help="The address of the server."
     )
     parser.add_argument(
         "--stats_port",

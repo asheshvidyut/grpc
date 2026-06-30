@@ -202,7 +202,7 @@ class MetadataCodeDetailsTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE, get_method_handlers(self._servicer)
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         self._server.start()
 
         self._channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
@@ -831,7 +831,7 @@ class InspectContextTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE, get_method_handlers(self._servicer)
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         self._server.start()
 
         self._channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
