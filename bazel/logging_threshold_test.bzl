@@ -61,6 +61,10 @@ def py_grpc_logging_threshold_test(
         outs = [copied_main_filename],
         cmd = "cp $< $@",
     )
+    tags = kwargs.pop("tags", [])
+    if "no_mac" not in tags:
+        tags.append("no_mac")
+
     py_test(
         name = name + ".logging_threshold",
         args = ["$(location //bazel:_single_module_tester)", name],
@@ -70,5 +74,6 @@ def py_grpc_logging_threshold_test(
         main = copied_main_filename,
         python_version = "PY3",
         flaky = False,
+        tags = tags,
         **kwargs
     )
