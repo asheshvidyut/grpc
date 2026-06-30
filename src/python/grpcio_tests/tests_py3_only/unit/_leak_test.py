@@ -58,7 +58,7 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 def _start_a_test_server():
     server = grpc.server(
-        ThreadPoolExecutor(max_workers=1), options=(("grpc.so_reuseport", 0),)
+        ThreadPoolExecutor(max_workers=10), options=(("grpc.so_reuseport", 0),)
     )
     server.add_generic_rpc_handlers((_GenericHandler(),))
     port = server.add_insecure_port("127.0.0.1:0")

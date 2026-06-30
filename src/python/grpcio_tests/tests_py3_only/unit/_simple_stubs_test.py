@@ -257,6 +257,7 @@ class SimpleStubsTest(unittest.TestCase):
                     options=options,
                     channel_credentials=grpc.local_channel_credentials(),
                     _registered_method=0,
+                    timeout=None,
                 )
                 self.assert_eventually(
                     lambda: grpc._simple_stubs.ChannelCache.get()._test_only_channel_count()

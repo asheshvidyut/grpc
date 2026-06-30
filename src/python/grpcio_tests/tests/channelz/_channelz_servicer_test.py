@@ -69,7 +69,7 @@ class _ChannelServerPair:
     def __init__(self):
         # Server will enable channelz service
         self.server = grpc.server(
-            futures.ThreadPoolExecutor(max_workers=3),
+            futures.ThreadPoolExecutor(max_workers=10),
             options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ,
         )
         port = self.server.add_insecure_port("127.0.0.1:0")
@@ -142,7 +142,7 @@ class ChannelzServicerTest(unittest.TestCase):
         # This server is for Channelz info fetching only
         # It self should not enable Channelz
         self._server = grpc.server(
-            futures.ThreadPoolExecutor(max_workers=3),
+            futures.ThreadPoolExecutor(max_workers=10),
             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ,
         )
         port = self._server.add_insecure_port("127.0.0.1:0")

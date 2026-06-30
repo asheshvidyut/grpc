@@ -58,6 +58,7 @@ py_test(
     srcs = ["xds_interop_client_test.py"],
     imports = ["."],
     python_version = "PY3",
+    size = "large",
     deps = [
         ":xds_interop_client",
         ":xds_interop_server",
