@@ -35,8 +35,10 @@ class RecordingThreadPool(futures.ThreadPoolExecutor):
             return self._was_used
 
     def shutdown(self, wait=True, *, cancel_futures=False):
-        if hasattr(self._tp_executor, 'shutdown'):
+        if hasattr(self._tp_executor, "shutdown"):
             if sys.version_info >= (3, 9):
-                self._tp_executor.shutdown(wait=wait, cancel_futures=cancel_futures)
+                self._tp_executor.shutdown(
+                    wait=wait, cancel_futures=cancel_futures
+                )
             else:
                 self._tp_executor.shutdown(wait=wait)

@@ -33,7 +33,9 @@ _TCP_PROXY_TIMEOUT = datetime.timedelta(milliseconds=500)
 def _init_proxy_socket(gateway_address, gateway_port):
     for i in range(10):
         try:
-            proxy_socket = socket.create_connection((gateway_address, gateway_port))
+            proxy_socket = socket.create_connection(
+                (gateway_address, gateway_port)
+            )
             return proxy_socket
         except Exception:
             if i == 9:

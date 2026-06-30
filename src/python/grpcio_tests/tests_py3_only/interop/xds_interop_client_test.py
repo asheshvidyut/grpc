@@ -170,7 +170,9 @@ class XdsInteropClientTest(unittest.TestCase):
                 wait_for_ready=True,
             )
             logging.info("Server successfully started.")
-            _, stats_port, stats_socket = framework_common.get_socket(listen=False)
+            _, stats_port, stats_socket = framework_common.get_socket(
+                listen=False
+            )
             with _start_python_with_args(
                 _CLIENT_PATH,
                 [
