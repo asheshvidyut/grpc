@@ -24,11 +24,11 @@ from typing import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Generic,
     List,
     Optional,
     Sequence,
     Union,
-    Generic,
 )
 
 import grpc
