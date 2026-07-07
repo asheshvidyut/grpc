@@ -59,6 +59,12 @@ py_test(
     imports = ["."],
     python_version = "PY3",
     size = "large",
+    # This is a load test: the client drives _QPS * _NUM_CHANNELS RPCs per
+    # second against a subprocess server and asserts that none of them
+    # fails. Running it concurrently with other tests (e.g. under
+    # --runs_per_test=N) oversubscribes the machine and produces spurious
+    # RPC failures, so run it in isolation.
+    tags = ["exclusive"],
     deps = [
         ":xds_interop_client",
         ":xds_interop_server",

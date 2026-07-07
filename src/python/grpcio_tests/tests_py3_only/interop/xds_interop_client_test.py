@@ -48,6 +48,10 @@ _TEST_ITERATIONS = 10
 _ITERATION_DURATION_SECONDS = 1
 _SUBPROCESS_TIMEOUT_SECONDS = 2
 
+# Maximum number of one-second windows to wait for the client to reach a
+# steady state (RPCs flowing with no failures) before asserting on stats.
+_WARMUP_MAX_WINDOWS = 30
+
 
 def _set_union(a: Iterable, b: Iterable) -> Set:
     c = set(a)
@@ -131,6 +135,44 @@ def _collect_stats(
 
 
 class XdsInteropClientTest(unittest.TestCase):
+    def _await_client_steady_state(self, stats_port: int) -> None:
+        """Waits until the client's RPCs flow with no failures.
+
+        Right after startup, the client fires _QPS RPCs per second from each
+        of its _NUM_CHANNELS channels while the channels are still
+        connecting and the server process is still warming up. On a loaded
+        machine (e.g. --runs_per_test with several copies of this test in
+        parallel), RPCs started during this window can fail with transient
+        statuses that have nothing to do with the configure-consistency
+        property this test asserts on. Wait for a clean one-second window
+        before asserting. If the client never stabilizes, proceed and let
+        the assertions report the failure with full stats.
+        """
+        for _ in range(_WARMUP_MAX_WINDOWS):
+            try:
+                delta = _collect_stats(stats_port, 1)
+            except grpc.RpcError:
+                # The client's stats server may not be listening yet.
+                time.sleep(1)
+                continue
+            succeeded = sum(
+                count
+                for method_stats in delta.values()
+                for status, count in method_stats.items()
+                if status == 0
+            )
+            failed = sum(
+                count
+                for method_stats in delta.values()
+                for status, count in method_stats.items()
+                if status != 0
+            )
+            if succeeded > 0 and failed == 0:
+                return
+        logging.warning(
+            "Client did not reach a steady state; proceeding anyway."
+        )
+
     def _assert_client_consistent(
         self, server_port: int, stats_port: int, qps: int, num_channels: int
     ):
@@ -160,6 +202,14 @@ class XdsInteropClientTest(unittest.TestCase):
             _SERVER_PATH,
             [f"--port={server_port}", f"--maintenance_port={server_port}"],
         ) as (server, server_stdout, server_stderr):
+            # Release the port reservation before probing the server. The
+            # server binds the wildcard address while the reservation socket
+            # listens on 127.0.0.1; TCP routes connections to the most
+            # specific listener, so keeping the reservation open would
+            # swallow the probe RPC (and every subsequent connection) into a
+            # socket that never accepts. wait_for_ready below retries until
+            # the server has bound the released port.
+            socket.close()
             # Send RPC to server to make sure it's running.
             logging.info("Sending RPC to server.")
             test_pb2_grpc.TestService.EmptyCall(
@@ -169,7 +219,6 @@ class XdsInteropClientTest(unittest.TestCase):
                 wait_for_ready=True,
             )
             logging.info("Server successfully started.")
-            socket.close()
             _, stats_port, stats_socket = framework_common.get_socket()
             with _start_python_with_args(
                 _CLIENT_PATH,
@@ -182,6 +231,7 @@ class XdsInteropClientTest(unittest.TestCase):
             ) as (client, client_stdout, client_stderr):
                 stats_socket.close()
                 try:
+                    self._await_client_steady_state(stats_port)
                     self._assert_client_consistent(
                         server_port, stats_port, _QPS, _NUM_CHANNELS
                     )
