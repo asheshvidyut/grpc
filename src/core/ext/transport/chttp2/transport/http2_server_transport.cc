@@ -368,6 +368,9 @@ Http2Status Http2ServerTransport::ProcessIncomingFrame(Http2DataFrame&& frame) {
 
 template <typename T>
 Http2Status Http2ServerTransport::ProcessIncomingMetadata(T&& frame) {
+  GRPC_HTTP2_SERVER_DLOG
+      << "Http2ServerTransport::ProcessIncomingMetadata { stream_id="
+      << frame.stream_id << ", end_headers=" << frame.end_headers << " }";
   ping_manager_->ReceivedDataFrame();
 
   bool is_new_stream = false;
@@ -433,9 +436,8 @@ Http2Status Http2ServerTransport::ProcessIncomingFrame(
     Http2HeaderFrame&& frame) {
   // https://www.rfc-editor.org/rfc/rfc9113.html#name-headers
   GRPC_HTTP2_SERVER_DLOG
-      << "Http2ServerTransport::ProcessIncomingFrame(HeaderFrame) { stream_id="
-      << frame.stream_id << ", end_headers=" << frame.end_headers
-      << ", end_stream=" << frame.end_stream << " }";
+      << "Http2ServerTransport::ProcessIncomingFrame(HeaderFrame) end_stream="
+      << frame.end_stream;
   return ProcessIncomingMetadata(std::forward<Http2HeaderFrame>(frame));
 }
 
@@ -664,9 +666,7 @@ Http2Status Http2ServerTransport::ProcessIncomingFrame(
     Http2ContinuationFrame&& frame) {
   // https://www.rfc-editor.org/rfc/rfc9113.html#name-continuation
   GRPC_HTTP2_SERVER_DLOG
-      << "Http2ServerTransport::ProcessIncomingFrame(ContinuationFrame) { "
-         "stream_id="
-      << frame.stream_id << ", end_headers=" << frame.end_headers << " }";
+      << "Http2ServerTransport::ProcessIncomingFrame(ContinuationFrame)";
   return ProcessIncomingMetadata(std::forward<Http2ContinuationFrame>(frame));
 }
 
@@ -745,7 +745,8 @@ auto Http2ServerTransport::ReadAndProcessOneFrame() {
             /*max_frame_size_setting=*/settings_->acked().max_frame_size(),
             /*current_frame_header=*/header,
             // TODO(tjagtap) : [PH2][P0] : Fix
-            /*last_stream_id=*//*GetLastStreamId()*/ 100,
+            /*last_stream_id=*//*GetLastStreamId()*/
+            std::numeric_limits<uint32_t>::max(),
             /*is_first_settings_processed=*/
             settings_->IsFirstPeerSettingsApplied());
 
@@ -830,13 +831,13 @@ absl::Status Http2ServerTransport::PrepareControlFrames() {
   // 5. Custom gRPC security frame
 
   goaway_manager_.MaybeGetSerializedGoawayFrame(frame_sender);
-  bool should_spawn_security_frame_loop = false;
+  ApplySettingsResult apply_settings_result;
 
   const uint32_t old_initial_window_size =
       settings_->peer().initial_window_size();
-  http2::Http2ErrorCode apply_status =
-      settings_->MaybeReportAndApplyBufferedPeerSettings(
-          event_engine_.get(), should_spawn_security_frame_loop);
+  const http2::Http2ErrorCode apply_status =
+      settings_->MaybeReportAndApplyBufferedPeerSettings(event_engine_.get(),
+                                                         apply_settings_result);
 
   if (apply_status == http2::Http2ErrorCode::kNoError) {
     const uint32_t new_initial_window_size =
@@ -855,7 +856,7 @@ absl::Status Http2ServerTransport::PrepareControlFrames() {
     }
   }
 
-  if (should_spawn_security_frame_loop) {
+  if (apply_settings_result.should_spawn_security_frame_loop) {
     const SecurityFrameHandler::EndpointExtensionState state =
         security_frame_handler_->Initialize(event_engine_);
     if (state.is_set) {
@@ -2021,7 +2022,6 @@ Http2ServerTransport::Http2ServerTransport(
     grpc_closure* on_close_callback)
     : channelz::DataSource(http2::CreateChannelzSocketNode(
           endpoint.GetEventEngineEndpoint(), channel_args)),
-      outgoing_frames_(10),  // TODO(akshitpatel) : [PH2][P0][Write] : Remove
       event_engine_(std::move(event_engine)),
       endpoint_(std::move(endpoint)),
       settings_(MakeRefCounted<SettingsPromiseManager>(
