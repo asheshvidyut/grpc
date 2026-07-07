@@ -16,6 +16,7 @@ import contextlib
 import errno
 import os
 import socket
+import sys
 
 _DEFAULT_SOCK_OPTIONS = (
     (socket.SO_REUSEADDR, socket.SO_REUSEPORT)
@@ -23,6 +24,43 @@ _DEFAULT_SOCK_OPTIONS = (
     else (socket.SO_REUSEADDR,)
 )
 _UNRECOVERABLE_ERRNOS = (errno.EADDRINUSE, errno.ENOSR)
+
+import grpc
+
+_original_grpc_server = grpc.server
+
+
+def _grpc_server(*args, **kwargs):
+    options = kwargs.get("options", None)
+    options = list(options) if options else []
+    if sys.platform == "darwin" and not any(
+        k == "grpc.so_reuseport" for k, v in options
+    ):
+        options.append(("grpc.so_reuseport", 0))
+    kwargs["options"] = tuple(options)
+    return _original_grpc_server(*args, **kwargs)
+
+
+grpc.server = _grpc_server
+
+try:
+    from grpc.experimental import aio
+
+    _original_aio_server = aio.server
+
+    def _aio_server(*args, **kwargs):
+        options = kwargs.get("options", None)
+        options = list(options) if options else []
+        if sys.platform == "darwin" and not any(
+            k == "grpc.so_reuseport" for k, v in options
+        ):
+            options.append(("grpc.so_reuseport", 0))
+        kwargs["options"] = tuple(options)
+        return _original_aio_server(*args, **kwargs)
+
+    aio.server = _aio_server
+except ImportError:
+    pass
 
 
 def get_socket(
@@ -55,6 +93,8 @@ def get_socket(
     for address_family in address_families:
         try:
             sock = socket.socket(address_family, socket.SOCK_STREAM)
+            if sys.platform == "darwin" and address_family == socket.AF_INET6:
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
             for sock_option in _sock_options:
                 sock.setsockopt(socket.SOL_SOCKET, sock_option, 1)
             sock.bind((bind_address, port))
