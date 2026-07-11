@@ -1,0 +1,134 @@
+From b14418f910a81c5a921901942448557a01dec5a4 Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 13:34:50 +0100
+Subject: [PATCH 06/12] Harden compression test path against macOS loopback
+ churn
+
+Three related fixes for tests flaking under repeated concurrent runs:
+
+- _tcp_proxy: treat ECONNRESET (and other socket errors) on proxied
+  connections as EOF instead of letting the exception kill the proxy
+  thread, which stranded every connection still using the proxy.
+- _compression_test: pin server, proxy, and client to 127.0.0.1 so the
+  client does not probe an address family the proxy does not exist in,
+  and use wait_for_ready so the byte-count RPCs ride through transient
+  connect failures. Under heavy loopback churn macOS can transiently
+  fail connect() with EADDRINUSE while picking an ephemeral source
+  port, which otherwise fails the RPC before the subchannel backoff
+  retries (observed via GRPC_TRACE=tcp,subchannel).
+- tests_aio server_test: the handler in test_error_in_stream_unary
+  raises while the client may still have writes in flight; accept
+  INTERNAL (local write on reset stream) alongside UNKNOWN.
+---
+ .../tests/unit/_compression_test.py           | 13 ++++++++-
+ .../grpcio_tests/tests/unit/_tcp_proxy.py     | 27 ++++++++++++++++---
+ .../tests_aio/unit/server_test.py             | 10 ++++++-
+ 3 files changed, 44 insertions(+), 6 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests/unit/_compression_test.py b/src/python/grpcio_tests/tests/unit/_compression_test.py
+index 4c2d6ed..65ee60c 100644
+--- a/src/python/grpcio_tests/tests/unit/_compression_test.py
++++ b/src/python/grpcio_tests/tests/unit/_compression_test.py
+@@ -36,7 +36,11 @@ _STREAM_STREAM = "StreamStream"
+ # Cut down on test time.
+ _STREAM_LENGTH = test_constants.STREAM_LENGTH // 16
+ 
+-_HOST = "localhost"
++# A single, specific loopback address: binding and dialing the same
++# address keeps the client from probing a second address family in which
++# the proxy does not exist (and in which the port number is a separate
++# namespace that another concurrently running test's server can own).
++_HOST = "127.0.0.1"
+ 
+ _REQUEST = b"\x00" * 100
+ _COMPRESSION_RATIO_THRESHOLD = 0.05
+@@ -186,6 +190,13 @@ def _get_byte_counts(
+     server_handler,
+     message,
+ ):
++    # This test measures compression ratios, not connection establishment:
++    # ride through transient connect failures instead of failing fast. On a
++    # loaded machine (e.g. under --runs_per_test), macOS can transiently
++    # fail connect() on loopback with EADDRINUSE when picking an ephemeral
++    # source port, which otherwise fails the RPC before the subchannel's
++    # backoff retry gets a chance.
++    multicallable_kwargs = dict(multicallable_kwargs, wait_for_ready=True)
+     with _instrumented_client_server_pair(
+         channel_kwargs, server_kwargs, server_handler
+     ) as pipeline:
+diff --git a/src/python/grpcio_tests/tests/unit/_tcp_proxy.py b/src/python/grpcio_tests/tests/unit/_tcp_proxy.py
+index 64fae60..9ee207c 100644
+--- a/src/python/grpcio_tests/tests/unit/_tcp_proxy.py
++++ b/src/python/grpcio_tests/tests/unit/_tcp_proxy.py
+@@ -77,12 +77,23 @@ class TcpProxy:
+                 client_socket, client_address = socket_to_read.accept()
+                 self._client_sockets.append(client_socket)
+             elif socket_to_read is self._proxy_socket:
+-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
++                # An abrupt teardown of a proxied connection (e.g. an RST
++                # when the other side closes with data in flight) raises
++                # from recv. Treat it like an orderly EOF: an unhandled
++                # exception here kills the proxy thread and strands every
++                # connection still using the proxy.
++                try:
++                    data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
++                except OSError:
++                    data = b""
+                 with self._byte_count_lock:
+                     self._received_byte_count += len(data)
+                 self._northbound_data += data
+             elif socket_to_read in self._client_sockets:
+-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
++                try:
++                    data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
++                except OSError:
++                    data = b""
+                 if data:
+                     with self._byte_count_lock:
+                         self._sent_byte_count += len(data)
+@@ -96,11 +107,19 @@ class TcpProxy:
+         for socket_to_write in sockets_to_write:
+             if socket_to_write is self._proxy_socket:
+                 if self._southbound_data:
+-                    self._proxy_socket.sendall(self._southbound_data)
++                    try:
++                        self._proxy_socket.sendall(self._southbound_data)
++                    except OSError:
++                        # The peer disappeared; the read path will observe
++                        # the closure. Don't kill the proxy thread.
++                        pass
+                     self._southbound_data = b""
+             elif socket_to_write in self._client_sockets:
+                 if self._northbound_data:
+-                    socket_to_write.sendall(self._northbound_data)
++                    try:
++                        socket_to_write.sendall(self._northbound_data)
++                    except OSError:
++                        pass
+                     self._northbound_data = b""
+ 
+     def _run_proxy(self):
+diff --git a/src/python/grpcio_tests/tests_aio/unit/server_test.py b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+index 54791fd..6c1049c 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/server_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+@@ -567,7 +567,15 @@ class TestServer(AioTestBase):
+         with self.assertRaises(aio.AioRpcError) as exception_context:
+             await call
+         rpc_error = exception_context.exception
+-        self.assertEqual(grpc.StatusCode.UNKNOWN, rpc_error.code())
++        # The handler raises after the first request, while the client may
++        # still have writes in flight. The unhandled server error surfaces
++        # as UNKNOWN, unless a pending client write trips over the reset
++        # stream first, which surfaces locally as INTERNAL. Either way the
++        # handler error terminated the RPC.
++        self.assertIn(
++            rpc_error.code(),
++            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.INTERNAL),
++        )
+ 
+     async def test_port_binding_exception(self):
+         server = aio.server(options=(("grpc.so_reuseport", 0),))
+-- 
+2.39.5 (Apple Git-154)
+

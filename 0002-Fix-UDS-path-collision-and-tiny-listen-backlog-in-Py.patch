@@ -1,0 +1,60 @@
+From 7f6acf3031856efd73457049958e543f35eac793 Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 11:14:36 +0100
+Subject: [PATCH 02/12] Fix UDS path collision and tiny listen backlog in
+ Python test helpers
+
+test_uds bound a fixed /tmp path, so concurrent runs of the test
+(e.g. under --runs_per_test) raced to bind the same socket file.
+get_socket() listened with a backlog of 1; macOS refuses connections
+that overflow the accept queue instead of dropping the SYN like Linux,
+turning bursts into spurious 'connection refused' failures.
+---
+ .../grpcio_tests/tests/unit/_local_credentials_test.py     | 5 ++++-
+ .../grpcio_tests/tests/unit/framework/common/__init__.py   | 7 ++++++-
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests/unit/_local_credentials_test.py b/src/python/grpcio_tests/tests/unit/_local_credentials_test.py
+index 8c949cd..ecfc56c 100644
+--- a/src/python/grpcio_tests/tests/unit/_local_credentials_test.py
++++ b/src/python/grpcio_tests/tests/unit/_local_credentials_test.py
+@@ -16,6 +16,7 @@
+ from concurrent.futures import ThreadPoolExecutor
+ import os
+ import unittest
++import uuid
+ 
+ import grpc
+ 
+@@ -65,7 +66,9 @@ class LocalCredentialsTest(unittest.TestCase):
+         os.name == "nt", "Unix Domain Socket is not supported on Windows"
+     )
+     def test_uds(self):
+-        server_addr = "unix:/tmp/grpc_fullstack_test"
++        # A unique path so that concurrent runs of this test (e.g. under
++        # --runs_per_test) do not race to bind the same socket file.
++        server_addr = f"unix:/tmp/grpc_fullstack_test_{uuid.uuid4().hex}"
+         channel_creds = grpc.local_channel_credentials(
+             grpc.LocalConnectionType.UDS
+         )
+diff --git a/src/python/grpcio_tests/tests/unit/framework/common/__init__.py b/src/python/grpcio_tests/tests/unit/framework/common/__init__.py
+index d3c36a3..4f1cee7 100644
+--- a/src/python/grpcio_tests/tests/unit/framework/common/__init__.py
++++ b/src/python/grpcio_tests/tests/unit/framework/common/__init__.py
+@@ -59,7 +59,12 @@ def get_socket(
+                 sock.setsockopt(socket.SOL_SOCKET, sock_option, 1)
+             sock.bind((bind_address, port))
+             if listen:
+-                sock.listen(1)
++                # Use the full backlog: with a backlog of 1, a burst of
++                # connection attempts can overflow the accept queue, and
++                # macOS actively refuses (RST) overflowing connections
++                # rather than silently dropping the SYN and letting the
++                # client retransmit as Linux does.
++                sock.listen(socket.SOMAXCONN)
+             return bind_address, sock.getsockname()[1], sock
+         except OSError as os_error:
+             sock.close()
+-- 
+2.39.5 (Apple Git-154)
+

@@ -36,7 +36,11 @@ _STREAM_STREAM = "StreamStream"
 # Cut down on test time.
 _STREAM_LENGTH = test_constants.STREAM_LENGTH // 16
 
-_HOST = "localhost"
+# A single, specific loopback address: binding and dialing the same
+# address keeps the client from probing a second address family in which
+# the proxy does not exist (and in which the port number is a separate
+# namespace that another concurrently running test's server can own).
+_HOST = "127.0.0.1"
 
 _REQUEST = b"\x00" * 100
 _COMPRESSION_RATIO_THRESHOLD = 0.05
@@ -186,6 +190,13 @@ def _get_byte_counts(
     server_handler,
     message,
 ):
+    # This test measures compression ratios, not connection establishment:
+    # ride through transient connect failures instead of failing fast. On a
+    # loaded machine (e.g. under --runs_per_test), macOS can transiently
+    # fail connect() on loopback with EADDRINUSE when picking an ephemeral
+    # source port, which otherwise fails the RPC before the subchannel's
+    # backoff retry gets a chance.
+    multicallable_kwargs = dict(multicallable_kwargs, wait_for_ready=True)
     with _instrumented_client_server_pair(
         channel_kwargs, server_kwargs, server_handler
     ) as pipeline:

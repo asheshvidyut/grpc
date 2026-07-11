@@ -1,0 +1,90 @@
+From 7af7a84da6b340f83998037a07dcf1bde3af3445 Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 14:09:36 +0100
+Subject: [PATCH 07/12] Pin _reconnect_test and aio server_test to 127.0.0.1
+
+_reconnect_test reserved its port on one loopback family (via
+"localhost", landing on [::1]) while the client dialed localhost. The
+unguarded 127.0.0.1 twin of the port was owned by an unrelated local
+process (a Docker-forwarded port) that answers every RPC with HTTP/2
+404: when server #1 stopped, pick_first failed over to that live
+foreign socket and stuck there, so the recovery phase never saw
+server #2. Pin the reservation, bind, and dial to 127.0.0.1, and
+release the reservation once the server has bound: keeping a
+bound-but-not-listening socket would break the test's fail-fast
+assumption on macOS, which silently drops SYNs to such sockets instead
+of refusing them like Linux.
+
+tests_aio server_test used its own local _start_test_server helper
+with the same wildcard-bind localhost-dial pattern; pin it like the
+shared helper.
+---
+ .../tests/unit/_reconnect_test.py             | 21 ++++++++++++++++++-
+ .../tests_aio/unit/server_test.py             |  9 ++++++--
+ 2 files changed, 27 insertions(+), 3 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests/unit/_reconnect_test.py b/src/python/grpcio_tests/tests/unit/_reconnect_test.py
+index 57032c7..e0e49ef 100644
+--- a/src/python/grpcio_tests/tests/unit/_reconnect_test.py
++++ b/src/python/grpcio_tests/tests/unit/_reconnect_test.py
+@@ -59,7 +59,16 @@ class TestServer:
+ 
+     def __init__(self):
+         self.pool = logging_pool.pool(test_constants.THREAD_CONCURRENCY)
+-        self.host, self.port, self._sock = test_common.get_socket(listen=False)
++        # Bind and dial one specific loopback address. Reserving only one
++        # address family while the client dials "localhost" lets the client
++        # fail over to the other family, where the same port number is a
++        # separate namespace that can be owned by an unrelated process. This
++        # was observed with a Docker-forwarded port on 127.0.0.1 answering
++        # every RPC with HTTP/2 404 while the test's real server lived on
++        # [::1], permanently breaking the recovery phase.
++        self.host, self.port, self._sock = test_common.get_socket(
++            bind_address="127.0.0.1", listen=False
++        )
+ 
+     @property
+     def addr(self) -> str:
+@@ -86,6 +95,16 @@ class TestServer:
+ 
+         logging.info("[SERVER #%s] Starting on %s", self.server_id, self.addr)
+         server.start()
++        # Release the port reservation: the running server anchors the port
++        # from here on. Keeping the bound-but-not-listening reservation open
++        # would break the test's fail-fast assumption on macOS, which
++        # silently drops SYNs to such a socket (instead of refusing them
++        # like Linux), so RPCs sent while the server is down would stall in
++        # connect timeouts rather than failing quickly. Closing it leaves a
++        # small window between server restarts in which the port is unheld,
++        # which the kernel's cyclic ephemeral port assignment makes very
++        # unlikely to matter.
++        self._sock.close()
+ 
+     def terminate(self) -> None:
+         if not self.server:
+diff --git a/src/python/grpcio_tests/tests_aio/unit/server_test.py b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+index 6c1049c..af3cd6e 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/server_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+@@ -241,11 +241,16 @@ class _GenericHandler(grpc.GenericRpcHandler):
+ 
+ async def _start_test_server():
+     server = aio.server()
+-    port = server.add_insecure_port("[::]:0")
++    # Bind and dial the same specific loopback address: with a wildcard
++    # bind and a "localhost" target, the client may fall back to the other
++    # loopback address family, where the same port number is a separate
++    # namespace that another concurrently running test's server (or an
++    # unrelated local process) can own.
++    port = server.add_insecure_port("127.0.0.1:0")
+     generic_handler = _GenericHandler()
+     server.add_generic_rpc_handlers((generic_handler,))
+     await server.start()
+-    return "localhost:%d" % port, server, generic_handler
++    return "127.0.0.1:%d" % port, server, generic_handler
+ 
+ 
+ class TestServer(AioTestBase):
+-- 
+2.39.5 (Apple Git-154)
+

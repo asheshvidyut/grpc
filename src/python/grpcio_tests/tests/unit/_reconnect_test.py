@@ -59,7 +59,16 @@ class TestServer:
 
     def __init__(self):
         self.pool = logging_pool.pool(test_constants.THREAD_CONCURRENCY)
-        self.host, self.port, self._sock = test_common.get_socket(listen=False)
+        # Bind and dial one specific loopback address. Reserving only one
+        # address family while the client dials "localhost" lets the client
+        # fail over to the other family, where the same port number is a
+        # separate namespace that can be owned by an unrelated process. This
+        # was observed with a Docker-forwarded port on 127.0.0.1 answering
+        # every RPC with HTTP/2 404 while the test's real server lived on
+        # [::1], permanently breaking the recovery phase.
+        self.host, self.port, self._sock = test_common.get_socket(
+            bind_address="127.0.0.1", listen=False
+        )
 
     @property
     def addr(self) -> str:
@@ -86,6 +95,16 @@ class TestServer:
 
         logging.info("[SERVER #%s] Starting on %s", self.server_id, self.addr)
         server.start()
+        # Release the port reservation: the running server anchors the port
+        # from here on. Keeping the bound-but-not-listening reservation open
+        # would break the test's fail-fast assumption on macOS, which
+        # silently drops SYNs to such a socket (instead of refusing them
+        # like Linux), so RPCs sent while the server is down would stall in
+        # connect timeouts rather than failing quickly. Closing it leaves a
+        # small window between server restarts in which the port is unheld,
+        # which the kernel's cyclic ephemeral port assignment makes very
+        # unlikely to matter.
+        self._sock.close()
 
     def terminate(self) -> None:
         if not self.server:

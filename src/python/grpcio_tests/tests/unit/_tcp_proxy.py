@@ -77,12 +77,23 @@ class TcpProxy:
                 client_socket, client_address = socket_to_read.accept()
                 self._client_sockets.append(client_socket)
             elif socket_to_read is self._proxy_socket:
-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                # An abrupt teardown of a proxied connection (e.g. an RST
+                # when the other side closes with data in flight) raises
+                # from recv. Treat it like an orderly EOF: an unhandled
+                # exception here kills the proxy thread and strands every
+                # connection still using the proxy.
+                try:
+                    data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                except OSError:
+                    data = b""
                 with self._byte_count_lock:
                     self._received_byte_count += len(data)
                 self._northbound_data += data
             elif socket_to_read in self._client_sockets:
-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                try:
+                    data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
+                except OSError:
+                    data = b""
                 if data:
                     with self._byte_count_lock:
                         self._sent_byte_count += len(data)
@@ -96,11 +107,19 @@ class TcpProxy:
         for socket_to_write in sockets_to_write:
             if socket_to_write is self._proxy_socket:
                 if self._southbound_data:
-                    self._proxy_socket.sendall(self._southbound_data)
+                    try:
+                        self._proxy_socket.sendall(self._southbound_data)
+                    except OSError:
+                        # The peer disappeared; the read path will observe
+                        # the closure. Don't kill the proxy thread.
+                        pass
                     self._southbound_data = b""
             elif socket_to_write in self._client_sockets:
                 if self._northbound_data:
-                    socket_to_write.sendall(self._northbound_data)
+                    try:
+                        socket_to_write.sendall(self._northbound_data)
+                    except OSError:
+                        pass
                     self._northbound_data = b""
 
     def _run_proxy(self):

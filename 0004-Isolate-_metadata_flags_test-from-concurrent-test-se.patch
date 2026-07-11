@@ -1,0 +1,78 @@
+From 7402f3a41ee275ae0ef63da2b327c7b84554e248 Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 12:06:51 +0100
+Subject: [PATCH 04/12] Isolate _metadata_flags_test from concurrent test
+ servers
+
+The phony fail-fast channel dialed a TCP port that had just been
+released; under concurrent test runs the port, or its twin in the other
+loopback address family, can belong to another test's live server, and
+the RPC then fails with UNIMPLEMENTED instead of UNAVAILABLE. Dial a
+nonexistent Unix domain socket path instead, which fails
+deterministically. Pin the wait_for_ready test's reservation and target
+to 127.0.0.1 so the client cannot fall back across address families.
+---
+ .../tests/unit/_metadata_flags_test.py        | 28 +++++++++++++++----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests/unit/_metadata_flags_test.py b/src/python/grpcio_tests/tests/unit/_metadata_flags_test.py
+index ec46ba2..79c3b91 100644
+--- a/src/python/grpcio_tests/tests/unit/_metadata_flags_test.py
++++ b/src/python/grpcio_tests/tests/unit/_metadata_flags_test.py
+@@ -14,11 +14,13 @@
+ """Tests metadata flags feature by testing wait-for-ready semantics"""
+ 
+ import logging
++import os
+ import queue
+ import socket
+ import threading
+ import time
+ import unittest
++import uuid
+ import weakref
+ 
+ import grpc
+@@ -97,9 +99,19 @@ def get_method_handlers(test):
+ 
+ def create_phony_channel():
+     """Creating phony channels is a workaround for retries"""
+-    host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
+-    sock.close()
+-    return grpc.insecure_channel("{}:{}".format(host, port))
++    if os.name == "nt":
++        host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
++        sock.close()
++        return grpc.insecure_channel("{}:{}".format(host, port))
++    # A Unix domain socket path that does not exist fails to connect
++    # deterministically. A released TCP port does not: under concurrent
++    # test runs (e.g. --runs_per_test) the port, or its twin in the other
++    # loopback address family, can be owned by another test's live server,
++    # and the "phony" channel then reaches a real server and the RPC fails
++    # with UNIMPLEMENTED instead of UNAVAILABLE.
++    return grpc.insecure_channel(
++        "unix:/tmp/grpc_phony_{}".format(uuid.uuid4().hex)
++    )
+ 
+ 
+ def perform_unary_unary_call(channel, wait_for_ready=None):
+@@ -238,8 +250,14 @@ class MetadataFlagsTest(unittest.TestCase):
+         #   exceptions and raise them again in main thread.
+         unhandled_exceptions = queue.Queue()
+ 
+-        # We just need an unused TCP port
+-        host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
++        # We just need an unused TCP port. Pin both the reservation and the
++        # target to one address family (IPv4 loopback): with a "localhost"
++        # target the client may fall back to the other loopback family,
++        # where the same port number is a separate namespace that can be
++        # owned by another concurrently running test's server.
++        host, port, sock = get_socket(
++            bind_address="127.0.0.1", sock_options=(socket.SO_REUSEADDR,)
++        )
+         sock.close()
+ 
+         addr = "{}:{}".format(host, port)
+-- 
+2.39.5 (Apple Git-154)
+

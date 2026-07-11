@@ -14,11 +14,13 @@
 """Tests metadata flags feature by testing wait-for-ready semantics"""
 
 import logging
+import os
 import queue
 import socket
 import threading
 import time
 import unittest
+import uuid
 import weakref
 
 import grpc
@@ -97,9 +99,19 @@ def get_method_handlers(test):
 
 def create_phony_channel():
     """Creating phony channels is a workaround for retries"""
-    host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
-    sock.close()
-    return grpc.insecure_channel("{}:{}".format(host, port))
+    if os.name == "nt":
+        host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
+        sock.close()
+        return grpc.insecure_channel("{}:{}".format(host, port))
+    # A Unix domain socket path that does not exist fails to connect
+    # deterministically. A released TCP port does not: under concurrent
+    # test runs (e.g. --runs_per_test) the port, or its twin in the other
+    # loopback address family, can be owned by another test's live server,
+    # and the "phony" channel then reaches a real server and the RPC fails
+    # with UNIMPLEMENTED instead of UNAVAILABLE.
+    return grpc.insecure_channel(
+        "unix:/tmp/grpc_phony_{}".format(uuid.uuid4().hex)
+    )
 
 
 def perform_unary_unary_call(channel, wait_for_ready=None):
@@ -238,8 +250,14 @@ class MetadataFlagsTest(unittest.TestCase):
         #   exceptions and raise them again in main thread.
         unhandled_exceptions = queue.Queue()
 
-        # We just need an unused TCP port
-        host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
+        # We just need an unused TCP port. Pin both the reservation and the
+        # target to one address family (IPv4 loopback): with a "localhost"
+        # target the client may fall back to the other loopback family,
+        # where the same port number is a separate namespace that can be
+        # owned by another concurrently running test's server.
+        host, port, sock = get_socket(
+            bind_address="127.0.0.1", sock_options=(socket.SO_REUSEADDR,)
+        )
         sock.close()
 
         addr = "{}:{}".format(host, port)

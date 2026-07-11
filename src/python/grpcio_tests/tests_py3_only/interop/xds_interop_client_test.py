@@ -48,6 +48,19 @@ _TEST_ITERATIONS = 10
 _ITERATION_DURATION_SECONDS = 1
 _SUBPROCESS_TIMEOUT_SECONDS = 2
 
+# Maximum number of one-second windows to wait for the client to reach a
+# steady state (RPCs flowing with no failures) before asserting on stats.
+_WARMUP_MAX_WINDOWS = 30
+
+# The server's port is reserved, released, and then bound by the server
+# subprocess. In the window between the release and the bind, another
+# process can take the port (even as the ephemeral source port of an
+# unrelated connection), in which case the server fails to start. Bound the
+# probe RPC and retry with a fresh port instead of blocking until the test
+# times out with no diagnostics.
+_SERVER_PROBE_TIMEOUT_SECONDS = 30
+_SERVER_START_ATTEMPTS = 2
+
 
 def _set_union(a: Iterable, b: Iterable) -> Set:
     c = set(a)
@@ -115,7 +128,7 @@ def _collect_stats(
     stats_port: int, duration: int
 ) -> Mapping[str, Mapping[int, int]]:
     settings = {
-        "target": f"localhost:{stats_port}",
+        "target": f"127.0.0.1:{stats_port}",
         "insecure": True,
     }
     response = test_pb2_grpc.LoadBalancerStatsService.GetClientAccumulatedStats(
@@ -131,11 +144,49 @@ def _collect_stats(
 
 
 class XdsInteropClientTest(unittest.TestCase):
+    def _await_client_steady_state(self, stats_port: int) -> None:
+        """Waits until the client's RPCs flow with no failures.
+
+        Right after startup, the client fires _QPS RPCs per second from each
+        of its _NUM_CHANNELS channels while the channels are still
+        connecting and the server process is still warming up. On a loaded
+        machine (e.g. --runs_per_test with several copies of this test in
+        parallel), RPCs started during this window can fail with transient
+        statuses that have nothing to do with the configure-consistency
+        property this test asserts on. Wait for a clean one-second window
+        before asserting. If the client never stabilizes, proceed and let
+        the assertions report the failure with full stats.
+        """
+        for _ in range(_WARMUP_MAX_WINDOWS):
+            try:
+                delta = _collect_stats(stats_port, 1)
+            except grpc.RpcError:
+                # The client's stats server may not be listening yet.
+                time.sleep(1)
+                continue
+            succeeded = sum(
+                count
+                for method_stats in delta.values()
+                for status, count in method_stats.items()
+                if status == 0
+            )
+            failed = sum(
+                count
+                for method_stats in delta.values()
+                for status, count in method_stats.items()
+                if status != 0
+            )
+            if succeeded > 0 and failed == 0:
+                return
+        logging.warning(
+            "Client did not reach a steady state; proceeding anyway."
+        )
+
     def _assert_client_consistent(
         self, server_port: int, stats_port: int, qps: int, num_channels: int
     ):
         settings = {
-            "target": f"localhost:{stats_port}",
+            "target": f"127.0.0.1:{stats_port}",
             "insecure": True,
         }
         for i in range(_TEST_ITERATIONS):
@@ -154,46 +205,81 @@ class XdsInteropClientTest(unittest.TestCase):
                         self.assertEqual(delta[method_str][status], 0, delta)
 
     def test_configure_consistency(self):
-        _, server_port, socket = framework_common.get_socket()
+        for attempt in range(_SERVER_START_ATTEMPTS):
+            _, server_port, socket = framework_common.get_socket()
 
-        with _start_python_with_args(
-            _SERVER_PATH,
-            [f"--port={server_port}", f"--maintenance_port={server_port}"],
-        ) as (server, server_stdout, server_stderr):
-            # Send RPC to server to make sure it's running.
-            logging.info("Sending RPC to server.")
-            test_pb2_grpc.TestService.EmptyCall(
-                empty_pb2.Empty(),
-                f"localhost:{server_port}",
-                insecure=True,
-                wait_for_ready=True,
-            )
-            logging.info("Server successfully started.")
-            socket.close()
-            _, stats_port, stats_socket = framework_common.get_socket()
             with _start_python_with_args(
-                _CLIENT_PATH,
-                [
-                    f"--server=localhost:{server_port}",
-                    f"--stats_port={stats_port}",
-                    f"--qps={_QPS}",
-                    f"--num_channels={_NUM_CHANNELS}",
-                ],
-            ) as (client, client_stdout, client_stderr):
-                stats_socket.close()
+                _SERVER_PATH,
+                [f"--port={server_port}", f"--maintenance_port={server_port}"],
+            ) as (server, server_stdout, server_stderr):
+                # Release the port reservation before probing the server.
+                # The reservation socket is a listener that never accepts,
+                # while the server subprocess binds the wildcard address. If
+                # the reservation happens to hold an address the client
+                # connects to (which listener wins depends on the address
+                # family the reservation landed on), the probe RPC and every
+                # subsequent connection is swallowed by a socket that never
+                # speaks HTTP/2. wait_for_ready below retries until the
+                # server has bound the released port.
+                socket.close()
+                # Send RPC to server to make sure it's running.
+                logging.info("Sending RPC to server.")
                 try:
-                    self._assert_client_consistent(
-                        server_port, stats_port, _QPS, _NUM_CHANNELS
+                    test_pb2_grpc.TestService.EmptyCall(
+                        empty_pb2.Empty(),
+                        f"127.0.0.1:{server_port}",
+                        insecure=True,
+                        wait_for_ready=True,
+                        timeout=_SERVER_PROBE_TIMEOUT_SECONDS,
                     )
-                except:
-                    _dump_streams("server", server_stdout, server_stderr)
-                    _dump_streams("client", client_stdout, client_stderr)
-                    raise
-                finally:
+                except grpc.RpcError:
+                    # The server never came up, e.g. because its port was
+                    # taken during the reservation-release window.
                     server.kill()
-                    client.kill()
                     server.wait(timeout=_SUBPROCESS_TIMEOUT_SECONDS)
-                    client.wait(timeout=_SUBPROCESS_TIMEOUT_SECONDS)
+                    if attempt + 1 == _SERVER_START_ATTEMPTS:
+                        _dump_streams("server", server_stdout, server_stderr)
+                        raise
+                    logging.warning(
+                        "Server did not become ready on port %d; retrying "
+                        "with a fresh port.",
+                        server_port,
+                    )
+                    continue
+                logging.info("Server successfully started.")
+                self._run_client_and_assert(
+                    server_port, server, server_stdout, server_stderr
+                )
+                return
+
+    def _run_client_and_assert(
+        self, server_port, server, server_stdout, server_stderr
+    ):
+        _, stats_port, stats_socket = framework_common.get_socket()
+        with _start_python_with_args(
+            _CLIENT_PATH,
+            [
+                f"--server=127.0.0.1:{server_port}",
+                f"--stats_port={stats_port}",
+                f"--qps={_QPS}",
+                f"--num_channels={_NUM_CHANNELS}",
+            ],
+        ) as (client, client_stdout, client_stderr):
+            stats_socket.close()
+            try:
+                self._await_client_steady_state(stats_port)
+                self._assert_client_consistent(
+                    server_port, stats_port, _QPS, _NUM_CHANNELS
+                )
+            except:
+                _dump_streams("server", server_stdout, server_stderr)
+                _dump_streams("client", client_stdout, client_stderr)
+                raise
+            finally:
+                server.kill()
+                client.kill()
+                server.wait(timeout=_SUBPROCESS_TIMEOUT_SECONDS)
+                client.wait(timeout=_SUBPROCESS_TIMEOUT_SECONDS)
 
 
 if __name__ == "__main__":

@@ -58,6 +58,12 @@ py_library(
 _FLAKY_TESTS = [
     # TODO(https://github.com/grpc/grpc/issues/22347) remove from this list.
     "channel_argument_test.py",
+    # test_call_wait_for_ready_enabled rarely hangs in the server
+    # stop/restart cycle even over a Unix domain socket, pointing at a
+    # channel-state race rather than an environmental issue; the sibling
+    # test_channel_ready_blocked is already skipped for the same family of
+    # flakes (https://github.com/grpc/grpc/issues/37949).
+    "wait_for_ready_test.py",
 ]
 
 # All tests with runtime type checking

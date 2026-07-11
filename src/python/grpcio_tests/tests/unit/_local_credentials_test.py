@@ -16,6 +16,7 @@
 from concurrent.futures import ThreadPoolExecutor
 import os
 import unittest
+import uuid
 
 import grpc
 
@@ -38,7 +39,7 @@ class LocalCredentialsTest(unittest.TestCase):
         os.name == "nt", "TODO(https://github.com/grpc/grpc/issues/20078)"
     )
     def test_local_tcp(self):
-        server_addr = "localhost:{}"
+        server_addr = "127.0.0.1:{}"
         channel_creds = grpc.local_channel_credentials(
             grpc.LocalConnectionType.LOCAL_TCP
         )
@@ -65,7 +66,9 @@ class LocalCredentialsTest(unittest.TestCase):
         os.name == "nt", "Unix Domain Socket is not supported on Windows"
     )
     def test_uds(self):
-        server_addr = "unix:/tmp/grpc_fullstack_test"
+        # A unique path so that concurrent runs of this test (e.g. under
+        # --runs_per_test) do not race to bind the same socket file.
+        server_addr = f"unix:/tmp/grpc_fullstack_test_{uuid.uuid4().hex}"
         channel_creds = grpc.local_channel_credentials(
             grpc.LocalConnectionType.UDS
         )

@@ -1,0 +1,67 @@
+From 690769ddbff4110c06d1b40311c96f871e28da57 Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 11:47:39 +0100
+Subject: [PATCH 03/12] Accept CANCELLED in aio server shutdown-during-stream
+ tests
+
+server.stop(None) races between tearing down the connection (client
+observes UNAVAILABLE) and flushing CANCELLED trailers for in-flight
+calls before the socket closes (client observes CANCELLED). Both
+outcomes prove what this test was added for (no segfault, see
+80d7acff7c), so accept either status.
+---
+ .../tests_aio/unit/server_test.py             | 24 +++++++++++++++----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests_aio/unit/server_test.py b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+index dfaf18f..54791fd 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/server_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+@@ -438,8 +438,11 @@ class TestServer(AioTestBase):
+ 
+         with self.assertRaises(aio.AioRpcError) as exception_context:
+             await call
+-        self.assertEqual(
+-            grpc.StatusCode.UNAVAILABLE, exception_context.exception.code()
++        # Killing the in-flight call races between connection teardown
++        # (UNAVAILABLE) and CANCELLED trailers reaching the client first.
++        self.assertIn(
++            exception_context.exception.code(),
++            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
+         )
+ 
+     async def test_concurrent_graceful_shutdown(self):
+@@ -475,8 +478,11 @@ class TestServer(AioTestBase):
+ 
+         with self.assertRaises(aio.AioRpcError) as exception_context:
+             await call
+-        self.assertEqual(
+-            grpc.StatusCode.UNAVAILABLE, exception_context.exception.code()
++        # Killing the in-flight call races between connection teardown
++        # (UNAVAILABLE) and CANCELLED trailers reaching the client first.
++        self.assertIn(
++            exception_context.exception.code(),
++            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
+         )
+ 
+     async def test_shutdown_before_call(self):
+@@ -504,7 +510,15 @@ class TestServer(AioTestBase):
+         await call.write(_REQUEST)
+         await self._server.stop(None)
+ 
+-        self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
++        # An ungraceful stop (grace=None) races between tearing the
++        # connection down (the client observes UNAVAILABLE) and flushing
++        # CANCELLED trailers for the in-flight call before the socket
++        # closes (the client observes CANCELLED). Both prove the point of
++        # this test, which was added to guard against a segfault.
++        self.assertIn(
++            await call.code(),
++            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
++        )
+         # No segfault
+ 
+     async def test_error_in_stream_stream(self):
+-- 
+2.39.5 (Apple Git-154)
+

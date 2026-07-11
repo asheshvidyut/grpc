@@ -1,0 +1,1439 @@
+From ab2964b85b21327030b76ef3851a1bb72b4c5381 Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 15:21:08 +0100
+Subject: [PATCH 08/12] Pin Python test binds and dials to 127.0.0.1 across the
+ test tree
+
+Soak testing (repeating the 16x flake qualification run) kept catching
+the same failure class one file at a time: a test binds [::]:0 or
+localhost and dials localhost, and the client resolves localhost to
+both loopback addresses. A foreign listener holding the specific
+127.0.0.1 twin of the port (another concurrently running test, or an
+unrelated local process; observed with a Docker-forwarded port that
+answers HTTP/2 404) beats the test's wildcard listener for IPv4
+traffic or captures the fallback path, yielding UNIMPLEMENTED from
+strangers, writes failing mid-stream, and hangs.
+
+Mechanically pin bind and dial to 127.0.0.1 across the remaining
+test files. Excluded: TLS tests whose certificates are bound to the
+localhost hostname, and DNS resolver tests that dial hostnames on
+purpose (bind-only pinning there). channel_argument_test's reuseport
+probe is pinned to the address the server binds so it keeps
+contending for the same socket.
+---
+ .../grpcio_tests/tests/admin/admin_test.py    |  4 +--
+ .../tests/channelz/_channelz_servicer_test.py |  8 +++---
+ .../grpcio_tests/tests/csds/csds_test.py      |  4 +--
+ .../tests/fork/_fork_interop_test.py          |  4 +--
+ .../health_check/_health_servicer_test.py     |  4 +--
+ .../tests/interop/_insecure_intraop_test.py   |  4 +--
+ .../_open_telemetry_observability_test.py     |  4 +--
+ .../tests/observability/_test_server.py       | 16 ++++++------
+ .../protoc_plugin/_python_plugin_test.py      | 12 ++++-----
+ .../protoc_plugin/_split_definitions_test.py  |  4 +--
+ .../protoc_plugin/beta_python_plugin_test.py  |  8 +++---
+ .../reflection/_reflection_client_test.py     |  4 +--
+ .../reflection/_reflection_servicer_test.py   |  4 +--
+ .../tests/status/_grpc_status_test.py         |  4 +--
+ .../grpcio_tests/tests/unit/_abort_test.py    |  4 +--
+ .../tests/unit/_channel_close_test.py         | 14 +++++-----
+ .../tests/unit/_channel_connectivity_test.py  |  8 +++---
+ .../tests/unit/_channel_ready_future_test.py  |  4 +--
+ .../unit/_cython/_cancel_many_calls_test.py   |  4 +--
+ .../tests/unit/_cython/_common.py             |  4 +--
+ .../_read_some_but_not_all_responses_test.py  |  4 +--
+ .../tests/unit/_cython/_server_test.py        |  2 +-
+ .../tests/unit/_dns_resolver_test.py          |  2 +-
+ .../tests/unit/_empty_message_test.py         |  4 +--
+ .../unit/_error_message_encoding_test.py      |  4 +--
+ .../tests/unit/_exit_scenarios.py             | 10 +++----
+ .../tests/unit/_invocation_defects_test.py    |  4 +--
+ .../tests/unit/_local_credentials_test.py     |  2 +-
+ .../grpcio_tests/tests/unit/_metadata_test.py |  4 +--
+ .../tests/unit/_rpc_test_helpers.py           |  4 +--
+ .../tests/unit/_server_shutdown_scenarios.py  |  4 +--
+ .../tests/unit/beta/_not_found_test.py        |  4 +--
+ .../tests/unit/beta/_utilities_test.py        |  2 +-
+ .../channelz/channelz_servicer_test.py        |  8 +++---
+ .../health_check/health_servicer_test.py      |  4 +--
+ .../tests_aio/observability/_test_server.py   | 10 +++----
+ .../reflection/reflection_servicer_test.py    |  4 +--
+ .../tests_aio/status/grpc_status_test.py      |  4 +--
+ .../tests_aio/unit/_metadata_test.py          |  4 +--
+ .../grpcio_tests/tests_aio/unit/abort_test.py |  4 +--
+ .../tests_aio/unit/channel_argument_test.py   | 11 +++++---
+ .../tests_aio/unit/compatibility_test.py      |  8 +++---
+ .../tests_aio/unit/compression_test.py        |  8 +++---
+ .../tests_aio/unit/context_peer_test.py       |  4 +--
+ .../tests_aio/unit/done_callback_test.py      |  4 +--
+ .../tests_aio/unit/metadata_test.py           |  4 +--
+ .../tests_aio/unit/multithread_test.py        |  4 +--
+ .../tests_aio/unit/server_test.py             | 12 ++++-----
+ .../unit/server_time_remaining_test.py        |  4 +--
+ .../tests_aio/unit/timeout_test.py            |  4 +--
+ .../tests_gevent/unit/_test_server.py         |  2 +-
+ .../interop/xds_interop_client_test.py        |  8 +++---
+ .../tests_py3_only/unit/_leak_test.py         |  4 +--
+ .../tests_py3_only/unit/_simple_stubs_test.py | 26 +++++++++----------
+ 54 files changed, 158 insertions(+), 155 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests/admin/admin_test.py b/src/python/grpcio_tests/tests/admin/admin_test.py
+index b011cd0..04f70f9 100644
+--- a/src/python/grpcio_tests/tests/admin/admin_test.py
++++ b/src/python/grpcio_tests/tests/admin/admin_test.py
+@@ -28,11 +28,11 @@ from grpc_csds import csds_pb2_grpc
+ class TestAdmin(unittest.TestCase):
+     def setUp(self):
+         self._server = grpc.server(ThreadPoolExecutor())
+-        port = self._server.add_insecure_port("localhost:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         grpc_admin.add_admin_servicers(self._server)
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%s" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%s" % port)
+ 
+     def tearDown(self):
+         self._channel.close()
+diff --git a/src/python/grpcio_tests/tests/channelz/_channelz_servicer_test.py b/src/python/grpcio_tests/tests/channelz/_channelz_servicer_test.py
+index d04b8cb..b3d5e83 100644
+--- a/src/python/grpcio_tests/tests/channelz/_channelz_servicer_test.py
++++ b/src/python/grpcio_tests/tests/channelz/_channelz_servicer_test.py
+@@ -72,13 +72,13 @@ class _ChannelServerPair:
+             futures.ThreadPoolExecutor(max_workers=3),
+             options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ,
+         )
+-        port = self.server.add_insecure_port("[::]:0")
++        port = self.server.add_insecure_port("127.0.0.1:0")
+         self.server.add_generic_rpc_handlers((_GenericHandler(),))
+         self.server.start()
+ 
+         # Channel will enable channelz service...
+         self.channel = grpc.insecure_channel(
+-            "localhost:%d" % port, _ENABLE_CHANNELZ
++            "127.0.0.1:%d" % port, _ENABLE_CHANNELZ
+         )
+ 
+ 
+@@ -145,14 +145,14 @@ class ChannelzServicerTest(unittest.TestCase):
+             futures.ThreadPoolExecutor(max_workers=3),
+             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ,
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         channelz.add_channelz_servicer(self._server)
+         self._server.start()
+ 
+         # This channel is used to fetch Channelz info only
+         # Channelz should not be enabled
+         self._channel = grpc.insecure_channel(
+-            "localhost:%d" % port, _DISABLE_CHANNELZ
++            "127.0.0.1:%d" % port, _DISABLE_CHANNELZ
+         )
+         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
+ 
+diff --git a/src/python/grpcio_tests/tests/csds/csds_test.py b/src/python/grpcio_tests/tests/csds/csds_test.py
+index 906b9b9..cc3f6d9 100644
+--- a/src/python/grpcio_tests/tests/csds/csds_test.py
++++ b/src/python/grpcio_tests/tests/csds/csds_test.py
+@@ -60,11 +60,11 @@ class TestCsds(unittest.TestCase):
+     def setUp(self):
+         os.environ["GRPC_XDS_BOOTSTRAP_CONFIG"] = _DUMMY_BOOTSTRAP_FILE
+         self._server = grpc.server(ThreadPoolExecutor())
+-        port = self._server.add_insecure_port("localhost:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         grpc_csds.add_csds_servicer(self._server)
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%s" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%s" % port)
+         self._stub = csds_pb2_grpc.ClientStatusDiscoveryServiceStub(
+             self._channel
+         )
+diff --git a/src/python/grpcio_tests/tests/fork/_fork_interop_test.py b/src/python/grpcio_tests/tests/fork/_fork_interop_test.py
+index 0beb56f..aa04c74 100644
+--- a/src/python/grpcio_tests/tests/fork/_fork_interop_test.py
++++ b/src/python/grpcio_tests/tests/fork/_fork_interop_test.py
+@@ -56,7 +56,7 @@ _CLIENT_FORK_SCRIPT_TEMPLATE = """if True:
+     cygrpc._GRPC_ENABLE_FORK_SUPPORT = True
+     os.environ['GRPC_ENABLE_FORK_SUPPORT'] = 'true'
+     methods.TestCase.%s.run_test({
+-      'server_host': 'localhost',
++      'server_host': '127.0.0.1',
+       'server_port': %d,
+       'use_tls': False
+     })
+@@ -87,7 +87,7 @@ class ForkInteropTest(unittest.TestCase):
+             server = test_common.test_server()
+             test_pb2_grpc.add_TestServiceServicer_to_server(
+                 interop_service.TestService(), server)
+-            port = server.add_insecure_port('[::]:0')
++            port = server.add_insecure_port('127.0.0.1:0')
+             server.start()
+             print(port)
+             sys.stdout.flush()
+diff --git a/src/python/grpcio_tests/tests/health_check/_health_servicer_test.py b/src/python/grpcio_tests/tests/health_check/_health_servicer_test.py
+index 867fd28..3de7c2c 100644
+--- a/src/python/grpcio_tests/tests/health_check/_health_servicer_test.py
++++ b/src/python/grpcio_tests/tests/health_check/_health_servicer_test.py
+@@ -57,13 +57,13 @@ class BaseWatchTests:
+                 _NOT_SERVING_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
+             )
+             self._server = test_common.test_server()
+-            port = self._server.add_insecure_port("[::]:0")
++            port = self._server.add_insecure_port("127.0.0.1:0")
+             health_pb2_grpc.add_HealthServicer_to_server(
+                 self._servicer, self._server
+             )
+             self._server.start()
+ 
+-            self._channel = grpc.insecure_channel("localhost:%d" % port)
++            self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+             self._stub = health_pb2_grpc.HealthStub(self._channel)
+ 
+         def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests/interop/_insecure_intraop_test.py b/src/python/grpcio_tests/tests/interop/_insecure_intraop_test.py
+index 16f7bdf..bcf7a1c 100644
+--- a/src/python/grpcio_tests/tests/interop/_insecure_intraop_test.py
++++ b/src/python/grpcio_tests/tests/interop/_insecure_intraop_test.py
+@@ -32,10 +32,10 @@ class InsecureIntraopTest(
+         test_pb2_grpc.add_TestServiceServicer_to_server(
+             service.TestService(), self.server
+         )
+-        port = self.server.add_insecure_port("[::]:0")
++        port = self.server.add_insecure_port("127.0.0.1:0")
+         self.server.start()
+         self.stub = test_pb2_grpc.TestServiceStub(
+-            grpc.insecure_channel("localhost:{}".format(port))
++            grpc.insecure_channel("127.0.0.1:{}".format(port))
+         )
+ 
+     def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests/observability/_open_telemetry_observability_test.py b/src/python/grpcio_tests/tests/observability/_open_telemetry_observability_test.py
+index 37d9795..89bc575 100644
+--- a/src/python/grpcio_tests/tests/observability/_open_telemetry_observability_test.py
++++ b/src/python/grpcio_tests/tests/observability/_open_telemetry_observability_test.py
+@@ -363,8 +363,8 @@ class OpenTelemetryObservabilityTest(unittest.TestCase):
+     def testTargetAttributeFilter(self):
+         main_server, main_port = _test_server.start_server()
+         backup_server, backup_port = _test_server.start_server()
+-        main_target = f"localhost:{main_port}"
+-        backup_target = f"localhost:{backup_port}"
++        main_target = f"127.0.0.1:{main_port}"
++        backup_target = f"127.0.0.1:{backup_port}"
+ 
+         # Replace target label with 'other' for main_server.
+         def target_filter(target: str) -> bool:
+diff --git a/src/python/grpcio_tests/tests/observability/_test_server.py b/src/python/grpcio_tests/tests/observability/_test_server.py
+index ddc0f83..3cee1c4 100644
+--- a/src/python/grpcio_tests/tests/observability/_test_server.py
++++ b/src/python/grpcio_tests/tests/observability/_test_server.py
+@@ -41,7 +41,7 @@ def handle_unary_unary(request, servicer_context):
+                     futures.ThreadPoolExecutor(max_workers=10)
+                 )
+                 second_server.add_generic_rpc_handlers((_GenericHandler(),))
+-                second_server_port = second_server.add_insecure_port("[::]:0")
++                second_server_port = second_server.add_insecure_port("127.0.0.1:0")
+                 second_server.start()
+                 unary_unary_call(port=second_server_port)
+                 second_server.stop(0)
+@@ -133,13 +133,13 @@ def start_server(
+         server.add_registered_method_handlers(
+             _SERVICE_NAME, REGISTERED_RPC_METHOD_HANDLERS
+         )
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.start()
+     return server, port
+ 
+ 
+ def unary_unary_call(port, metadata=None, registered_method=False):
+-    with grpc.insecure_channel(f"localhost:{port}") as channel:
++    with grpc.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.unary_unary(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
+             _registered_method=registered_method,
+@@ -153,7 +153,7 @@ def unary_unary_call(port, metadata=None, registered_method=False):
+ 
+ 
+ def intercepted_unary_unary_call(port, interceptors, metadata=None):
+-    with grpc.insecure_channel(f"localhost:{port}") as channel:
++    with grpc.insecure_channel(f"127.0.0.1:{port}") as channel:
+         intercept_channel = grpc.intercept_channel(channel, interceptors)
+         multi_callable = intercept_channel.unary_unary(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY)
+@@ -167,7 +167,7 @@ def intercepted_unary_unary_call(port, interceptors, metadata=None):
+ 
+ 
+ def unary_unary_filtered_call(port, metadata=None):
+-    with grpc.insecure_channel(f"localhost:{port}") as channel:
++    with grpc.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.unary_unary(
+             grpc._common.fully_qualified_method(
+                 _SERVICE_NAME, _UNARY_UNARY_FILTERED
+@@ -182,7 +182,7 @@ def unary_unary_filtered_call(port, metadata=None):
+ 
+ 
+ def unary_stream_call(port):
+-    with grpc.insecure_channel(f"localhost:{port}") as channel:
++    with grpc.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.unary_stream(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_STREAM)
+         )
+@@ -192,7 +192,7 @@ def unary_stream_call(port):
+ 
+ 
+ def stream_unary_call(port):
+-    with grpc.insecure_channel(f"localhost:{port}") as channel:
++    with grpc.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.stream_unary(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_UNARY)
+         )
+@@ -202,7 +202,7 @@ def stream_unary_call(port):
+ 
+ 
+ def stream_stream_call(port):
+-    with grpc.insecure_channel(f"localhost:{port}") as channel:
++    with grpc.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.stream_stream(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_STREAM)
+         )
+diff --git a/src/python/grpcio_tests/tests/protoc_plugin/_python_plugin_test.py b/src/python/grpcio_tests/tests/protoc_plugin/_python_plugin_test.py
+index 9640305..01e72e4 100644
+--- a/src/python/grpcio_tests/tests/protoc_plugin/_python_plugin_test.py
++++ b/src/python/grpcio_tests/tests/protoc_plugin/_python_plugin_test.py
+@@ -165,9 +165,9 @@ def _CreateService():
+     getattr(service_pb2_grpc, ADD_SERVICER_TO_SERVER_IDENTIFIER)(
+         Servicer(), server
+     )
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.start()
+-    channel = grpc.insecure_channel("localhost:{}".format(port))
++    channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+     stub = getattr(service_pb2_grpc, STUB_IDENTIFIER)(channel)
+     return _Service(servicer_methods, server, stub)
+ 
+@@ -187,9 +187,9 @@ def _CreateIncompleteService():
+     getattr(service_pb2_grpc, ADD_SERVICER_TO_SERVER_IDENTIFIER)(
+         Servicer(), server
+     )
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.start()
+-    channel = grpc.insecure_channel("localhost:{}".format(port))
++    channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+     stub = getattr(service_pb2_grpc, STUB_IDENTIFIER)(channel)
+     return _Service(None, server, stub)
+ 
+@@ -590,9 +590,9 @@ class SimpleStubsPluginTest(unittest.TestCase):
+         service_pb2_grpc.add_TestServiceServicer_to_server(
+             self.Servicer(), self._server
+         )
+-        self._port = self._server.add_insecure_port("[::]:0")
++        self._port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+-        self._target = "localhost:{}".format(self._port)
++        self._target = "127.0.0.1:{}".format(self._port)
+ 
+     def tearDown(self):
+         self._server.stop(None)
+diff --git a/src/python/grpcio_tests/tests/protoc_plugin/_split_definitions_test.py b/src/python/grpcio_tests/tests/protoc_plugin/_split_definitions_test.py
+index fdcb07b..8dd49fb 100644
+--- a/src/python/grpcio_tests/tests/protoc_plugin/_split_definitions_test.py
++++ b/src/python/grpcio_tests/tests/protoc_plugin/_split_definitions_test.py
+@@ -327,9 +327,9 @@ class _Test(unittest.TestCase, metaclass=abc.ABCMeta):
+             services_module.add_TestServiceServicer_to_server(
+                 _Servicer(self._messages_pb2.Response), server
+             )
+-            port = server.add_insecure_port("[::]:0")
++            port = server.add_insecure_port("127.0.0.1:0")
+             server.start()
+-            channel = grpc.insecure_channel("localhost:{}".format(port))
++            channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+             stub = services_module.TestServiceStub(channel)
+             response = stub.Call(self._messages_pb2.Request())
+             self.assertEqual(self._messages_pb2.Response(), response)
+diff --git a/src/python/grpcio_tests/tests/protoc_plugin/beta_python_plugin_test.py b/src/python/grpcio_tests/tests/protoc_plugin/beta_python_plugin_test.py
+index 9a37bad..dbd483f 100644
+--- a/src/python/grpcio_tests/tests/protoc_plugin/beta_python_plugin_test.py
++++ b/src/python/grpcio_tests/tests/protoc_plugin/beta_python_plugin_test.py
+@@ -219,9 +219,9 @@ def _CreateService(payload_pb2, responses_pb2, service_pb2):
+ 
+     servicer = Servicer()
+     server = getattr(service_pb2, SERVER_FACTORY_IDENTIFIER)(servicer)
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.start()
+-    channel = implementations.insecure_channel("localhost", port)
++    channel = implementations.insecure_channel("127.0.0.1", port)
+     stub = getattr(service_pb2, STUB_FACTORY_IDENTIFIER)(channel)
+     yield servicer_methods, stub
+     server.stop(0)
+@@ -246,9 +246,9 @@ def _CreateIncompleteService(service_pb2):
+ 
+     servicer = Servicer()
+     server = getattr(service_pb2, SERVER_FACTORY_IDENTIFIER)(servicer)
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.start()
+-    channel = implementations.insecure_channel("localhost", port)
++    channel = implementations.insecure_channel("127.0.0.1", port)
+     stub = getattr(service_pb2, STUB_FACTORY_IDENTIFIER)(channel)
+     yield None, stub
+     server.stop(0)
+diff --git a/src/python/grpcio_tests/tests/reflection/_reflection_client_test.py b/src/python/grpcio_tests/tests/reflection/_reflection_client_test.py
+index 0fad0aa..08f8a59 100644
+--- a/src/python/grpcio_tests/tests/reflection/_reflection_client_test.py
++++ b/src/python/grpcio_tests/tests/reflection/_reflection_client_test.py
+@@ -45,10 +45,10 @@ class ReflectionClientTest(unittest.TestCase):
+             reflection.SERVICE_NAME,
+         )
+         reflection.enable_server_reflection(self._SERVICE_NAMES, self._server)
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+         self._reflection_db = ProtoReflectionDescriptorDatabase(self._channel)
+         self.desc_pool = DescriptorPool(self._reflection_db)
+diff --git a/src/python/grpcio_tests/tests/reflection/_reflection_servicer_test.py b/src/python/grpcio_tests/tests/reflection/_reflection_servicer_test.py
+index 4f6e051..f6f38f5 100644
+--- a/src/python/grpcio_tests/tests/reflection/_reflection_servicer_test.py
++++ b/src/python/grpcio_tests/tests/reflection/_reflection_servicer_test.py
+@@ -58,10 +58,10 @@ class ReflectionServicerTest(unittest.TestCase):
+     def setUp(self):
+         self._server = test_common.test_server()
+         reflection.enable_server_reflection(_SERVICE_NAMES, self._server)
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+         self._stub = reflection_pb2_grpc.ServerReflectionStub(self._channel)
+ 
+     def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests/status/_grpc_status_test.py b/src/python/grpcio_tests/tests/status/_grpc_status_test.py
+index 0340ac9..5f82252 100644
+--- a/src/python/grpcio_tests/tests/status/_grpc_status_test.py
++++ b/src/python/grpcio_tests/tests/status/_grpc_status_test.py
+@@ -124,10 +124,10 @@ class StatusTest(unittest.TestCase):
+     def setUp(self):
+         self._server = test_common.test_server()
+         self._server.add_generic_rpc_handlers((_GenericHandler(),))
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(None)
+diff --git a/src/python/grpcio_tests/tests/unit/_abort_test.py b/src/python/grpcio_tests/tests/unit/_abort_test.py
+index ee75ac4..7354225 100644
+--- a/src/python/grpcio_tests/tests/unit/_abort_test.py
++++ b/src/python/grpcio_tests/tests/unit/_abort_test.py
+@@ -91,13 +91,13 @@ RPC_METHOD_HANDLERS = {
+ class AbortTest(unittest.TestCase):
+     def setUp(self):
+         self._server = test_common.test_server()
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, RPC_METHOD_HANDLERS
+         )
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._channel.close()
+diff --git a/src/python/grpcio_tests/tests/unit/_channel_close_test.py b/src/python/grpcio_tests/tests/unit/_channel_close_test.py
+index c812360..64ea826 100644
+--- a/src/python/grpcio_tests/tests/unit/_channel_close_test.py
++++ b/src/python/grpcio_tests/tests/unit/_channel_close_test.py
+@@ -111,14 +111,14 @@ class ChannelCloseTest(unittest.TestCase):
+             max_workers=test_constants.THREAD_CONCURRENCY
+         )
+         self._server.add_registered_method_handlers("", _METHOD_HANDLERS)
+-        self._port = self._server.add_insecure_port("[::]:0")
++        self._port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+     def tearDown(self):
+         self._server.stop(None)
+ 
+     def test_close_immediately_after_call_invocation(self):
+-        channel = grpc.insecure_channel("localhost:{}".format(self._port))
++        channel = grpc.insecure_channel("127.0.0.1:{}".format(self._port))
+         multi_callable = channel.stream_stream(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
+             _registered_method=True,
+@@ -131,7 +131,7 @@ class ChannelCloseTest(unittest.TestCase):
+         self.assertIs(response_iterator.code(), grpc.StatusCode.CANCELLED)
+ 
+     def test_close_while_call_active(self):
+-        channel = grpc.insecure_channel("localhost:{}".format(self._port))
++        channel = grpc.insecure_channel("127.0.0.1:{}".format(self._port))
+         multi_callable = channel.stream_stream(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
+             _registered_method=True,
+@@ -146,7 +146,7 @@ class ChannelCloseTest(unittest.TestCase):
+ 
+     def test_context_manager_close_while_call_active(self):
+         with grpc.insecure_channel(
+-            "localhost:{}".format(self._port)
++            "127.0.0.1:{}".format(self._port)
+         ) as channel:
+             multi_callable = channel.stream_stream(
+                 grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
+@@ -161,7 +161,7 @@ class ChannelCloseTest(unittest.TestCase):
+ 
+     def test_context_manager_close_while_many_calls_active(self):
+         with grpc.insecure_channel(
+-            "localhost:{}".format(self._port)
++            "127.0.0.1:{}".format(self._port)
+         ) as channel:
+             multi_callable = channel.stream_stream(
+                 grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
+@@ -183,7 +183,7 @@ class ChannelCloseTest(unittest.TestCase):
+             self.assertIs(response_iterator.code(), grpc.StatusCode.CANCELLED)
+ 
+     def test_many_concurrent_closes(self):
+-        channel = grpc.insecure_channel("localhost:{}".format(self._port))
++        channel = grpc.insecure_channel("127.0.0.1:{}".format(self._port))
+         multi_callable = channel.stream_stream(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
+             _registered_method=True,
+@@ -212,7 +212,7 @@ class ChannelCloseTest(unittest.TestCase):
+ 
+     def test_exception_in_callback(self):
+         with grpc.insecure_channel(
+-            "localhost:{}".format(self._port)
++            "127.0.0.1:{}".format(self._port)
+         ) as channel:
+             stream_multi_callable = channel.stream_stream(
+                 grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
+diff --git a/src/python/grpcio_tests/tests/unit/_channel_connectivity_test.py b/src/python/grpcio_tests/tests/unit/_channel_connectivity_test.py
+index 0ee794d..2390987 100644
+--- a/src/python/grpcio_tests/tests/unit/_channel_connectivity_test.py
++++ b/src/python/grpcio_tests/tests/unit/_channel_connectivity_test.py
+@@ -92,12 +92,12 @@ class ChannelConnectivityTest(unittest.TestCase):
+         server = grpc.server(
+             recording_thread_pool, options=(("grpc.so_reuseport", 0),)
+         )
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+         first_callback = _Callback()
+         second_callback = _Callback()
+ 
+-        channel = grpc.insecure_channel("localhost:{}".format(port))
++        channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+         channel.subscribe(first_callback.update, try_to_connect=False)
+         first_connectivities = (
+             first_callback.block_until_connectivities_satisfy(bool)
+@@ -152,11 +152,11 @@ class ChannelConnectivityTest(unittest.TestCase):
+         server = grpc.server(
+             recording_thread_pool, options=(("grpc.so_reuseport", 0),)
+         )
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+         callback = _Callback()
+ 
+-        channel = grpc.insecure_channel("localhost:{}".format(port))
++        channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+         channel.subscribe(callback.update, try_to_connect=True)
+         callback.block_until_connectivities_satisfy(_ready_in_connectivities)
+         # Now take down the server and confirm that channel readiness is repudiated.
+diff --git a/src/python/grpcio_tests/tests/unit/_channel_ready_future_test.py b/src/python/grpcio_tests/tests/unit/_channel_ready_future_test.py
+index a378e70..679eb9c 100644
+--- a/src/python/grpcio_tests/tests/unit/_channel_ready_future_test.py
++++ b/src/python/grpcio_tests/tests/unit/_channel_ready_future_test.py
+@@ -68,9 +68,9 @@ class ChannelReadyFutureTest(unittest.TestCase):
+         server = grpc.server(
+             recording_thread_pool, options=(("grpc.so_reuseport", 0),)
+         )
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+-        channel = grpc.insecure_channel("localhost:{}".format(port))
++        channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+         callback = _Callback()
+ 
+         ready_future = grpc.channel_ready_future(channel)
+diff --git a/src/python/grpcio_tests/tests/unit/_cython/_cancel_many_calls_test.py b/src/python/grpcio_tests/tests/unit/_cython/_cancel_many_calls_test.py
+index f630c62..c98cb9e 100644
+--- a/src/python/grpcio_tests/tests/unit/_cython/_cancel_many_calls_test.py
++++ b/src/python/grpcio_tests/tests/unit/_cython/_cancel_many_calls_test.py
+@@ -161,10 +161,10 @@ class CancelManyCallsTest(unittest.TestCase):
+             False,
+         )
+         server.register_completion_queue(server_completion_queue)
+-        port = server.add_http2_port(b"[::]:0")
++        port = server.add_http2_port(b"127.0.0.1:0")
+         server.start()
+         channel = cygrpc.Channel(
+-            "localhost:{}".format(port).encode(), None, None
++            "127.0.0.1:{}".format(port).encode(), None, None
+         )
+ 
+         state = _State()
+diff --git a/src/python/grpcio_tests/tests/unit/_cython/_common.py b/src/python/grpcio_tests/tests/unit/_cython/_common.py
+index f660ac3..515a1d5 100644
+--- a/src/python/grpcio_tests/tests/unit/_cython/_common.py
++++ b/src/python/grpcio_tests/tests/unit/_cython/_common.py
+@@ -101,10 +101,10 @@ class RpcTest:
+         self.server_completion_queue = cygrpc.CompletionQueue()
+         self.server = cygrpc.Server([(b"grpc.so_reuseport", 0)], False)
+         self.server.register_completion_queue(self.server_completion_queue)
+-        port = self.server.add_http2_port(b"[::]:0")
++        port = self.server.add_http2_port(b"127.0.0.1:0")
+         self.server.start()
+         self.channel = cygrpc.Channel(
+-            "localhost:{}".format(port).encode(), [], None
++            "127.0.0.1:{}".format(port).encode(), [], None
+         )
+ 
+         self._server_shutdown_tag = "server_shutdown_tag"
+diff --git a/src/python/grpcio_tests/tests/unit/_cython/_read_some_but_not_all_responses_test.py b/src/python/grpcio_tests/tests/unit/_cython/_read_some_but_not_all_responses_test.py
+index 4eb7885..4d5f557 100644
+--- a/src/python/grpcio_tests/tests/unit/_cython/_read_some_but_not_all_responses_test.py
++++ b/src/python/grpcio_tests/tests/unit/_cython/_read_some_but_not_all_responses_test.py
+@@ -118,10 +118,10 @@ class ReadSomeButNotAllResponsesTest(unittest.TestCase):
+             False,
+         )
+         server.register_completion_queue(server_completion_queue)
+-        port = server.add_http2_port(b"[::]:0")
++        port = server.add_http2_port(b"127.0.0.1:0")
+         server.start()
+         channel = cygrpc.Channel(
+-            "localhost:{}".format(port).encode(), set(), None
++            "127.0.0.1:{}".format(port).encode(), set(), None
+         )
+ 
+         server_shutdown_tag = "server_shutdown_tag"
+diff --git a/src/python/grpcio_tests/tests/unit/_cython/_server_test.py b/src/python/grpcio_tests/tests/unit/_cython/_server_test.py
+index 2ee3681..ab9863c 100644
+--- a/src/python/grpcio_tests/tests/unit/_cython/_server_test.py
++++ b/src/python/grpcio_tests/tests/unit/_cython/_server_test.py
+@@ -27,7 +27,7 @@ class Test(unittest.TestCase):
+         server = cygrpc.Server(None, False)
+         server.register_completion_queue(server_call_completion_queue)
+         server.register_completion_queue(server_shutdown_completion_queue)
+-        port = server.add_http2_port(b"[::]:0")
++        port = server.add_http2_port(b"127.0.0.1:0")
+         server.start()
+ 
+         server_request_call_tag = "server_request_call_tag"
+diff --git a/src/python/grpcio_tests/tests/unit/_dns_resolver_test.py b/src/python/grpcio_tests/tests/unit/_dns_resolver_test.py
+index 2f8ff58..77f98dd 100644
+--- a/src/python/grpcio_tests/tests/unit/_dns_resolver_test.py
++++ b/src/python/grpcio_tests/tests/unit/_dns_resolver_test.py
+@@ -40,7 +40,7 @@ class DNSResolverTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, _METHOD_HANDLERS
+         )
+-        self._port = self._server.add_insecure_port("[::]:0")
++        self._port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+     def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests/unit/_empty_message_test.py b/src/python/grpcio_tests/tests/unit/_empty_message_test.py
+index 330291c..b6d7398 100644
+--- a/src/python/grpcio_tests/tests/unit/_empty_message_test.py
++++ b/src/python/grpcio_tests/tests/unit/_empty_message_test.py
+@@ -84,9 +84,9 @@ class EmptyMessageTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, _METHOD_HANDLERS
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(0)
+diff --git a/src/python/grpcio_tests/tests/unit/_error_message_encoding_test.py b/src/python/grpcio_tests/tests/unit/_error_message_encoding_test.py
+index 6ade0b3..e133a1f 100644
+--- a/src/python/grpcio_tests/tests/unit/_error_message_encoding_test.py
++++ b/src/python/grpcio_tests/tests/unit/_error_message_encoding_test.py
+@@ -59,9 +59,9 @@ class ErrorMessageEncodingTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, _METHOD_HANDLERS
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(0)
+diff --git a/src/python/grpcio_tests/tests/unit/_exit_scenarios.py b/src/python/grpcio_tests/tests/unit/_exit_scenarios.py
+index 48f8c81..930a930 100644
+--- a/src/python/grpcio_tests/tests/unit/_exit_scenarios.py
++++ b/src/python/grpcio_tests/tests/unit/_exit_scenarios.py
+@@ -185,7 +185,7 @@ if __name__ == "__main__":
+             time.sleep(WAIT_TIME)
+     elif args.scenario == RUNNING_SERVER:
+         server = grpc.server(DaemonPool(), options=(("grpc.so_reuseport", 0),))
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+         if args.wait_for_interrupt:
+             time.sleep(WAIT_TIME)
+@@ -200,9 +200,9 @@ if __name__ == "__main__":
+             time.sleep(WAIT_TIME)
+     elif args.scenario == POLL_CONNECTIVITY:
+         server = grpc.server(DaemonPool(), options=(("grpc.so_reuseport", 0),))
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+-        channel = grpc.insecure_channel("localhost:%d" % port)
++        channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+         def connectivity_callback(connectivity):
+             pass
+@@ -213,10 +213,10 @@ if __name__ == "__main__":
+ 
+     else:
+         server = grpc.server(DaemonPool(), options=(("grpc.so_reuseport", 0),))
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.add_registered_method_handlers(_SERVICE_NAME, _METHOD_HANDLERS)
+         server.start()
+-        channel = grpc.insecure_channel("localhost:%d" % port)
++        channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+         method = (
+             grpc._common.fully_qualified_method(
+diff --git a/src/python/grpcio_tests/tests/unit/_invocation_defects_test.py b/src/python/grpcio_tests/tests/unit/_invocation_defects_test.py
+index a84658b..0258d09 100644
+--- a/src/python/grpcio_tests/tests/unit/_invocation_defects_test.py
++++ b/src/python/grpcio_tests/tests/unit/_invocation_defects_test.py
+@@ -276,13 +276,13 @@ class InvocationDefectsTest(unittest.TestCase):
+         self._handler = _Handler(self._control)
+ 
+         self._server = test_common.test_server()
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, get_method_handlers(self._handler)
+         )
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(0)
+diff --git a/src/python/grpcio_tests/tests/unit/_local_credentials_test.py b/src/python/grpcio_tests/tests/unit/_local_credentials_test.py
+index ecfc56c..b515162 100644
+--- a/src/python/grpcio_tests/tests/unit/_local_credentials_test.py
++++ b/src/python/grpcio_tests/tests/unit/_local_credentials_test.py
+@@ -39,7 +39,7 @@ class LocalCredentialsTest(unittest.TestCase):
+         os.name == "nt", "TODO(https://github.com/grpc/grpc/issues/20078)"
+     )
+     def test_local_tcp(self):
+-        server_addr = "localhost:{}"
++        server_addr = "127.0.0.1:{}"
+         channel_creds = grpc.local_channel_credentials(
+             grpc.LocalConnectionType.LOCAL_TCP
+         )
+diff --git a/src/python/grpcio_tests/tests/unit/_metadata_test.py b/src/python/grpcio_tests/tests/unit/_metadata_test.py
+index c93d268..3f53f9c 100644
+--- a/src/python/grpcio_tests/tests/unit/_metadata_test.py
++++ b/src/python/grpcio_tests/tests/unit/_metadata_test.py
+@@ -177,10 +177,10 @@ class MetadataTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, get_method_handlers(weakref.proxy(self))
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+         self._channel = grpc.insecure_channel(
+-            "localhost:%d" % port, options=_CHANNEL_ARGS
++            "127.0.0.1:%d" % port, options=_CHANNEL_ARGS
+         )
+ 
+     def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests/unit/_rpc_test_helpers.py b/src/python/grpcio_tests/tests/unit/_rpc_test_helpers.py
+index 258cd9f..143ed2c 100644
+--- a/src/python/grpcio_tests/tests/unit/_rpc_test_helpers.py
++++ b/src/python/grpcio_tests/tests/unit/_rpc_test_helpers.py
+@@ -401,13 +401,13 @@ class BaseRPCTest:
+         self._handler = _Handler(self._control, self._thread_pool)
+ 
+         self._server = test_common.test_server()
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, get_method_handlers(self._handler)
+         )
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(None)
+diff --git a/src/python/grpcio_tests/tests/unit/_server_shutdown_scenarios.py b/src/python/grpcio_tests/tests/unit/_server_shutdown_scenarios.py
+index 6f49aff..cd0ca6e 100644
+--- a/src/python/grpcio_tests/tests/unit/_server_shutdown_scenarios.py
++++ b/src/python/grpcio_tests/tests/unit/_server_shutdown_scenarios.py
+@@ -60,7 +60,7 @@ _METHOD_HANDLERS = {
+ 
+ def run_server(port_queue):
+     server = test_common.test_server()
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     port_queue.put(port)
+     server.add_registered_method_handlers(_SERVICE_NAME, _METHOD_HANDLERS)
+     server.start()
+@@ -86,7 +86,7 @@ def run_test(args):
+         thread.daemon = True
+         thread.start()
+         port = port_queue.get()
+-        channel = grpc.insecure_channel("localhost:%d" % port)
++        channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+         multi_callable = channel.unary_unary(
+             grpc._common.fully_qualified_method(_SERVICE_NAME, FORK_EXIT),
+             _registered_method=True,
+diff --git a/src/python/grpcio_tests/tests/unit/beta/_not_found_test.py b/src/python/grpcio_tests/tests/unit/beta/_not_found_test.py
+index ad56155..736d00a 100644
+--- a/src/python/grpcio_tests/tests/unit/beta/_not_found_test.py
++++ b/src/python/grpcio_tests/tests/unit/beta/_not_found_test.py
+@@ -25,8 +25,8 @@ from tests.unit.framework.common import test_constants
+ class NotFoundTest(unittest.TestCase):
+     def setUp(self):
+         self._server = implementations.server({})
+-        port = self._server.add_insecure_port("[::]:0")
+-        channel = implementations.insecure_channel("localhost", port)
++        port = self._server.add_insecure_port("127.0.0.1:0")
++        channel = implementations.insecure_channel("127.0.0.1", port)
+         self._generic_stub = implementations.generic_stub(channel)
+         self._server.start()
+ 
+diff --git a/src/python/grpcio_tests/tests/unit/beta/_utilities_test.py b/src/python/grpcio_tests/tests/unit/beta/_utilities_test.py
+index bc7aa8d..f5b9395 100644
+--- a/src/python/grpcio_tests/tests/unit/beta/_utilities_test.py
++++ b/src/python/grpcio_tests/tests/unit/beta/_utilities_test.py
+@@ -63,7 +63,7 @@ class ChannelConnectivityTest(unittest.TestCase):
+ 
+     def test_immediately_connectable_channel_connectivity(self):
+         server = implementations.server({})
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+         channel = implementations.insecure_channel("localhost", port)
+         callback = _Callback()
+diff --git a/src/python/grpcio_tests/tests_aio/channelz/channelz_servicer_test.py b/src/python/grpcio_tests/tests_aio/channelz/channelz_servicer_test.py
+index 710499c..1dfd89c 100644
+--- a/src/python/grpcio_tests/tests_aio/channelz/channelz_servicer_test.py
++++ b/src/python/grpcio_tests/tests_aio/channelz/channelz_servicer_test.py
+@@ -80,8 +80,8 @@ class _ChannelServerPair:
+     async def start(self):
+         # Server will enable channelz service
+         self.server = aio.server(options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ)
+-        port = self.server.add_insecure_port("[::]:0")
+-        self.address = "localhost:%d" % port
++        port = self.server.add_insecure_port("127.0.0.1:0")
++        self.address = "127.0.0.1:%d" % port
+         self.server.add_generic_rpc_handlers((_GenericHandler(),))
+         await self.server.start()
+ 
+@@ -130,14 +130,14 @@ class ChannelzServicerTest(AioTestBase):
+         self._server = aio.server(
+             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         channelz.add_channelz_servicer(self._server)
+         await self._server.start()
+ 
+         # This channel is used to fetch Channelz info only
+         # Channelz should not be enabled
+         self._channel = aio.insecure_channel(
+-            "localhost:%d" % port, options=_DISABLE_CHANNELZ
++            "127.0.0.1:%d" % port, options=_DISABLE_CHANNELZ
+         )
+         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
+ 
+diff --git a/src/python/grpcio_tests/tests_aio/health_check/health_servicer_test.py b/src/python/grpcio_tests/tests_aio/health_check/health_servicer_test.py
+index 3bb0f6c..d7aef02 100644
+--- a/src/python/grpcio_tests/tests_aio/health_check/health_servicer_test.py
++++ b/src/python/grpcio_tests/tests_aio/health_check/health_servicer_test.py
+@@ -54,13 +54,13 @@ class HealthServicerTest(AioTestBase):
+             _NOT_SERVING_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
+         )
+         self._server = aio.server()
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         health_pb2_grpc.add_HealthServicer_to_server(
+             self._servicer, self._server
+         )
+         await self._server.start()
+ 
+-        self._channel = aio.insecure_channel("localhost:%d" % port)
++        self._channel = aio.insecure_channel("127.0.0.1:%d" % port)
+         self._stub = health_pb2_grpc.HealthStub(self._channel)
+ 
+     async def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests_aio/observability/_test_server.py b/src/python/grpcio_tests/tests_aio/observability/_test_server.py
+index 9250476..adf81f9 100644
+--- a/src/python/grpcio_tests/tests_aio/observability/_test_server.py
++++ b/src/python/grpcio_tests/tests_aio/observability/_test_server.py
+@@ -69,7 +69,7 @@ class _GenericHandler(grpc.GenericRpcHandler):
+ 
+ async def start_server() -> Tuple[grpc.aio.Server, int]:
+     server = grpc.aio.server()
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     generic_handler = _GenericHandler()
+     server.add_generic_rpc_handlers((generic_handler,))
+     await server.start()
+@@ -77,13 +77,13 @@ async def start_server() -> Tuple[grpc.aio.Server, int]:
+ 
+ 
+ async def unary_unary_call(port):
+-    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
++    async with grpc.aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.unary_unary(_UNARY_UNARY)
+         unused_response = await multi_callable(_REQUEST)
+ 
+ 
+ async def unary_stream_call(port):
+-    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
++    async with grpc.aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.unary_stream(_UNARY_STREAM)
+         call = multi_callable(_REQUEST)
+         async for _ in call:
+@@ -91,14 +91,14 @@ async def unary_stream_call(port):
+ 
+ 
+ async def stream_unary_call(port):
+-    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
++    async with grpc.aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.stream_unary(_STREAM_UNARY)
+         call = multi_callable(iter([_REQUEST] * STREAM_LENGTH))
+         unused_response = await call
+ 
+ 
+ async def stream_stream_call(port):
+-    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
++    async with grpc.aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+         multi_callable = channel.stream_stream(_STREAM_STREAM)
+         call = multi_callable(iter([_REQUEST] * STREAM_LENGTH))
+         async for _ in call:
+diff --git a/src/python/grpcio_tests/tests_aio/reflection/reflection_servicer_test.py b/src/python/grpcio_tests/tests_aio/reflection/reflection_servicer_test.py
+index d1cc2c7..eecbb4a 100644
+--- a/src/python/grpcio_tests/tests_aio/reflection/reflection_servicer_test.py
++++ b/src/python/grpcio_tests/tests_aio/reflection/reflection_servicer_test.py
+@@ -59,10 +59,10 @@ class ReflectionServicerTest(AioTestBase):
+     async def setUp(self):
+         self._server = aio.server()
+         reflection.enable_server_reflection(_SERVICE_NAMES, self._server)
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         await self._server.start()
+ 
+-        self._channel = aio.insecure_channel("localhost:%d" % port)
++        self._channel = aio.insecure_channel("127.0.0.1:%d" % port)
+         self._stub = reflection_pb2_grpc.ServerReflectionStub(self._channel)
+ 
+     async def tearDown(self):
+diff --git a/src/python/grpcio_tests/tests_aio/status/grpc_status_test.py b/src/python/grpcio_tests/tests_aio/status/grpc_status_test.py
+index b7eaf49..3d6d85b 100644
+--- a/src/python/grpcio_tests/tests_aio/status/grpc_status_test.py
++++ b/src/python/grpcio_tests/tests_aio/status/grpc_status_test.py
+@@ -113,10 +113,10 @@ class StatusTest(AioTestBase):
+     async def setUp(self):
+         self._server = aio.server()
+         self._server.add_generic_rpc_handlers((_GenericHandler(),))
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         await self._server.start()
+ 
+-        self._channel = aio.insecure_channel("localhost:%d" % port)
++        self._channel = aio.insecure_channel("127.0.0.1:%d" % port)
+ 
+     async def tearDown(self):
+         await self._server.stop(None)
+diff --git a/src/python/grpcio_tests/tests_aio/unit/_metadata_test.py b/src/python/grpcio_tests/tests_aio/unit/_metadata_test.py
+index 82c0f9b..e9fb3ae 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/_metadata_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/_metadata_test.py
+@@ -83,10 +83,10 @@ class UnaryUnaryAddMetadataInterceptor(aio.UnaryUnaryClientInterceptor):
+ 
+ async def _start_test_server(options=None):
+     server = aio.server(options=options)
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.add_generic_rpc_handlers((_GenericHandler(),))
+     await server.start()
+-    return f"localhost:{port}", server
++    return f"127.0.0.1:{port}", server
+ 
+ 
+ class TestTypeMetadata(unittest.TestCase):
+diff --git a/src/python/grpcio_tests/tests_aio/unit/abort_test.py b/src/python/grpcio_tests/tests_aio/unit/abort_test.py
+index a6543b9..4792aa2 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/abort_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/abort_test.py
+@@ -79,10 +79,10 @@ class _GenericHandler(grpc.GenericRpcHandler):
+ 
+ async def _start_test_server():
+     server = aio.server()
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.add_generic_rpc_handlers((_GenericHandler(),))
+     await server.start()
+-    return "localhost:%d" % port, server
++    return "127.0.0.1:%d" % port, server
+ 
+ 
+ class TestAbort(AioTestBase):
+diff --git a/src/python/grpcio_tests/tests_aio/unit/channel_argument_test.py b/src/python/grpcio_tests/tests_aio/unit/channel_argument_test.py
+index 911900b..8a8bbe9 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/channel_argument_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/channel_argument_test.py
+@@ -69,12 +69,15 @@ _INVALID_TEST_CHANNEL_ARGS = [
+ 
+ 
+ async def test_if_reuse_port_enabled(server: aio.Server):
+-    port = server.add_insecure_port("localhost:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     await server.start()
+ 
+     try:
+         with common.bound_socket(
+-            bind_address="localhost",
++            # Must contend with the same address the server bound above,
++            # otherwise this probe binds the other loopback family and
++            # succeeds regardless of SO_REUSEPORT.
++            bind_address="127.0.0.1",
+             port=port,
+             listen=False,
+         ) as (unused_host, bound_port):
+@@ -124,7 +127,7 @@ class TestChannelArgument(AioTestBase):
+ 
+     async def test_client(self):
+         # Do not segfault, or raise exception!
+-        channel = aio.insecure_channel("[::]:0", options=_TEST_CHANNEL_ARGS)
++        channel = aio.insecure_channel("127.0.0.1:0", options=_TEST_CHANNEL_ARGS)
+         await channel.close()
+ 
+     async def test_server(self):
+@@ -138,7 +141,7 @@ class TestChannelArgument(AioTestBase):
+             self.assertRaises(
+                 (ValueError, TypeError),
+                 aio.insecure_channel,
+-                "[::]:0",
++                "127.0.0.1:0",
+                 options=invalid_arg,
+             )
+ 
+diff --git a/src/python/grpcio_tests/tests_aio/unit/compatibility_test.py b/src/python/grpcio_tests/tests_aio/unit/compatibility_test.py
+index 255ec59..334eb25 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/compatibility_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/compatibility_test.py
+@@ -60,8 +60,8 @@ class TestCompatibility(AioTestBase):
+         self._adhoc_handlers = _common.AdhocGenericHandler()
+         self._async_server.add_generic_rpc_handlers((self._adhoc_handlers,))
+ 
+-        port = self._async_server.add_insecure_port("[::]:0")
+-        address = "localhost:%d" % port
++        port = self._async_server.add_insecure_port("127.0.0.1:0")
++        address = "127.0.0.1:%d" % port
+         await self._async_server.start()
+ 
+         # Create async stub
+@@ -196,12 +196,12 @@ class TestCompatibility(AioTestBase):
+         server = grpc.server(
+             ThreadPoolExecutor(), handlers=(GenericHandlers(),)
+         )
+-        port = server.add_insecure_port("localhost:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.start()
+ 
+         def sync_work() -> None:
+             for _ in range(100):
+-                with grpc.insecure_channel("localhost:%d" % port) as channel:
++                with grpc.insecure_channel("127.0.0.1:%d" % port) as channel:
+                     response = channel.unary_unary("/test/test")(b"\x07\x08")
+                     self.assertEqual(response, b"\x07\x08")
+ 
+diff --git a/src/python/grpcio_tests/tests_aio/unit/compression_test.py b/src/python/grpcio_tests/tests_aio/unit/compression_test.py
+index 74d3a8a..0d275a7 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/compression_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/compression_test.py
+@@ -103,10 +103,10 @@ class _GenericHandler(grpc.GenericRpcHandler):
+ 
+ async def _start_test_server(options=None):
+     server = aio.server(options=options)
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.add_generic_rpc_handlers((_GenericHandler(),))
+     await server.start()
+-    return f"localhost:{port}", server
++    return f"127.0.0.1:{port}", server
+ 
+ 
+ class TestCompression(AioTestBase):
+@@ -187,11 +187,11 @@ class TestCompression(AioTestBase):
+ 
+     async def test_server_default_compression_algorithm(self):
+         server = aio.server(compression=grpc.Compression.Deflate)
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         server.add_generic_rpc_handlers((_GenericHandler(),))
+         await server.start()
+ 
+-        async with aio.insecure_channel(f"localhost:{port}") as channel:
++        async with aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+             multicallable = channel.unary_unary(_TEST_UNARY_UNARY)
+             call = multicallable(_REQUEST)
+             self.assertEqual(_RESPONSE, await call)
+diff --git a/src/python/grpcio_tests/tests_aio/unit/context_peer_test.py b/src/python/grpcio_tests/tests_aio/unit/context_peer_test.py
+index 531f286..0948882 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/context_peer_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/context_peer_test.py
+@@ -51,11 +51,11 @@ class TestContextPeer(AioTestBase):
+             "test", {"UnaryUnary": check_peer_unary_unary}
+         )
+         server.add_generic_rpc_handlers((handlers,))
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         await server.start()
+ 
+         # Creates a channel
+-        async with aio.insecure_channel("localhost:%d" % port) as channel:
++        async with aio.insecure_channel("127.0.0.1:%d" % port) as channel:
+             response = await channel.unary_unary(_TEST_METHOD)(_REQUEST)
+             self.assertEqual(_REQUEST, response)
+ 
+diff --git a/src/python/grpcio_tests/tests_aio/unit/done_callback_test.py b/src/python/grpcio_tests/tests_aio/unit/done_callback_test.py
+index b6a4a35..2aba682 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/done_callback_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/done_callback_test.py
+@@ -130,8 +130,8 @@ class TestClientSideDoneCallback(AioTestBase):
+ class TestServerSideDoneCallback(AioTestBase):
+     async def setUp(self):
+         self._server = aio.server()
+-        port = self._server.add_insecure_port("[::]:0")
+-        self._channel = aio.insecure_channel("localhost:%d" % port)
++        port = self._server.add_insecure_port("127.0.0.1:0")
++        self._channel = aio.insecure_channel("127.0.0.1:%d" % port)
+ 
+     async def tearDown(self):
+         await self._channel.close()
+diff --git a/src/python/grpcio_tests/tests_aio/unit/metadata_test.py b/src/python/grpcio_tests/tests_aio/unit/metadata_test.py
+index 4c585c1..980d6c0 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/metadata_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/metadata_test.py
+@@ -209,7 +209,7 @@ class _TestGenericHandlerItself(grpc.GenericRpcHandler):
+ 
+ async def _start_test_server():
+     server = aio.server()
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.add_generic_rpc_handlers(
+         (
+             _TestGenericHandlerForMethods(),
+@@ -217,7 +217,7 @@ async def _start_test_server():
+         )
+     )
+     await server.start()
+-    return "localhost:%d" % port, server
++    return "127.0.0.1:%d" % port, server
+ 
+ 
+ class TestMetadata(AioTestBase):
+diff --git a/src/python/grpcio_tests/tests_aio/unit/multithread_test.py b/src/python/grpcio_tests/tests_aio/unit/multithread_test.py
+index 203810d..231c351 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/multithread_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/multithread_test.py
+@@ -42,12 +42,12 @@ class MultithreadTest(AioTestBase):
+             "grpc.testing.TestService", rpc_method_handlers
+         )
+         server.add_generic_rpc_handlers((generic_handler,))
+-        port = server.add_insecure_port("[::]:0")
++        port = server.add_insecure_port("127.0.0.1:0")
+         await server.start()
+         return port, server
+ 
+     async def run_client(self, port):
+-        async with aio.insecure_channel(f"localhost:{port}") as channel:
++        async with aio.insecure_channel(f"127.0.0.1:{port}") as channel:
+             unary_call = channel.unary_unary(
+                 "/grpc.testing.TestService/UnaryCall"
+             )
+diff --git a/src/python/grpcio_tests/tests_aio/unit/server_test.py b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+index af3cd6e..32c5803 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/server_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/server_test.py
+@@ -584,8 +584,8 @@ class TestServer(AioTestBase):
+ 
+     async def test_port_binding_exception(self):
+         server = aio.server(options=(("grpc.so_reuseport", 0),))
+-        port = server.add_insecure_port("localhost:0")
+-        bind_address = "localhost:%d" % port
++        port = server.add_insecure_port("127.0.0.1:0")
++        bind_address = "127.0.0.1:%d" % port
+ 
+         with self.assertRaises(RuntimeError):
+             server.add_insecure_port(bind_address)
+@@ -602,8 +602,8 @@ class TestServer(AioTestBase):
+ 
+         # Build the server with concurrent rpc argument
+         server = aio.server(maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS)
+-        port = server.add_insecure_port("localhost:0")
+-        bind_address = "localhost:%d" % port
++        port = server.add_insecure_port("127.0.0.1:0")
++        bind_address = "127.0.0.1:%d" % port
+         server.add_generic_rpc_handlers((_GenericHandler(),))
+         await server.start()
+         # Build the channel
+@@ -657,8 +657,8 @@ class TestServer(AioTestBase):
+         # Use a limit of 1 to make the test deterministic
+         max_concurrent = 1
+         server = aio.server(maximum_concurrent_rpcs=max_concurrent)
+-        port = server.add_insecure_port("[::]:0")
+-        bind_address = f"localhost:{port}"
++        port = server.add_insecure_port("127.0.0.1:0")
++        bind_address = f"127.0.0.1:{port}"
+         server.add_generic_rpc_handlers((_GenericHandler(),))
+         await server.start()
+         channel = aio.insecure_channel(bind_address)
+diff --git a/src/python/grpcio_tests/tests_aio/unit/server_time_remaining_test.py b/src/python/grpcio_tests/tests_aio/unit/server_time_remaining_test.py
+index bdb6a6e..6abd274 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/server_time_remaining_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/server_time_remaining_test.py
+@@ -35,8 +35,8 @@ class TestServerTimeRemaining(AioTestBase):
+         self._server = aio.server(options=(("grpc.so_reuseport", 0),))
+         self._adhoc_handlers = AdhocGenericHandler()
+         self._server.add_generic_rpc_handlers((self._adhoc_handlers,))
+-        port = self._server.add_insecure_port("[::]:0")
+-        address = "localhost:%d" % port
++        port = self._server.add_insecure_port("127.0.0.1:0")
++        address = "127.0.0.1:%d" % port
+         await self._server.start()
+         # Create async channel
+         self._channel = aio.insecure_channel(address)
+diff --git a/src/python/grpcio_tests/tests_aio/unit/timeout_test.py b/src/python/grpcio_tests/tests_aio/unit/timeout_test.py
+index b6834ba..6054357 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/timeout_test.py
++++ b/src/python/grpcio_tests/tests_aio/unit/timeout_test.py
+@@ -84,10 +84,10 @@ class _GenericHandler(grpc.GenericRpcHandler):
+ 
+ async def _start_test_server():
+     server = aio.server()
+-    port = server.add_insecure_port("[::]:0")
++    port = server.add_insecure_port("127.0.0.1:0")
+     server.add_generic_rpc_handlers((_GenericHandler(),))
+     await server.start()
+-    return f"localhost:{port}", server
++    return f"127.0.0.1:{port}", server
+ 
+ 
+ class TestTimeout(AioTestBase):
+diff --git a/src/python/grpcio_tests/tests_gevent/unit/_test_server.py b/src/python/grpcio_tests/tests_gevent/unit/_test_server.py
+index daa1a2a..014d215 100644
+--- a/src/python/grpcio_tests/tests_gevent/unit/_test_server.py
++++ b/src/python/grpcio_tests/tests_gevent/unit/_test_server.py
+@@ -43,7 +43,7 @@ def start_test_server(port: int = 0) -> Tuple[str, Any]:
+     server.add_generic_rpc_handlers((_create_extra_generic_handler(servicer),))
+     port = server.add_insecure_port("[::]:%d" % port)
+     server.start()
+-    return "localhost:%d" % port, server
++    return "127.0.0.1:%d" % port, server
+ 
+ 
+ def _create_extra_generic_handler(servicer: TestServiceServicer) -> Any:
+diff --git a/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py b/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py
+index c2bd595..c194d72 100644
+--- a/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py
++++ b/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py
+@@ -119,7 +119,7 @@ def _collect_stats(
+     stats_port: int, duration: int
+ ) -> Mapping[str, Mapping[int, int]]:
+     settings = {
+-        "target": f"localhost:{stats_port}",
++        "target": f"127.0.0.1:{stats_port}",
+         "insecure": True,
+     }
+     response = test_pb2_grpc.LoadBalancerStatsService.GetClientAccumulatedStats(
+@@ -177,7 +177,7 @@ class XdsInteropClientTest(unittest.TestCase):
+         self, server_port: int, stats_port: int, qps: int, num_channels: int
+     ):
+         settings = {
+-            "target": f"localhost:{stats_port}",
++            "target": f"127.0.0.1:{stats_port}",
+             "insecure": True,
+         }
+         for i in range(_TEST_ITERATIONS):
+@@ -216,7 +216,7 @@ class XdsInteropClientTest(unittest.TestCase):
+             logging.info("Sending RPC to server.")
+             test_pb2_grpc.TestService.EmptyCall(
+                 empty_pb2.Empty(),
+-                f"localhost:{server_port}",
++                f"127.0.0.1:{server_port}",
+                 insecure=True,
+                 wait_for_ready=True,
+             )
+@@ -225,7 +225,7 @@ class XdsInteropClientTest(unittest.TestCase):
+             with _start_python_with_args(
+                 _CLIENT_PATH,
+                 [
+-                    f"--server=localhost:{server_port}",
++                    f"--server=127.0.0.1:{server_port}",
+                     f"--stats_port={stats_port}",
+                     f"--qps={_QPS}",
+                     f"--num_channels={_NUM_CHANNELS}",
+diff --git a/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py b/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py
+index cfbf345..4d46136 100644
+--- a/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py
++++ b/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py
+@@ -63,8 +63,8 @@ def _start_a_test_server():
+     )
+     server.add_generic_rpc_handlers((_GenericHandler(),))
+     if os.name == "nt":
+-        port = server.add_insecure_port("localhost:0")
+-        address = "localhost:%d" % port
++        port = server.add_insecure_port("127.0.0.1:0")
++        address = "127.0.0.1:%d" % port
+     else:
+         # Use a Unix domain socket instead of TCP. Each of the
+         # _LARGE_NUM_OF_ITERATIONS short-lived channels below consumes an
+diff --git a/src/python/grpcio_tests/tests_py3_only/unit/_simple_stubs_test.py b/src/python/grpcio_tests/tests_py3_only/unit/_simple_stubs_test.py
+index adcc129..f25919f 100644
+--- a/src/python/grpcio_tests/tests_py3_only/unit/_simple_stubs_test.py
++++ b/src/python/grpcio_tests/tests_py3_only/unit/_simple_stubs_test.py
+@@ -125,7 +125,7 @@ def _time_invocation(to_time: Callable[[], None]) -> datetime.timedelta:
+ def _server(credentials: Optional[grpc.ServerCredentials]):
+     try:
+         server = test_common.test_server()
+-        target = "[::]:0"
++        target = "127.0.0.1:0"
+         if credentials is None:
+             port = server.add_insecure_port(target)
+         else:
+@@ -186,7 +186,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_unary_unary_insecure(self):
+         with _server(None) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             response = grpc.experimental.unary_unary(
+                 _REQUEST,
+                 target,
+@@ -199,7 +199,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_unary_unary_secure(self):
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             response = grpc.experimental.unary_unary(
+                 _REQUEST,
+                 target,
+@@ -212,7 +212,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_channels_cached(self):
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             test_name = inspect.stack()[0][3]
+             args = (_REQUEST, target, _UNARY_UNARY)
+             kwargs = {
+@@ -229,7 +229,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_channels_evicted(self):
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             response = grpc.experimental.unary_unary(
+                 _REQUEST,
+                 target,
+@@ -245,7 +245,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_total_channels_enforced(self):
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             for i in range(_STRESS_EPOCHS):
+                 # Ensure we get a new channel each time.
+                 options = (("foo", str(i)),)
+@@ -266,7 +266,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_unary_stream(self):
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             for response in grpc.experimental.unary_stream(
+                 _REQUEST,
+                 target,
+@@ -282,7 +282,7 @@ class SimpleStubsTest(unittest.TestCase):
+                 yield _REQUEST
+ 
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             response = grpc.experimental.stream_unary(
+                 request_iter(),
+                 target,
+@@ -298,7 +298,7 @@ class SimpleStubsTest(unittest.TestCase):
+                 yield _REQUEST
+ 
+         with _server(grpc.local_server_credentials()) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             for response in grpc.experimental.stream_stream(
+                 request_iter(),
+                 target,
+@@ -327,7 +327,7 @@ class SimpleStubsTest(unittest.TestCase):
+         with _env("GRPC_DEFAULT_SSL_ROOTS_FILE_PATH", cert_file):
+             server_creds = grpc.ssl_server_credentials(_server_certs)
+             with _server(server_creds) as port:
+-                target = f"localhost:{port}"
++                target = f"127.0.0.1:{port}"
+                 response = grpc.experimental.unary_unary(
+                     _REQUEST,
+                     target,
+@@ -338,7 +338,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_insecure_sugar(self):
+         with _server(None) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             response = grpc.experimental.unary_unary(
+                 _REQUEST,
+                 target,
+@@ -350,7 +350,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def test_insecure_sugar_mutually_exclusive(self):
+         with _server(None) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             with self.assertRaises(ValueError):
+                 response = grpc.experimental.unary_unary(
+                     _REQUEST,
+@@ -425,7 +425,7 @@ class SimpleStubsTest(unittest.TestCase):
+ 
+     def assert_times_out(self, invocation_args):
+         with _server(None) as port:
+-            target = f"localhost:{port}"
++            target = f"127.0.0.1:{port}"
+             with self.assertRaises(grpc.RpcError) as cm:
+                 response = grpc.experimental.unary_unary(
+                     _REQUEST,
+-- 
+2.39.5 (Apple Git-154)
+

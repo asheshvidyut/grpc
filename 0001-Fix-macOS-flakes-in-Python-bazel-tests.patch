@@ -1,0 +1,178 @@
+From ce712ecc944e80eb55f581f1cae32053b37b402e Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 11:00:08 +0100
+Subject: [PATCH 01/12] Fix macOS flakes in Python bazel tests
+
+Two independent root causes made 'bazel test --config=python
+--runs_per_test=16 --spawn_strategy=local //src/python/...' flaky on
+macOS:
+
+1. _leak_test opens 5000 short-lived TCP channels. Concurrent runs
+   exhaust macOS's 16384-port ephemeral range (TIME_WAIT is 2*MSL=30s),
+   failing the test and any test running alongside it with
+   EADDRNOTAVAIL. Run it over a Unix domain socket on POSIX; the
+   channel-object leak being measured is transport-independent.
+
+2. xds_interop_client_test held its port-reservation listener open
+   while probing the server subprocess, relying on the reservation
+   landing on a different address family than the probe. Close the
+   reservation before the wait_for_ready probe instead. The test is
+   also a 2000-RPS load test asserting zero failed RPCs, which cannot
+   share a machine with concurrent copies of itself: mark it exclusive
+   and wait for a clean stats window before asserting.
+---
+ .../tests_py3_only/interop/BUILD.bazel        |  6 +++
+ .../interop/xds_interop_client_test.py        | 54 ++++++++++++++++++-
+ .../tests_py3_only/unit/_leak_test.py         | 18 ++++++-
+ 3 files changed, 75 insertions(+), 3 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests_py3_only/interop/BUILD.bazel b/src/python/grpcio_tests/tests_py3_only/interop/BUILD.bazel
+index cfa9b32..e1742fd 100644
+--- a/src/python/grpcio_tests/tests_py3_only/interop/BUILD.bazel
++++ b/src/python/grpcio_tests/tests_py3_only/interop/BUILD.bazel
+@@ -58,6 +58,12 @@ py_test(
+     srcs = ["xds_interop_client_test.py"],
+     imports = ["."],
+     python_version = "PY3",
++    # This is a load test: the client drives _QPS * _NUM_CHANNELS RPCs per
++    # second against a subprocess server and asserts that none of them
++    # fails. Running it concurrently with other tests (e.g. under
++    # --runs_per_test=N) oversubscribes the machine and produces spurious
++    # RPC failures, so run it in isolation.
++    tags = ["exclusive"],
+     deps = [
+         ":xds_interop_client",
+         ":xds_interop_server",
+diff --git a/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py b/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py
+index 17419fe..c2bd595 100644
+--- a/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py
++++ b/src/python/grpcio_tests/tests_py3_only/interop/xds_interop_client_test.py
+@@ -48,6 +48,10 @@ _TEST_ITERATIONS = 10
+ _ITERATION_DURATION_SECONDS = 1
+ _SUBPROCESS_TIMEOUT_SECONDS = 2
+ 
++# Maximum number of one-second windows to wait for the client to reach a
++# steady state (RPCs flowing with no failures) before asserting on stats.
++_WARMUP_MAX_WINDOWS = 30
++
+ 
+ def _set_union(a: Iterable, b: Iterable) -> Set:
+     c = set(a)
+@@ -131,6 +135,44 @@ def _collect_stats(
+ 
+ 
+ class XdsInteropClientTest(unittest.TestCase):
++    def _await_client_steady_state(self, stats_port: int) -> None:
++        """Waits until the client's RPCs flow with no failures.
++
++        Right after startup, the client fires _QPS RPCs per second from each
++        of its _NUM_CHANNELS channels while the channels are still
++        connecting and the server process is still warming up. On a loaded
++        machine (e.g. --runs_per_test with several copies of this test in
++        parallel), RPCs started during this window can fail with transient
++        statuses that have nothing to do with the configure-consistency
++        property this test asserts on. Wait for a clean one-second window
++        before asserting. If the client never stabilizes, proceed and let
++        the assertions report the failure with full stats.
++        """
++        for _ in range(_WARMUP_MAX_WINDOWS):
++            try:
++                delta = _collect_stats(stats_port, 1)
++            except grpc.RpcError:
++                # The client's stats server may not be listening yet.
++                time.sleep(1)
++                continue
++            succeeded = sum(
++                count
++                for method_stats in delta.values()
++                for status, count in method_stats.items()
++                if status == 0
++            )
++            failed = sum(
++                count
++                for method_stats in delta.values()
++                for status, count in method_stats.items()
++                if status != 0
++            )
++            if succeeded > 0 and failed == 0:
++                return
++        logging.warning(
++            "Client did not reach a steady state; proceeding anyway."
++        )
++
+     def _assert_client_consistent(
+         self, server_port: int, stats_port: int, qps: int, num_channels: int
+     ):
+@@ -160,6 +202,16 @@ class XdsInteropClientTest(unittest.TestCase):
+             _SERVER_PATH,
+             [f"--port={server_port}", f"--maintenance_port={server_port}"],
+         ) as (server, server_stdout, server_stderr):
++            # Release the port reservation before probing the server. The
++            # reservation socket is a listener that never accepts, while the
++            # server subprocess binds the wildcard address. If the
++            # reservation happens to hold an address the client connects to
++            # (which listener wins depends on the address family the
++            # reservation landed on), the probe RPC and every subsequent
++            # connection is swallowed by a socket that never speaks HTTP/2.
++            # wait_for_ready below retries until the server has bound the
++            # released port.
++            socket.close()
+             # Send RPC to server to make sure it's running.
+             logging.info("Sending RPC to server.")
+             test_pb2_grpc.TestService.EmptyCall(
+@@ -169,7 +221,6 @@ class XdsInteropClientTest(unittest.TestCase):
+                 wait_for_ready=True,
+             )
+             logging.info("Server successfully started.")
+-            socket.close()
+             _, stats_port, stats_socket = framework_common.get_socket()
+             with _start_python_with_args(
+                 _CLIENT_PATH,
+@@ -182,6 +233,7 @@ class XdsInteropClientTest(unittest.TestCase):
+             ) as (client, client_stdout, client_stderr):
+                 stats_socket.close()
+                 try:
++                    self._await_client_steady_state(stats_port)
+                     self._assert_client_consistent(
+                         server_port, stats_port, _QPS, _NUM_CHANNELS
+                     )
+diff --git a/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py b/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py
+index 06fa646..cfbf345 100644
+--- a/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py
++++ b/src/python/grpcio_tests/tests_py3_only/unit/_leak_test.py
+@@ -24,6 +24,7 @@ import os
+ import resource
+ import sys
+ import unittest
++import uuid
+ 
+ import grpc
+ 
+@@ -61,9 +62,22 @@ def _start_a_test_server():
+         ThreadPoolExecutor(max_workers=1), options=(("grpc.so_reuseport", 0),)
+     )
+     server.add_generic_rpc_handlers((_GenericHandler(),))
+-    port = server.add_insecure_port("localhost:0")
++    if os.name == "nt":
++        port = server.add_insecure_port("localhost:0")
++        address = "localhost:%d" % port
++    else:
++        # Use a Unix domain socket instead of TCP. Each of the
++        # _LARGE_NUM_OF_ITERATIONS short-lived channels below consumes an
++        # ephemeral TCP port that then sits in TIME_WAIT for 2*MSL. On macOS
++        # the default ephemeral port range only has ~16k ports and MSL is
++        # 15s, so concurrent runs of this test (e.g. under --runs_per_test)
++        # exhaust the entire range and fail this test, and any test running
++        # in parallel with it, with EADDRNOTAVAIL. The leak being measured
++        # is channel-object churn, which is independent of the transport.
++        address = "unix:/tmp/grpc_leak_test_%s" % uuid.uuid4().hex
++        server.add_insecure_port(address)
+     server.start()
+-    return "localhost:%d" % port, server
++    return address, server
+ 
+ 
+ def _perform_an_rpc(address):
+-- 
+2.39.5 (Apple Git-154)
+

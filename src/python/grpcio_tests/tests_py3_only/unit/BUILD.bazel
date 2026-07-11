@@ -18,9 +18,10 @@ package(
     default_testonly = True,
 )
 
-GRPCIO_PY3_ONLY_TESTS_UNIT = glob([
-    "*_test.py",
-])
+GRPCIO_PY3_ONLY_TESTS_UNIT = glob(
+    ["*_test.py"],
+    exclude = ["_leak_test.py"],
+)
 
 [
     py_test(
@@ -40,3 +41,24 @@ GRPCIO_PY3_ONLY_TESTS_UNIT = glob([
     )
     for test_file_name in GRPCIO_PY3_ONLY_TESTS_UNIT
 ]
+
+py_test(
+    name = "_leak_test",
+    size = "small",
+    # The test performs 5000 sequential RPCs, each on a fresh channel. On a
+    # machine running many tests concurrently (e.g. --runs_per_test) with
+    # GRPC_VERBOSITY=debug this legitimately takes ~45-60s, right at the
+    # default small-test timeout; give it headroom.
+    timeout = "moderate",
+    srcs = ["_leak_test.py"],
+    main = "_leak_test.py",
+    python_version = "PY3",
+    srcs_version = "PY3",
+    deps = [
+        "//src/python/grpcio/grpc:grpcio",
+        "//src/python/grpcio_tests/tests/testing",
+        "//src/python/grpcio_tests/tests/unit:resources",
+        "//src/python/grpcio_tests/tests/unit:test_common",
+        "//src/python/grpcio_tests/tests/unit/framework/common",
+    ],
+)

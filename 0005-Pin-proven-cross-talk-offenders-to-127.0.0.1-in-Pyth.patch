@@ -1,0 +1,117 @@
+From 39444a93ebcecb830def26c5025d7944ea5e0c5a Mon Sep 17 00:00:00 2001
+From: Ashesh Vidyut <asheshvidyut@google.com>
+Date: Tue, 7 Jul 2026 12:24:47 +0100
+Subject: [PATCH 05/12] Pin proven cross-talk offenders to 127.0.0.1 in Python
+ tests
+
+Tests that bind [::]:0 and dial localhost:port can reach a different
+concurrently running test's server: the client resolves localhost to
+both loopback addresses, and on a transient IPv6 connect failure falls
+back to 127.0.0.1, where the same port number is a separate namespace.
+Soak testing (repeated --runs_per_test=16 sweeps) caught this as
+UNIMPLEMENTED from foreign servers, writes failing mid-stream, and a
+silent hang in _resource_exhausted_test's 25-call rendezvous.
+
+Pin bind and dial to 127.0.0.1 in the caught tests and in the shared
+tests_aio start_test_server helper (insecure path only; the secure path
+keeps localhost because the test TLS certificates are hostname-bound).
+---
+ .../grpcio_tests/tests/unit/_interceptor_test.py      |  4 ++--
+ .../tests/unit/_metadata_code_details_test.py         |  8 ++++----
+ .../tests/unit/_resource_exhausted_test.py            |  4 ++--
+ .../grpcio_tests/tests_aio/unit/_test_server.py       | 11 +++++++++--
+ 4 files changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/src/python/grpcio_tests/tests/unit/_interceptor_test.py b/src/python/grpcio_tests/tests/unit/_interceptor_test.py
+index 4dcc8d1..100acb3 100644
+--- a/src/python/grpcio_tests/tests/unit/_interceptor_test.py
++++ b/src/python/grpcio_tests/tests/unit/_interceptor_test.py
+@@ -490,13 +490,13 @@ class InterceptorTest(unittest.TestCase):
+                 _LoggingInterceptor("s2", self._record),
+             ),
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, get_method_handlers(self._handler)
+         )
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(None)
+diff --git a/src/python/grpcio_tests/tests/unit/_metadata_code_details_test.py b/src/python/grpcio_tests/tests/unit/_metadata_code_details_test.py
+index 0509898..b1f8e5f 100644
+--- a/src/python/grpcio_tests/tests/unit/_metadata_code_details_test.py
++++ b/src/python/grpcio_tests/tests/unit/_metadata_code_details_test.py
+@@ -202,10 +202,10 @@ class MetadataCodeDetailsTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE, get_method_handlers(self._servicer)
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:{}".format(port))
++        self._channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+         unary_unary_method_name = "/".join(
+             (
+                 "",
+@@ -831,10 +831,10 @@ class InspectContextTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE, get_method_handlers(self._servicer)
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+ 
+-        self._channel = grpc.insecure_channel("localhost:{}".format(port))
++        self._channel = grpc.insecure_channel("127.0.0.1:{}".format(port))
+         unary_unary_method_name = "/".join(
+             (
+                 "",
+diff --git a/src/python/grpcio_tests/tests/unit/_resource_exhausted_test.py b/src/python/grpcio_tests/tests/unit/_resource_exhausted_test.py
+index 64366af..d6bbf62 100644
+--- a/src/python/grpcio_tests/tests/unit/_resource_exhausted_test.py
++++ b/src/python/grpcio_tests/tests/unit/_resource_exhausted_test.py
+@@ -135,9 +135,9 @@ class ResourceExhaustedTest(unittest.TestCase):
+         self._server.add_registered_method_handlers(
+             _SERVICE_NAME, get_method_handlers(self._trigger)
+         )
+-        port = self._server.add_insecure_port("[::]:0")
++        port = self._server.add_insecure_port("127.0.0.1:0")
+         self._server.start()
+-        self._channel = grpc.insecure_channel("localhost:%d" % port)
++        self._channel = grpc.insecure_channel("127.0.0.1:%d" % port)
+ 
+     def tearDown(self):
+         self._server.stop(0)
+diff --git a/src/python/grpcio_tests/tests_aio/unit/_test_server.py b/src/python/grpcio_tests/tests_aio/unit/_test_server.py
+index 662b5b3..602ee28 100644
+--- a/src/python/grpcio_tests/tests_aio/unit/_test_server.py
++++ b/src/python/grpcio_tests/tests_aio/unit/_test_server.py
+@@ -179,10 +179,17 @@ async def start_test_server(
+                 [(resources.private_key(), resources.certificate_chain())]
+             )
+         port = server.add_secure_port("[::]:%d" % port, server_credentials)
++        host = "localhost"
+     else:
+-        port = server.add_insecure_port("[::]:%d" % port)
++        # Bind and dial the same specific loopback address. With a
++        # wildcard bind and a "localhost" target, the client may fall back
++        # to the other loopback address family, where the same port number
++        # is a separate namespace that can be owned by another
++        # concurrently running test's server.
++        port = server.add_insecure_port("127.0.0.1:%d" % port)
++        host = "127.0.0.1"
+ 
+     await server.start()
+ 
+     # NOTE(lidizheng) returning the server to prevent it from deallocation
+-    return "localhost:%d" % port, server
++    return "%s:%d" % (host, port), server
+-- 
+2.39.5 (Apple Git-154)
+

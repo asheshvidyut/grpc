@@ -241,11 +241,16 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 async def _start_test_server():
     server = aio.server()
-    port = server.add_insecure_port("[::]:0")
+    # Bind and dial the same specific loopback address: with a wildcard
+    # bind and a "localhost" target, the client may fall back to the other
+    # loopback address family, where the same port number is a separate
+    # namespace that another concurrently running test's server (or an
+    # unrelated local process) can own.
+    port = server.add_insecure_port("127.0.0.1:0")
     generic_handler = _GenericHandler()
     server.add_generic_rpc_handlers((generic_handler,))
     await server.start()
-    return "localhost:%d" % port, server, generic_handler
+    return "127.0.0.1:%d" % port, server, generic_handler
 
 
 class TestServer(AioTestBase):
@@ -438,8 +443,11 @@ class TestServer(AioTestBase):
 
         with self.assertRaises(aio.AioRpcError) as exception_context:
             await call
-        self.assertEqual(
-            grpc.StatusCode.UNAVAILABLE, exception_context.exception.code()
+        # Killing the in-flight call races between connection teardown
+        # (UNAVAILABLE) and CANCELLED trailers reaching the client first.
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
         )
 
     async def test_concurrent_graceful_shutdown(self):
@@ -475,8 +483,11 @@ class TestServer(AioTestBase):
 
         with self.assertRaises(aio.AioRpcError) as exception_context:
             await call
-        self.assertEqual(
-            grpc.StatusCode.UNAVAILABLE, exception_context.exception.code()
+        # Killing the in-flight call races between connection teardown
+        # (UNAVAILABLE) and CANCELLED trailers reaching the client first.
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
         )
 
     async def test_shutdown_before_call(self):
@@ -504,7 +515,15 @@ class TestServer(AioTestBase):
         await call.write(_REQUEST)
         await self._server.stop(None)
 
-        self.assertEqual(grpc.StatusCode.UNAVAILABLE, await call.code())
+        # An ungraceful stop (grace=None) races between tearing the
+        # connection down (the client observes UNAVAILABLE) and flushing
+        # CANCELLED trailers for the in-flight call before the socket
+        # closes (the client observes CANCELLED). Both prove the point of
+        # this test, which was added to guard against a segfault.
+        self.assertIn(
+            await call.code(),
+            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
+        )
         # No segfault
 
     async def test_error_in_stream_stream(self):
@@ -553,12 +572,20 @@ class TestServer(AioTestBase):
         with self.assertRaises(aio.AioRpcError) as exception_context:
             await call
         rpc_error = exception_context.exception
-        self.assertEqual(grpc.StatusCode.UNKNOWN, rpc_error.code())
+        # The handler raises after the first request, while the client may
+        # still have writes in flight. The unhandled server error surfaces
+        # as UNKNOWN, unless a pending client write trips over the reset
+        # stream first, which surfaces locally as INTERNAL. Either way the
+        # handler error terminated the RPC.
+        self.assertIn(
+            rpc_error.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.INTERNAL),
+        )
 
     async def test_port_binding_exception(self):
         server = aio.server(options=(("grpc.so_reuseport", 0),))
-        port = server.add_insecure_port("localhost:0")
-        bind_address = "localhost:%d" % port
+        port = server.add_insecure_port("127.0.0.1:0")
+        bind_address = "127.0.0.1:%d" % port
 
         with self.assertRaises(RuntimeError):
             server.add_insecure_port(bind_address)
@@ -575,8 +602,8 @@ class TestServer(AioTestBase):
 
         # Build the server with concurrent rpc argument
         server = aio.server(maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS)
-        port = server.add_insecure_port("localhost:0")
-        bind_address = "localhost:%d" % port
+        port = server.add_insecure_port("127.0.0.1:0")
+        bind_address = "127.0.0.1:%d" % port
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         # Build the channel
@@ -630,8 +657,8 @@ class TestServer(AioTestBase):
         # Use a limit of 1 to make the test deterministic
         max_concurrent = 1
         server = aio.server(maximum_concurrent_rpcs=max_concurrent)
-        port = server.add_insecure_port("[::]:0")
-        bind_address = f"localhost:{port}"
+        port = server.add_insecure_port("127.0.0.1:0")
+        bind_address = f"127.0.0.1:{port}"
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         channel = aio.insecure_channel(bind_address)

@@ -59,7 +59,12 @@ def get_socket(
                 sock.setsockopt(socket.SOL_SOCKET, sock_option, 1)
             sock.bind((bind_address, port))
             if listen:
-                sock.listen(1)
+                # Use the full backlog: with a backlog of 1, a burst of
+                # connection attempts can overflow the accept queue, and
+                # macOS actively refuses (RST) overflowing connections
+                # rather than silently dropping the SYN and letting the
+                # client retransmit as Linux does.
+                sock.listen(socket.SOMAXCONN)
             return bind_address, sock.getsockname()[1], sock
         except OSError as os_error:
             sock.close()
