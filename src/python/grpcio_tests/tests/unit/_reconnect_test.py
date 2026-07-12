@@ -59,7 +59,16 @@ class TestServer:
 
     def __init__(self):
         self.pool = logging_pool.pool(test_constants.THREAD_CONCURRENCY)
-        self.host, self.port, self._sock = test_common.get_socket(listen=False)
+        # Bind and dial one specific loopback address. Reserving only one
+        # address family while the client dials "localhost" lets the client
+        # fail over to the other family, where the same port number is a
+        # separate namespace that can be owned by an unrelated process. This
+        # was observed with a Docker-forwarded port on 127.0.0.1 answering
+        # every RPC with HTTP/2 404 while the test's real server lived on
+        # [::1], permanently breaking the recovery phase.
+        self.host, self.port, self._sock = test_common.get_socket(
+            bind_address="127.0.0.1", listen=False
+        )
 
     @property
     def addr(self) -> str:

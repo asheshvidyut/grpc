@@ -61,9 +61,22 @@ def _start_a_test_server():
         ThreadPoolExecutor(max_workers=1), options=(("grpc.so_reuseport", 0),)
     )
     server.add_generic_rpc_handlers((_GenericHandler(),))
-    port = server.add_insecure_port("localhost:0")
+    if os.name == "nt":
+        port = server.add_insecure_port("127.0.0.1:0")
+        address = "127.0.0.1:%d" % port
+    else:
+        # Use a Unix domain socket instead of TCP. Each of the
+        # _LARGE_NUM_OF_ITERATIONS short-lived channels below consumes an
+        # ephemeral TCP port that then sits in TIME_WAIT for 2*MSL. On macOS
+        # the default ephemeral port range only has ~16k ports and MSL is
+        # 15s, so concurrent runs of this test (e.g. under --runs_per_test)
+        # exhaust the entire range and fail this test, and any test running
+        # in parallel with it, with EADDRNOTAVAIL. The leak being measured
+        # is channel-object churn, which is independent of the transport.
+        address = "unix:/tmp/grpc_leak_test_%s" % uuid.uuid4().hex
+        server.add_insecure_port(address)
     server.start()
-    return "localhost:%d" % port, server
+    return address, server
 
 
 def _perform_an_rpc(address):

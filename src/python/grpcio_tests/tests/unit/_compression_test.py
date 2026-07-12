@@ -36,7 +36,11 @@ _STREAM_STREAM = "StreamStream"
 # Cut down on test time.
 _STREAM_LENGTH = test_constants.STREAM_LENGTH // 16
 
-_HOST = "localhost"
+# A single, specific loopback address: binding and dialing the same
+# address keeps the client from probing a second address family in which
+# the proxy does not exist (and in which the port number is a separate
+# namespace that another concurrently running test's server can own).
+_HOST = "127.0.0.1"
 
 _REQUEST = b"\x00" * 100
 _COMPRESSION_RATIO_THRESHOLD = 0.05

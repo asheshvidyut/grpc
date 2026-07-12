@@ -238,8 +238,14 @@ class MetadataFlagsTest(unittest.TestCase):
         #   exceptions and raise them again in main thread.
         unhandled_exceptions = queue.Queue()
 
-        # We just need an unused TCP port
-        host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
+        # We just need an unused TCP port. Pin both the reservation and the
+        # target to one address family (IPv4 loopback): with a "localhost"
+        # target the client may fall back to the other loopback family,
+        # where the same port number is a separate namespace that can be
+        # owned by another concurrently running test's server.
+        host, port, sock = get_socket(
+            bind_address="127.0.0.1", sock_options=(socket.SO_REUSEADDR,)
+        )
         sock.close()
 
         addr = "{}:{}".format(host, port)
