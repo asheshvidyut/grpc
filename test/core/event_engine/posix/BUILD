@@ -17,6 +17,27 @@ load("//test/cpp/microbenchmarks:grpc_benchmark_config.bzl", "grpc_cc_benchmark"
 
 licenses(["notice"])
 
+grpc_cc_test(
+    name = "repro_dns_shutdown_crash_test",
+    srcs = ["repro_dns_shutdown_crash_test.cc"],
+    external_deps = [
+        "absl/status",
+        "absl/status:statusor",
+        "gtest",
+    ],
+    uses_event_engine = True,
+    uses_polling = True,
+    deps = [
+        "//:event_engine_base_hdrs",
+        "//:gpr_platform",
+        "//:grpc",
+        "//:grpc_base",
+        "//src/core:default_event_engine",
+        "//test/core/test_util:grpc_test_util",
+    ],
+)
+
+
 grpc_package(
     name = "test/core/event_engine/posix",
     features = [
