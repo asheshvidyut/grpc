@@ -144,7 +144,9 @@ class _RegisteredMethod(_Method[RequestType, ResponseType]):
     def __init__(
         self,
         name: str,
-        registered_handler: Optional[grpc.RpcMethodHandler[RequestType, ResponseType]],
+        registered_handler: Optional[
+            grpc.RpcMethodHandler[RequestType, ResponseType]
+        ],
     ):
         self._name = name
         self._registered_handler = registered_handler
@@ -163,7 +165,9 @@ class _RegisteredMethod(_Method[RequestType, ResponseType]):
 class _GenericMethod(_Method[RequestType, ResponseType]):
     def __init__(
         self,
-        generic_handlers: List[grpc.GenericRpcHandler[RequestType, ResponseType]],
+        generic_handlers: List[
+            grpc.GenericRpcHandler[RequestType, ResponseType]
+        ],
     ):
         self._generic_handlers = generic_handlers
 
@@ -181,7 +185,7 @@ class _GenericMethod(_Method[RequestType, ResponseType]):
             service_fn = getattr(generic_handler, "service", None)
             if callable(service_fn):
                 method_handler = cast(
-                    Optional[grpc.RpcMethodHandler[RequestType, ResponseType]],
+                    "Optional[grpc.RpcMethodHandler[RequestType, ResponseType]]",
                     service_fn(handler_call_details),
                 )
                 if method_handler is not None:
@@ -931,7 +935,7 @@ def _get_request_deserializer(
     ],
 ) -> Optional[DeserializingFunction[RequestType]]:
     return cast(
-        Optional[DeserializingFunction[RequestType]],
+        "Optional[DeserializingFunction[RequestType]]",
         getattr(method_handler, "request_deserializer", None),
     )
 
@@ -942,20 +946,16 @@ def _get_response_serializer(
     ],
 ) -> Optional[SerializingFunction[ResponseType]]:
     return cast(
-        Optional[SerializingFunction[ResponseType]],
+        "Optional[SerializingFunction[ResponseType]]",
         getattr(method_handler, "response_serializer", None),
     )
 
 
 def _get_unary_unary(
     method_handler: grpc.RpcMethodHandler[RequestType, ResponseType],
-) -> Optional[
-    Callable[[RequestType, _common.ServicerContext], ResponseType]
-]:
+) -> Optional[Callable[[RequestType, _common.ServicerContext], ResponseType]]:
     return cast(
-        Optional[
-            Callable[[RequestType, _common.ServicerContext], ResponseType]
-        ],
+        "Optional[Callable[[RequestType, _common.ServicerContext], ResponseType]]",
         getattr(method_handler, "unary_unary", None),
     )
 
@@ -969,12 +969,7 @@ def _get_unary_stream(
     ]
 ]:
     return cast(
-        Optional[
-            Callable[
-                [RequestType, _common.ServicerContext],
-                Iterator[ResponseType],
-            ]
-        ],
+        "Optional[Callable[[RequestType, _common.ServicerContext], Iterator[ResponseType]]]",
         getattr(method_handler, "unary_stream", None),
     )
 
@@ -988,12 +983,7 @@ def _get_stream_unary(
     ]
 ]:
     return cast(
-        Optional[
-            Callable[
-                [Iterator[RequestType], _common.ServicerContext],
-                ResponseType,
-            ]
-        ],
+        "Optional[Callable[[Iterator[RequestType], _common.ServicerContext], ResponseType]]",
         getattr(method_handler, "stream_unary", None),
     )
 
@@ -1007,12 +997,7 @@ def _get_stream_stream(
     ]
 ]:
     return cast(
-        Optional[
-            Callable[
-                [Iterator[RequestType], _common.ServicerContext],
-                Iterator[ResponseType],
-            ]
-        ],
+        "Optional[Callable[[Iterator[RequestType], _common.ServicerContext], Iterator[ResponseType]]]",
         getattr(method_handler, "stream_stream", None),
     )
 
@@ -1028,9 +1013,7 @@ def _handle_unary_unary(
         raise ValueError(_UNEXPECTED_NONE_METHOD_HANDLER_MSG)
     request_deserializer = _get_request_deserializer(method_handler)
     response_serializer = _get_response_serializer(method_handler)
-    unary_request = _unary_request(
-        rpc_event, state, request_deserializer
-    )
+    unary_request = _unary_request(rpc_event, state, request_deserializer)
     thread_pool = _select_thread_pool_for_behavior(
         unary_unary, default_thread_pool
     )
@@ -1057,9 +1040,7 @@ def _handle_unary_stream(
         raise ValueError(_UNEXPECTED_NONE_METHOD_HANDLER_MSG)
     request_deserializer = _get_request_deserializer(method_handler)
     response_serializer = _get_response_serializer(method_handler)
-    unary_request = _unary_request(
-        rpc_event, state, request_deserializer
-    )
+    unary_request = _unary_request(rpc_event, state, request_deserializer)
     thread_pool = _select_thread_pool_for_behavior(
         unary_stream, default_thread_pool
     )
@@ -1334,14 +1315,18 @@ class _ServerState:
 
 
 def _add_generic_handlers(
-    state: _ServerState, generic_handlers: Iterable[grpc.GenericRpcHandler[Any, Any]]
+    state: _ServerState,
+    generic_handlers: Iterable[grpc.GenericRpcHandler[Any, Any]],
 ) -> None:
     with state.lock:
         state.generic_handlers.extend(generic_handlers)
 
 
 def _add_registered_method_handlers(
-    state: _ServerState, method_handlers: Dict[str, grpc.RpcMethodHandler[RequestType, ResponseType]]
+    state: _ServerState,
+    method_handlers: Dict[
+        str, grpc.RpcMethodHandler[RequestType, ResponseType]
+    ],
 ) -> None:
     with state.lock:
         state.registered_method_handlers.update(method_handlers)
@@ -1598,7 +1583,9 @@ class _Server(grpc.Server):
     def add_registered_method_handlers(
         self,
         service_name: str,
-        method_handlers: Dict[str, grpc.RpcMethodHandler[RequestType, ResponseType]],
+        method_handlers: Dict[
+            str, grpc.RpcMethodHandler[RequestType, ResponseType]
+        ],
     ) -> None:
         # Can't register method once server started.
         with self._state.lock:
