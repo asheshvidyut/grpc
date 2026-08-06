@@ -65,9 +65,6 @@ include "_cygrpc/thread.pyx.pxi"
 
 include "_cygrpc/fork.pyx.pxi"
 
-include "_cygrpc/native_dispatch.pxd.pxi"
-include "_cygrpc/native_dispatch.pyx.pxi"
-
 # Following pxi files are part of the Aio module
 include "_cygrpc/aio/common.pyx.pxi"
 include "_cygrpc/aio/rpc_status.pyx.pxi"

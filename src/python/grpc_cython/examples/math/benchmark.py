@@ -40,17 +40,19 @@ class PurePythonMathService:
 # 2. Benchmark Harness
 # ==========================================
 def measure_throughput(target, payload_a, payload_b, threads=8, duration_s=3.0):
+    import math_pb2_grpc
+    import math_pb2
     stop_at = time.perf_counter() + duration_s
     counts = [0] * threads
 
     def worker(idx):
         with grpc.insecure_channel(target) as channel:
-            # We use the generated fast stub!
-            client = math_cython_pb2.MathServiceFastStub(channel)
+            client = math_pb2_grpc.MathServiceStub(channel)
+            req = math_pb2.MathRequest(matrix_a=payload_a, matrix_b=payload_b)
             local = 0
             while time.perf_counter() < stop_at:
                 try:
-                    client.ComputeMatrix(matrix_a=payload_a, matrix_b=payload_b)
+                    client.ComputeMatrix(req)
                     local += 1
                 except Exception as e:
                     print("Error:", e)

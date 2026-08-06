@@ -14,7 +14,7 @@ python3 -m grpc_tools.protoc -I. \
     math.proto
 ```
 
-This automatically generates the `MathServiceFastStub` and `MathServiceBase`.
+This automatically generates the `MathServiceBase` and server registration helper.
 
 ## 2. Compile the Extensions
 Compile both the auto-generated boilerplate (`math_cython_pb2.pyx`) and your native business logic (`server.pyx`) into shared libraries (`.so`):

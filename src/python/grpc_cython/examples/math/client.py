@@ -1,32 +1,25 @@
 import grpc
-import math_cython_pb2
+import math_pb2
+import math_pb2_grpc
 
 def main():
     print("Connecting to math server...")
-    channel = grpc.insecure_channel('localhost:50051')
+    with grpc.insecure_channel('localhost:50051') as channel:
+        stub = math_pb2_grpc.MathServiceStub(channel)
 
-    print("Instantiating auto-generated Fast Client Stub...")
-    client = math_cython_pb2.MathServiceFastStub(channel)
+        print("Creating arrays...")
+        matrix_a = [1.0] * 1024
+        matrix_b = [2.5] * 1024
 
-    print("Creating Numpy arrays...")
-    try:
-        import numpy as np
-        matrix_a = np.ones(1024, dtype=np.float32)
-        matrix_b = np.full(1024, 2.5, dtype=np.float32)
-    except ImportError:
-        import array
-        matrix_a = array.array('f', [1.0] * 1024)
-        matrix_b = array.array('f', [2.5] * 1024)
-
-    print("Dispatching natively without freezing the asyncio event loop!")
-    try:
-        # Pass the arrays directly into the stub
-        # The stub drops the GIL and does all heavy lifting in C++
-        response = client.ComputeMatrix(matrix_a=matrix_a, matrix_b=matrix_b)
-        res_len = len(response.get('result_matrix', []))
-        print(f"Success! Native execution completed. Received {res_len} elements in response.")
-    except Exception as e:
-        print(f"Call finished with expected failure (since no backend is actually listening): {e}")
+        req = math_pb2.MathRequest(matrix_a=matrix_a, matrix_b=matrix_b)
+        print("Dispatching request to server...")
+        try:
+            response = stub.ComputeMatrix(req)
+            res_len = len(response.result_matrix)
+            print(f"Success! Server execution completed. Received {res_len} elements in response.")
+        except Exception as e:
+            print(f"Call finished with expected failure (since no backend is actually listening): {e}")
 
 if __name__ == '__main__':
     main()
+
