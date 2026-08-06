@@ -1,6 +1,7 @@
 import grpc
 from concurrent import futures
-from server import FastMathService
+from grpc_cython_server import FastMathService
+
 from math_cython_pb2 import add_MathServiceServicer_to_server
 
 def serve():

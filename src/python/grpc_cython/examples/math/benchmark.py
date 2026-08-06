@@ -99,7 +99,7 @@ def main():
     import math_pb2_grpc
     
     try:
-        from server import FastMathService
+        from grpc_cython_server import FastMathService
         from math_cython_pb2 import add_MathServiceServicer_to_server
     except ImportError:
         print("Please compile the cython extension first: python3 setup.py build_ext --inplace")

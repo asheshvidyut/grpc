@@ -1,5 +1,5 @@
 import math_pb2
-from server import FastMathService
+from grpc_cython_server import FastMathService
 
 req = math_pb2.MathRequest()
 req.matrix_a.extend([1.0, 2.0, 3.0])

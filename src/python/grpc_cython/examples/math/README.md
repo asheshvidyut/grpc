@@ -17,7 +17,7 @@ python3 -m grpc_tools.protoc -I. \
 This automatically generates the `MathServiceBase` and server registration helper.
 
 ## 2. Compile the Extensions
-Compile both the auto-generated boilerplate (`math_cython_pb2.pyx`) and your native business logic (`server.pyx`) into shared libraries (`.so`):
+Compile both the auto-generated boilerplate (`math_cython_pb2.pyx`) and your native business logic (`grpc_cython_server.pyx`) into shared libraries (`.so`):
 
 ```bash
 python3 setup.py build_ext --inplace
@@ -30,11 +30,11 @@ In a production application, you would attach the `FastMathService` to your `grp
 # Server Bootstrapping Example
 import grpc
 from concurrent import futures
-import server  # Your compiled server.so
+import grpc_cython_server  # Your compiled grpc_cython_server.so
 import math_cython_pb2
 
 grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
-math_cython_pb2.add_MathServiceServicer_to_server(server.FastMathService(), grpc_server)
+math_cython_pb2.add_MathServiceServicer_to_server(grpc_cython_server.FastMathService(), grpc_server)
 grpc_server.add_insecure_port("[::]:50051")
 grpc_server.start()
 grpc_server.wait_for_termination()
