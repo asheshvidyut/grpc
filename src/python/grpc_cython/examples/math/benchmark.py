@@ -54,9 +54,7 @@ def measure_throughput(target, payload_a, payload_b, threads=8, duration_s=3.0):
                 try:
                     client.ComputeMatrix(req)
                     local += 1
-                except Exception as e:
-                    print("Error:", e)
-                    import traceback; traceback.print_exc()
+                except Exception:
                     break
             counts[idx] = local
 

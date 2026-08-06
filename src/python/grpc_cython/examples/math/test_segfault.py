@@ -9,7 +9,7 @@ req_bytes = req.SerializeToString()
 
 service = FastMathService()
 print("Calling native dispatch...")
-res_bytes = service._native_Dispatch_ComputeMatrix(req_bytes)
+res_bytes = service._native_Dispatch_ComputeMatrix(req_bytes, None)
 print("Finished!")
 
 res = math_pb2.MathResponse()
