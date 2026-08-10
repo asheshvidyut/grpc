@@ -27,6 +27,11 @@ cd $(dirname $0)/../../..
 
 source tools/internal_ci/helper_scripts/prepare_build_macos_rc
 
+# Increase macOS ephemeral port range and file descriptor limits
+# This prevents 'Operation timed out' and EMFILE errors when Bazel runs highly concurrent test suites
+sudo sysctl -w net.inet.ip.portrange.first=32768 || true
+ulimit -n 65536 || true
+
 # make sure bazel is available
 tools/bazel version
 
@@ -72,6 +77,7 @@ python_bazel_tests/bazel_wrapper \
   --output_base=.bazel_rbe \
   --bazelrc=tools/remote_build/mac.bazelrc \
   test \
+  --local_test_jobs=4 \
   --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   ${BAZEL_FLAGS} \
@@ -85,6 +91,7 @@ python_bazel_tests_single_threaded_unary_streams/bazel_wrapper \
   --output_base=.bazel_rbe \
   --bazelrc=tools/remote_build/mac.bazelrc \
   test \
+  --local_test_jobs=4 \
   --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   --config=python_single_threaded_unary_stream \
@@ -100,6 +107,7 @@ python_bazel_tests_fork_support/bazel_wrapper \
   --output_base=.bazel_rbe \
   --bazelrc=tools/remote_build/mac.bazelrc \
   test \
+  --local_test_jobs=4 \
   --google_credentials="${KOKORO_GFILE_DIR}/GrpcTesting-d0eeee2db331.json" \
   "${BAZEL_REMOTE_CACHE_ARGS[@]}" \
   --config=fork_support \
