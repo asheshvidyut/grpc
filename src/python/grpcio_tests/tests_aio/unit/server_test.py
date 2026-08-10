@@ -508,7 +508,10 @@ class TestServer(AioTestBase):
         # 1. Closing the socket instantly (client sees UNAVAILABLE)
         # 2. Flushing CANCELLED HTTP/2 trailers before socket closes (client sees CANCELLED)
         # This test was originally added strictly to ensure "No segfault" (commit 80d7acff7c).
-        self.assertIn(await call.code(), (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED))
+        self.assertIn(
+            await call.code(),
+            (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.CANCELLED),
+        )
         # No segfault
 
     async def test_error_in_stream_stream(self):
