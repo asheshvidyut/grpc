@@ -12,8 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import multiprocessing
+
 from tests import _loader
 from tests import _runner
+
+try:
+    multiprocessing.set_start_method("fork", force=True)
+except RuntimeError:
+    pass
 
 Loader = _loader.Loader
 Runner = _runner.Runner

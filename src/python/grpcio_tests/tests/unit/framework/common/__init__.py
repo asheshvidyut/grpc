@@ -16,6 +16,7 @@ import contextlib
 import errno
 import os
 import socket
+import sys
 
 _DEFAULT_SOCK_OPTIONS = (
     (socket.SO_REUSEADDR, socket.SO_REUSEPORT)
@@ -55,6 +56,8 @@ def get_socket(
     for address_family in address_families:
         try:
             sock = socket.socket(address_family, socket.SOCK_STREAM)
+            if sys.platform == "darwin" and address_family == socket.AF_INET6:
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
             for sock_option in _sock_options:
                 sock.setsockopt(socket.SOL_SOCKET, sock_option, 1)
             sock.bind((bind_address, port))
