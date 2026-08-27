@@ -205,6 +205,7 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
         )
 
         call = stub.StreamingOutputCall(request)
+        await call.wait_for_connection()
 
         response_cnt = 0
         for response in range(_NUM_STREAM_RESPONSES):
@@ -250,6 +251,7 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
                 )
 
                 call = stub.StreamingOutputCall(request)
+                await call.wait_for_connection()
 
                 response_cnt = 0
                 for response in range(_NUM_STREAM_RESPONSES):
@@ -295,6 +297,7 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
                 )
 
                 call = stub.StreamingOutputCall(request)
+                await call.wait_for_connection()
 
                 response_cnt = 0
                 async for response in call:
@@ -547,7 +550,7 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
     _METHOD_NAME = "UnaryStream"
 
     async def setUp(self):
-        self._server = aio.server()
+        self._server = aio.server(options=(("grpc.so_reuseport", 0),))
         self._port = self._server.add_insecure_port("[::]:0")
         self._method_handlers = {
             self._METHOD_NAME: grpc.unary_stream_rpc_method_handler(
@@ -560,7 +563,7 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
         await self._server.start()
 
     async def tearDown(self):
-        await self._server.stop(0)
+        await self._server.stop(None)
 
     async def _unary_stream_handler(self, unused_request, unused_context):
         for _ in range(_NUM_STREAM_RESPONSES):

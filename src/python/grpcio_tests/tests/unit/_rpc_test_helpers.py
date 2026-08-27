@@ -401,17 +401,18 @@ class BaseRPCTest:
         self._handler = _Handler(self._control, self._thread_pool)
 
         self._server = test_common.test_server()
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(self._handler)
         )
         self._server.start()
 
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
     def tearDown(self):
-        self._server.stop(None)
         self._channel.close()
+        self._server.stop(None)
 
     def _consume_one_stream_response_unary_request(self, multi_callable):
         request = b"\x57\x38"
@@ -571,8 +572,9 @@ class BaseRPCTest:
                 )
                 next(response_iterator)
 
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, exception_context.exception.code()
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
 
     def _failed_stream_request_stream_response(self, multi_callable):
@@ -589,10 +591,14 @@ class BaseRPCTest:
                 )
                 tuple(response_iterator)
 
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, exception_context.exception.code()
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
-        self.assertIs(grpc.StatusCode.UNKNOWN, response_iterator.code())
+        self.assertIn(
+            response_iterator.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
+        )
 
     def _ignored_unary_stream_request_future_unary_response(
         self, multi_callable

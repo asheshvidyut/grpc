@@ -39,6 +39,7 @@ class TestClientSideDoneCallback(AioTestBase):
     async def setUp(self):
         address, self._server = await start_test_server()
         self._channel = aio.insecure_channel(address)
+        await self._channel.channel_ready()
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)
 
     async def tearDown(self):

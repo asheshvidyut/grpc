@@ -34,7 +34,7 @@ class SecureIntraopTest(_intraop_test_case.IntraopTestCase, unittest.TestCase):
             service.TestService(), self.server
         )
         port = self.server.add_secure_port(
-            "[::]:0",
+            "localhost:0",
             grpc.ssl_server_credentials(
                 [
                     (
@@ -58,8 +58,8 @@ class SecureIntraopTest(_intraop_test_case.IntraopTestCase, unittest.TestCase):
         self.stub = test_pb2_grpc.TestServiceStub(self.channel)
 
     def tearDown(self):
-        self.server.stop(None)
         self.channel.close()
+        self.server.stop(None)
 
 
 class SecureInteropWithSyncPrivateKeyOffloadingTest(
@@ -73,7 +73,7 @@ class SecureInteropWithSyncPrivateKeyOffloadingTest(
         )
         # Configure the server for mTLS so the client will do Private Key signing
         port = self.server.add_secure_port(
-            "[::]:0",
+            "localhost:0",
             grpc.ssl_server_credentials(
                 [
                     (
@@ -103,8 +103,8 @@ class SecureInteropWithSyncPrivateKeyOffloadingTest(
         self.stub = test_pb2_grpc.TestServiceStub(self.channel)
 
     def tearDown(self):
-        self.server.stop(None)
         self.channel.close()
+        self.server.stop(None)
 
 
 class SecureInteropWithAsyncPrivateKeyOffloadingTest(
@@ -118,7 +118,7 @@ class SecureInteropWithAsyncPrivateKeyOffloadingTest(
         )
         # Configure the server for mTLS so the client will do Private Key signing
         port = self.server.add_secure_port(
-            "[::]:0",
+            "localhost:0",
             grpc.ssl_server_credentials(
                 [
                     (
@@ -148,8 +148,8 @@ class SecureInteropWithAsyncPrivateKeyOffloadingTest(
         self.stub = test_pb2_grpc.TestServiceStub(self.channel)
 
     def tearDown(self):
-        self.server.stop(None)
         self.channel.close()
+        self.server.stop(None)
 
 
 if __name__ == "__main__":

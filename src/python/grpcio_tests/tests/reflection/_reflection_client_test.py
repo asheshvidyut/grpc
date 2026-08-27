@@ -45,7 +45,7 @@ class ReflectionClientTest(unittest.TestCase):
             reflection.SERVICE_NAME,
         )
         reflection.enable_server_reflection(self._SERVICE_NAMES, self._server)
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
 
         self._channel = grpc.insecure_channel("localhost:%d" % port)
@@ -54,8 +54,8 @@ class ReflectionClientTest(unittest.TestCase):
         self.desc_pool = DescriptorPool(self._reflection_db)
 
     def tearDown(self):
-        self._server.stop(None)
         self._channel.close()
+        self._server.stop(None)
 
     def testListServices(self):
         services = self._reflection_db.get_services()

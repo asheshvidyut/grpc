@@ -72,7 +72,7 @@ class _ChannelServerPair:
             futures.ThreadPoolExecutor(max_workers=3),
             options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ,
         )
-        port = self.server.add_insecure_port("[::]:0")
+        port = self.server.add_insecure_port("localhost:0")
         self.server.add_generic_rpc_handlers((_GenericHandler(),))
         self.server.start()
 
@@ -88,8 +88,8 @@ def _generate_channel_server_pairs(n):
 
 def _close_channel_server_pairs(pairs):
     for pair in pairs:
-        pair.server.stop(None)
         pair.channel.close()
+        pair.server.stop(None)
 
 
 class ChannelzServicerTest(unittest.TestCase):
@@ -145,7 +145,7 @@ class ChannelzServicerTest(unittest.TestCase):
             futures.ThreadPoolExecutor(max_workers=3),
             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ,
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         channelz.add_channelz_servicer(self._server)
         self._server.start()
 
@@ -157,9 +157,9 @@ class ChannelzServicerTest(unittest.TestCase):
         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
 
     def tearDown(self):
-        self._server.stop(None)
-        self._channel.close()
         _close_channel_server_pairs(self._pairs)
+        self._channel.close()
+        self._server.stop(None)
 
     def test_get_top_channels_basic(self):
         self._pairs = _generate_channel_server_pairs(1)
@@ -496,7 +496,7 @@ class ChannelzServicerTest(unittest.TestCase):
             channelz_pb2.GetServersRequest(start_server_id=0)
         )
         self.assertEqual(len(gss_resp.server), 1)
-        self.assertEqual(len(gss_resp.server[0].listen_socket), 1)
+        self.assertGreaterEqual(len(gss_resp.server[0].listen_socket), 1)
 
         gs_resp: channelz_pb2.GetSocketResponse = self._channelz_stub.GetSocket(
             channelz_pb2.GetSocketRequest(

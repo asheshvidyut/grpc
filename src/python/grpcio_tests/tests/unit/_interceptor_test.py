@@ -490,7 +490,7 @@ class InterceptorTest(unittest.TestCase):
                 _LoggingInterceptor("s2", self._record),
             ),
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(self._handler)
         )
@@ -499,9 +499,9 @@ class InterceptorTest(unittest.TestCase):
         self._channel = grpc.insecure_channel("localhost:%d" % port)
 
     def tearDown(self):
+        self._channel.close()
         self._server.stop(None)
         self._server_pool.shutdown(wait=True)
-        self._channel.close()
 
     def testTripleRequestMessagesClientInterceptor(self):
         def triple(request_iterator):

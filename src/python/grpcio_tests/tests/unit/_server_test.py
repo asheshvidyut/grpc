@@ -163,15 +163,18 @@ class ServerTest(unittest.TestCase):
 
 class ServerHandlerTest(unittest.TestCase):
     def tearDown(self):
-        self._server.stop(0)
-        self._channel.close()
+        if hasattr(self, "_channel") and self._channel is not None:
+            self._channel.close()
+        if hasattr(self, "_server") and self._server is not None:
+            self._server.stop(None)
 
     def test_generic_unary_unary_handler(self):
         self._server = test_common.test_server()
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         response = self._channel.unary_unary(
             _UNARY_UNARY,
@@ -182,9 +185,10 @@ class ServerHandlerTest(unittest.TestCase):
     def test_generic_unary_stream_handler(self):
         self._server = test_common.test_server()
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         response_iterator = self._channel.unary_stream(
             _UNARY_STREAM,
@@ -197,9 +201,10 @@ class ServerHandlerTest(unittest.TestCase):
     def test_generic_stream_unary_handler(self):
         self._server = test_common.test_server()
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         response = self._channel.stream_unary(
             _STREAM_UNARY,
@@ -210,9 +215,10 @@ class ServerHandlerTest(unittest.TestCase):
     def test_generic_stream_stream_handler(self):
         self._server = test_common.test_server()
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         response_iterator = self._channel.stream_stream(
             _STREAM_STREAM,
@@ -224,10 +230,11 @@ class ServerHandlerTest(unittest.TestCase):
 
     def test_add_generic_handler_after_server_start(self):
         self._server = test_common.test_server()
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         response = self._channel.unary_unary(
             _UNARY_UNARY,
@@ -237,7 +244,7 @@ class ServerHandlerTest(unittest.TestCase):
 
     def test_add_registered_handler_after_server_start(self):
         self._server = test_common.test_server()
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         with self.assertLogs(level="WARNING") as cm:
             self._server.add_registered_method_handlers(
@@ -251,6 +258,7 @@ class ServerHandlerTest(unittest.TestCase):
         )
 
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         with self.assertRaises(grpc.RpcError) as exception_context:
             self._channel.unary_unary(
@@ -268,9 +276,10 @@ class ServerHandlerTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, _REGISTERED_METHOD_HANDLERS
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         generic_response = self._channel.unary_unary(
             _UNARY_UNARY,
@@ -296,9 +305,10 @@ class ServerHandlerTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, _REGISTERED_METHOD_HANDLERS
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
         registered_response = self._channel.unary_unary(
             grpc._common.fully_qualified_method(

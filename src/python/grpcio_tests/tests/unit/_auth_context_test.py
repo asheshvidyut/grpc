@@ -72,7 +72,7 @@ class AuthContextTest(unittest.TestCase):
     def testInsecure(self):
         server = test_common.test_server()
         server.add_registered_method_handlers(_SERVICE_NAME, _METHOD_HANDLERS)
-        port = server.add_insecure_port("[::]:0")
+        port = server.add_insecure_port("localhost:0")
         server.start()
 
         with grpc.insecure_channel("localhost:%d" % port) as channel:

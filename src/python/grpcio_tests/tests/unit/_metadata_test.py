@@ -177,15 +177,16 @@ class MetadataTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(weakref.proxy(self))
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel(
             "localhost:%d" % port, options=_CHANNEL_ARGS
         )
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
     def tearDown(self):
-        self._server.stop(0)
         self._channel.close()
+        self._server.stop(None)
 
     def testUnaryUnary(self):
         multi_callable = self._channel.unary_unary(

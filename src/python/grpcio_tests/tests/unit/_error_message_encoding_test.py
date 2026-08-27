@@ -59,13 +59,14 @@ class ErrorMessageEncodingTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, _METHOD_HANDLERS
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
     def tearDown(self):
-        self._server.stop(0)
         self._channel.close()
+        self._server.stop(None)
 
     def testMessageEncoding(self):
         for message in _UNICODE_ERROR_MESSAGES:

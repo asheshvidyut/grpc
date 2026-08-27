@@ -80,7 +80,7 @@ class _ChannelServerPair:
     async def start(self):
         # Server will enable channelz service
         self.server = aio.server(options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ)
-        port = self.server.add_insecure_port("[::]:0")
+        port = self.server.add_insecure_port("localhost:0")
         self.address = "localhost:%d" % port
         self.server.add_generic_rpc_handlers((_GenericHandler(),))
         await self.server.start()
@@ -130,7 +130,7 @@ class ChannelzServicerTest(AioTestBase):
         self._server = aio.server(
             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         channelz.add_channelz_servicer(self._server)
         await self._server.start()
 
@@ -477,7 +477,7 @@ class ChannelzServicerTest(AioTestBase):
         pairs = await _create_channel_server_pairs(1, self._channelz_stub)
 
         resp = await self._get_server_by_ref_id(pairs[0].server_ref_id)
-        self.assertEqual(len(resp.listen_socket), 1)
+        self.assertGreaterEqual(len(resp.listen_socket), 1)
 
         gs_resp: channelz_pb2.GetSocketResponse = (
             await self._channelz_stub.GetSocket(

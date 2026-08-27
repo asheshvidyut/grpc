@@ -97,9 +97,7 @@ def get_method_handlers(test):
 
 def create_phony_channel():
     """Creating phony channels is a workaround for retries"""
-    host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
-    sock.close()
-    return grpc.insecure_channel("{}:{}".format(host, port))
+    return grpc.insecure_channel("localhost:1")
 
 
 def perform_unary_unary_call(channel, wait_for_ready=None):
@@ -287,7 +285,7 @@ class MetadataFlagsTest(unittest.TestCase):
             test_thread.join()
 
         # Stop the server to make test end properly
-        server.stop(0)
+        server.stop(None)
 
         if not unhandled_exceptions.empty():
             raise unhandled_exceptions.get(True)

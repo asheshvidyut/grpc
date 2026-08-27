@@ -46,17 +46,17 @@ class _TestTrigger:
     def await_calls(self):
         with self._start_condition:
             while self._pending_calls < self._total_call_count:
-                self._start_condition.wait()
+                self._start_condition.wait(timeout=0.1)
 
     # Block in a response handler and wait for a trigger
     def await_trigger(self):
         with self._start_condition:
             self._pending_calls += 1
-            self._start_condition.notify()
+            self._start_condition.notify_all()
 
         with self._finish_condition:
-            if not self._triggered:
-                self._finish_condition.wait()
+            while not self._triggered:
+                self._finish_condition.wait(timeout=0.1)
 
     # Finish all response handlers
     def trigger(self):
@@ -135,13 +135,13 @@ class ResourceExhaustedTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(self._trigger)
         )
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("localhost:0")
         self._server.start()
         self._channel = grpc.insecure_channel("localhost:%d" % port)
 
     def tearDown(self):
-        self._server.stop(0)
         self._channel.close()
+        self._server.stop(None)
 
     def testUnaryUnary(self):
         multi_callable = self._channel.unary_unary(
