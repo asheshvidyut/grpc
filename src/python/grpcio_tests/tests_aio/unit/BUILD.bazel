@@ -13,12 +13,21 @@
 # limitations under the License.
 
 load("@grpc_python_dependencies//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//bazel:internal_python_rules.bzl", "internal_py_grpc_test_with_runtime_type_check")
 
 package(
     default_testonly = 1,
     default_visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "repro_bench",
+    srcs = ["repro_bench.py"],
+    python_version = "PY3",
+    deps = [
+        "//src/python/grpcio/grpc:grpcio",
+    ],
 )
 
 GRPC_ASYNC_TESTS = glob(["*_test.py"])
