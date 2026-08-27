@@ -8,7 +8,7 @@ async def _handler(request, context):
     return EMPTY
 
 async def serve(port):
-    server = grpc.aio.server(options=[("grpc.so_reuseport", 0)])
+    server = grpc.aio.server(options=[("grpc.so_reuseport", 1)])
     rpc = grpc.unary_unary_rpc_method_handler(
         _handler, request_deserializer=None, response_serializer=None)
     server.add_generic_rpc_handlers(
@@ -19,8 +19,7 @@ async def serve(port):
 
 async def run_client(port, concurrency, trials, trial_seconds):
     channel = grpc.aio.insecure_channel(f"127.0.0.1:{port}")
-    call = channel.unary_unary(METHOD, request_serializer=None,
-                               response_deserializer=None, _registered_method=False)
+    call = channel.unary_unary(METHOD, request_serializer=None, response_deserializer=None)
     await asyncio.wait_for(channel.channel_ready(), timeout=10)
     await call(EMPTY)  # warm
     rates = []
@@ -48,11 +47,17 @@ if __name__ == "__main__":
         asyncio.run(serve(int(sys.argv[2])))
     else:
         port = free_port()
-        srv = subprocess.Popen([sys.executable, sys.argv[0], "server", str(port)])
+        num_servers = 4
+        servers = [
+            subprocess.Popen([sys.executable, sys.argv[0], "server", str(port)])
+            for _ in range(num_servers)
+        ]
         try:
             time.sleep(2.5)
-            print(f"\nStarting benchmark (concurrency=100, trials=20, trial_seconds=3)...")
-            rps = asyncio.run(run_client(port, 100, 20, 3))
+            print(f"\nStarting benchmark (concurrency=100, trials=10, trial_seconds=3, num_servers={num_servers})...")
+            rps = asyncio.run(run_client(port, 100, 10, 3))
             print(f"\nRESULT rps={rps:.1f} grpcio={grpc.__version__}\n")
         finally:
-            srv.terminate(); srv.wait(timeout=10)
+            for srv in servers:
+                srv.terminate()
+                srv.wait(timeout=5)
