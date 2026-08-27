@@ -51,8 +51,8 @@ if __name__ == "__main__":
         srv = subprocess.Popen([sys.executable, sys.argv[0], "server", str(port)])
         try:
             time.sleep(2.5)
-            print(f"\nStarting benchmark (concurrency=100, trials=4, trial_seconds=5)...")
-            rps = asyncio.run(run_client(port, 100, 4, 5))
+            print(f"\nStarting benchmark (concurrency=100, trials=20, trial_seconds=3)...")
+            rps = asyncio.run(run_client(port, 100, 20, 3))
             print(f"\nRESULT rps={rps:.1f} grpcio={grpc.__version__}\n")
         finally:
             srv.terminate(); srv.wait(timeout=10)
