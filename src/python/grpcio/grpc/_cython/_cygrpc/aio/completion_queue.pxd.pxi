@@ -24,7 +24,7 @@ cdef extern from *:
     #include <unistd.h>
     #endif
 
-    static void _unified_socket_write_impl(int fd) {
+    inline static void _unified_socket_write_impl(int fd) {
     #ifdef _WIN32
         send((SOCKET)fd, "1", 1, 0);
     #else
@@ -32,7 +32,7 @@ cdef extern from *:
     #endif
     }
     """
-    inline void _unified_socket_write_impl(int fd) nogil
+    void _unified_socket_write_impl(int fd) nogil
 
 
 cdef void _unified_socket_write(int fd) noexcept nogil
