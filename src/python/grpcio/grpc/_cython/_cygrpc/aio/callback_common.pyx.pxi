@@ -34,10 +34,10 @@ cdef class CallbackWrapper:
 
     def __cinit__(self, object future, object loop, CallbackFailureHandler failure_handler):
         self.context.functor.functor_run = self.functor_run
-        self.context.waiter = <cpython.PyObject*>future
         self.context.loop = <cpython.PyObject*>loop
+        self.context.wrapper = <cpython.PyObject*>self
+        self.context.waiter = <cpython.PyObject*>future
         self.context.failure_handler = <cpython.PyObject*>failure_handler
-        self.context.callback_wrapper = <cpython.PyObject*>self
         # NOTE(lidiz) Not using a list here, because this class is critical in
         # data path. We should make it as efficient as possible.
         self._reference_of_future = future
@@ -58,10 +58,14 @@ cdef class CallbackWrapper:
                 (<CallbackFailureHandler>context.failure_handler).handle(waiter)
             else:
                 waiter.set_result(None)
-        cpython.Py_DECREF(<object>context.callback_wrapper)
+        cpython.Py_DECREF(<object>context.wrapper)
+
+    cdef void _on_done(self, int success):
+        CallbackWrapper.functor_run(&self.context.functor, success)
 
     cdef grpc_completion_queue_functor *c_functor(self):
         return &self.context.functor
+
 
 
 cdef CallbackFailureHandler CQ_SHUTDOWN_FAILURE_HANDLER = CallbackFailureHandler(

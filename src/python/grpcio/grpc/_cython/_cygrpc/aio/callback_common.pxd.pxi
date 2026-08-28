@@ -23,27 +23,27 @@ cdef class CallbackFailureHandler:
 
 cdef struct _DirectFunctorContext:
     grpc_completion_queue_functor functor
+    cpython.PyObject *loop
     cpython.PyObject *wrapper
 
 
 cdef struct CallbackContext:
-
     # C struct to store callback context in the form of pointers.
     #    
     #   Attributes:
     #     functor: A grpc_completion_queue_functor represents the
     #       callback function in the only way Core understands.
+    #     loop: An asyncio event loop.
+    #     wrapper: A self-reference to the CallbackWrapper.
     #     waiter: An asyncio.Future object that fulfills when the callback is
     #       invoked by Core.
     #     failure_handler: A CallbackFailureHandler object that called when Core
     #       returns 'success == 0' state.
-    #     wrapper: A self-reference to the CallbackWrapper to help life cycle
-    #       management.
     grpc_completion_queue_functor functor
-    cpython.PyObject *waiter
     cpython.PyObject *loop
+    cpython.PyObject *wrapper
+    cpython.PyObject *waiter
     cpython.PyObject *failure_handler
-    cpython.PyObject *callback_wrapper
 
 
 cdef class CallbackWrapper:
@@ -56,8 +56,11 @@ cdef class CallbackWrapper:
             grpc_completion_queue_functor* functor,
             int succeed) noexcept
 
+    cdef void _on_done(self, int success)
+
     cdef grpc_completion_queue_functor *c_functor(self)
 
 
 cdef class GrpcCallWrapper:
     cdef grpc_call* call
+

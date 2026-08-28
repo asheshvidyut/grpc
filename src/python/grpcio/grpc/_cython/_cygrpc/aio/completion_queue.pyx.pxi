@@ -25,8 +25,9 @@ cdef void _unified_notify_write(int fd, int is_eventfd) noexcept nogil:
     _notify_fd_write_impl(fd, is_eventfd)
 
 
-def _handle_callback_wrapper(CallbackWrapper callback_wrapper, int success):
-    CallbackWrapper.functor_run(callback_wrapper.c_functor(), success)
+def _handle_direct_functor(object wrapper, int success):
+    wrapper._on_done(success)
+
 
 
 cdef class BaseCompletionQueue:
@@ -154,8 +155,8 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
         self._notified = False
         self._queue_mutex.unlock()
         cdef grpc_event event
-        cdef CallbackContext *context
-
+        cdef grpc_completion_queue_functor *functor
+        cdef _DirectFunctorContext *direct_ctx
 
         while True:
             self._queue_mutex.lock()
@@ -167,17 +168,19 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
                 self._queue.pop()
                 self._queue_mutex.unlock()
 
-            context = <CallbackContext *>event.tag
-            loop = <object>context.loop
+            functor = <grpc_completion_queue_functor *>event.tag
+            direct_ctx = <_DirectFunctorContext *>event.tag
+            loop = <object>direct_ctx.loop
             if loop is context_loop:
-                # Executes callbacks: complete the future
-                CallbackWrapper.functor_run(
-                    <grpc_completion_queue_functor *>event.tag,
+                # Executes callbacks: complete the future directly
+                functor.functor_run(
+                    functor,
                     event.success
                 )
             else:
                 loop.call_soon_threadsafe(
-                    _handle_callback_wrapper,
-                    <CallbackWrapper>context.callback_wrapper,
+                    _handle_direct_functor,
+                    <object>direct_ctx.wrapper,
                     event.success
                 )
+

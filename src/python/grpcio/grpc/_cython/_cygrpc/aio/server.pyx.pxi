@@ -47,7 +47,9 @@ cdef class _ServerUnaryResponseContext:
 
     def __cinit__(self, object future, object loop):
         self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.loop = <cpython.PyObject*>loop
         self.functor_ctx.wrapper = <cpython.PyObject*>self
+
         self.future = future
         self._message_buffer = NULL
         self._c_trailing_metadata = NULL

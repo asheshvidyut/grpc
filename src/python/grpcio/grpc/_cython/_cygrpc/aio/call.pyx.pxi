@@ -48,6 +48,7 @@ cdef class _UnaryCallContext:
 
     def __cinit__(self, _AioCall call, object future, object loop):
         self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.loop = <cpython.PyObject*>loop
         self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.call = call
         self.future = future
@@ -155,6 +156,7 @@ cdef class _SendMessageContext:
 
     def __cinit__(self, object future, object loop):
         self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.loop = <cpython.PyObject*>loop
         self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.future = future
         self._message_buffer = NULL
@@ -186,6 +188,7 @@ cdef class _ReceiveMessageContext:
 
     def __cinit__(self, object future, object loop):
         self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.loop = <cpython.PyObject*>loop
         self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.future = future
         self._message_buffer = NULL
@@ -240,6 +243,7 @@ cdef class _SendCloseContext:
 
     def __cinit__(self, object future, object loop):
         self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.loop = <cpython.PyObject*>loop
         self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.future = future
         cpython.Py_INCREF(self)
@@ -261,6 +265,7 @@ cdef class _SendCloseContext:
                 self.future.set_exception(InternalError("Failed send_close"))
             else:
                 self.future.set_result(None)
+
 
 
 
