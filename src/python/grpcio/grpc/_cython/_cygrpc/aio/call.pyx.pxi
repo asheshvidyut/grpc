@@ -137,6 +137,72 @@ cdef class _UnaryCallContext:
                 self.future.set_result(None)
 
 
+cdef class _SendMessageContext:
+
+    def __cinit__(self, object future, object loop):
+        self.future = future
+        self._message_buffer = NULL
+        self.internal_future = loop.create_future()
+        self.internal_future.add_done_callback(self._on_done)
+        self.callback_wrapper = CallbackWrapper(
+            self.internal_future,
+            loop,
+            CallbackFailureHandler('send_message', 'Failed send_message', InternalError)
+        )
+
+    def _on_done(self, object internal_future):
+        if self._message_buffer != NULL:
+            grpc_byte_buffer_destroy(self._message_buffer)
+            self._message_buffer = NULL
+        if not self.future.cancelled():
+            if internal_future.exception() is not None:
+                self.future.set_exception(internal_future.exception())
+            else:
+                self.future.set_result(None)
+
+
+cdef class _ReceiveMessageContext:
+
+    def __cinit__(self, object future, object loop):
+        self.future = future
+        self._message_buffer = NULL
+        self.internal_future = loop.create_future()
+        self.internal_future.add_done_callback(self._on_done)
+        self.callback_wrapper = CallbackWrapper(
+            self.internal_future,
+            loop,
+            CallbackFailureHandler('receive_message', 'Failed receive_message', InternalError)
+        )
+
+    def _on_done(self, object internal_future):
+        cdef grpc_byte_buffer_reader message_reader
+        cdef bint message_reader_status
+        cdef grpc_slice message_slice
+        cdef size_t message_slice_length
+        cdef list chunks = []
+        cdef bytes response_bytes = None
+
+        if self._message_buffer != NULL:
+            message_reader_status = grpc_byte_buffer_reader_init(
+                &message_reader, self._message_buffer)
+            if message_reader_status:
+                while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
+                    message_slice_length = grpc_slice_length(message_slice)
+                    if message_slice_length > 0:
+                        chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
+                    grpc_slice_unref(message_slice)
+                grpc_byte_buffer_reader_destroy(&message_reader)
+                response_bytes = b"".join(chunks)
+            grpc_byte_buffer_destroy(self._message_buffer)
+            self._message_buffer = NULL
+
+        if not self.future.cancelled():
+            if internal_future.exception() is not None:
+                self.future.set_result(None)
+            else:
+                self.future.set_result(response_bytes)
+
+
 cdef class _AioCall(GrpcCallWrapper):
 
     def __cinit__(self, AioChannel channel, object deadline,
@@ -542,18 +608,56 @@ cdef class _AioCall(GrpcCallWrapper):
             op.error_string(),
         ))
 
+    def send_serialized_message_fast(self, bytes message):
+        cdef object future = self._loop.create_future()
+        cdef _SendMessageContext ctx = _SendMessageContext(future, self._loop)
+
+        cdef grpc_op c_op
+        memset(&c_op, 0, sizeof(c_op))
+        c_op.type = GRPC_OP_SEND_MESSAGE
+        c_op.flags = _EMPTY_FLAGS
+        cdef grpc_slice message_slice
+        if message is not None:
+            message_slice = grpc_slice_from_copied_buffer(message, len(message))
+            ctx._message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
+            grpc_slice_unref(message_slice)
+            c_op.data.send_message.send_message = ctx._message_buffer
+        else:
+            c_op.data.send_message.send_message = NULL
+
+        self._references.append(ctx)
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed send_message: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+        return future
+
+    def receive_serialized_message_fast(self):
+        cdef object future = self._loop.create_future()
+        cdef _ReceiveMessageContext ctx = _ReceiveMessageContext(future, self._loop)
+
+        cdef grpc_op c_op
+        memset(&c_op, 0, sizeof(c_op))
+        c_op.type = GRPC_OP_RECV_MESSAGE
+        c_op.flags = _EMPTY_FLAGS
+        c_op.data.receive_message.receive_message = &ctx._message_buffer
+
+        self._references.append(ctx)
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed receive_message: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+        return future
+
     async def receive_serialized_message(self):
         """Receives one single raw message in bytes."""
-        cdef bytes received_message
-
-        # Receives a message. Returns None when failed:
-        # * EOF, no more messages to read;
-        # * The client application cancels;
-        # * The server sends final status.
-        received_message = await _receive_message(
-            self,
-            self._loop
-        )
+        cdef bytes received_message = await self.receive_serialized_message_fast()
         if received_message is not None:
             return received_message
         else:
@@ -561,11 +665,8 @@ cdef class _AioCall(GrpcCallWrapper):
 
     async def send_serialized_message(self, bytes message):
         """Sends one single raw message in bytes."""
-        await _send_message(self,
-                            message,
-                            None,
-                            False,
-                            self._loop)
+        await self.send_serialized_message_fast(message)
+
 
     async def send_receive_close(self):
         """Half close the RPC on the client-side."""

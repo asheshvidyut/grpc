@@ -29,6 +29,21 @@ cdef class _UnaryCallContext:
     cdef object internal_future
 
 
+cdef class _SendMessageContext:
+    cdef object future
+    cdef grpc_byte_buffer *_message_buffer
+    cdef CallbackWrapper callback_wrapper
+    cdef object internal_future
+
+
+cdef class _ReceiveMessageContext:
+    cdef object future
+    cdef grpc_byte_buffer *_message_buffer
+    cdef CallbackWrapper callback_wrapper
+    cdef object internal_future
+
+
+
 
 cdef class _AioCall(GrpcCallWrapper):
     cdef:
