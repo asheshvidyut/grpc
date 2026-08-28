@@ -398,13 +398,16 @@ class _StreamResponseMixin(Call[RequestType, ResponseType]):
 
         # Reads response message from Core
         try:
-            raw_response = await self._cython_call.receive_serialized_message()
+            raw_response = (
+                await self._cython_call.receive_serialized_message_fast()
+            )
+
         except asyncio.CancelledError:
             if not self.cancelled():
                 self.cancel()
             raise
 
-        if raw_response is cygrpc.EOF:
+        if raw_response is cygrpc.EOF or raw_response is None:
             return cygrpc.EOF
         if self._response_deserializer is not None:
             return self._response_deserializer(raw_response)

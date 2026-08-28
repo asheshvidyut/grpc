@@ -14,6 +14,7 @@
 
 
 cdef class _UnaryCallContext:
+    cdef _DirectFunctorContext functor_ctx
     cdef _AioCall call
     cdef object future
     cdef grpc_metadata *_c_send_initial_metadata
@@ -25,28 +26,32 @@ cdef class _UnaryCallContext:
     cdef const char *_status_error_string
     cdef grpc_metadata_array _recv_initial_metadata
     cdef grpc_metadata_array _recv_trailing_metadata
-    cdef CallbackWrapper callback_wrapper
-    cdef object internal_future
+
+    cdef void _on_done(self, int success)
 
 
 cdef class _SendMessageContext:
+    cdef _DirectFunctorContext functor_ctx
     cdef object future
     cdef grpc_byte_buffer *_message_buffer
-    cdef CallbackWrapper callback_wrapper
-    cdef object internal_future
+
+    cdef void _on_done(self, int success)
 
 
 cdef class _ReceiveMessageContext:
+    cdef _DirectFunctorContext functor_ctx
     cdef object future
     cdef grpc_byte_buffer *_message_buffer
-    cdef CallbackWrapper callback_wrapper
-    cdef object internal_future
+
+    cdef void _on_done(self, int success)
 
 
 cdef class _SendCloseContext:
+    cdef _DirectFunctorContext functor_ctx
     cdef object future
-    cdef CallbackWrapper callback_wrapper
-    cdef object internal_future
+
+    cdef void _on_done(self, int success)
+
 
 
 cdef class _AioCall(GrpcCallWrapper):

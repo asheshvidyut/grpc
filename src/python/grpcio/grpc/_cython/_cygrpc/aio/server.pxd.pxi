@@ -18,13 +18,15 @@ cdef class _HandlerCallDetails:
 
 
 cdef class _ServerUnaryResponseContext:
+    cdef _DirectFunctorContext functor_ctx
     cdef object future
     cdef grpc_byte_buffer *_message_buffer
     cdef grpc_metadata *_c_trailing_metadata
     cdef size_t _c_trailing_metadata_count
     cdef grpc_slice _status_details
-    cdef CallbackWrapper callback_wrapper
-    cdef object internal_future
+
+    cdef void _on_done(self, int success)
+
 
 
 cdef class RPCState(GrpcCallWrapper):

@@ -21,7 +21,13 @@ cdef class CallbackFailureHandler:
     cdef handle(self, object future)
 
 
+cdef struct _DirectFunctorContext:
+    grpc_completion_queue_functor functor
+    cpython.PyObject *wrapper
+
+
 cdef struct CallbackContext:
+
     # C struct to store callback context in the form of pointers.
     #    
     #   Attributes:

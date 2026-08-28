@@ -47,6 +47,8 @@ cdef int _get_send_initial_metadata_flags(object wait_for_ready) except *:
 cdef class _UnaryCallContext:
 
     def __cinit__(self, _AioCall call, object future, object loop):
+        self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.call = call
         self.future = future
         self._c_send_initial_metadata = NULL
@@ -58,15 +60,20 @@ cdef class _UnaryCallContext:
         self._status_error_string = NULL
         grpc_metadata_array_init(&self._recv_initial_metadata)
         grpc_metadata_array_init(&self._recv_trailing_metadata)
-        self.internal_future = loop.create_future()
-        self.internal_future.add_done_callback(self._on_internal_done)
-        self.callback_wrapper = CallbackWrapper(
-            self.internal_future,
-            loop,
-            CallbackFailureHandler('unary_unary', 'Failed batch', InternalError)
-        )
+        cpython.Py_INCREF(self)
 
-    def _on_internal_done(self, object internal_future):
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept:
+        cdef _DirectFunctorContext *ctx = <_DirectFunctorContext *>functor
+        cdef _UnaryCallContext self = <_UnaryCallContext>ctx.wrapper
+        try:
+            self._on_done(success)
+        finally:
+            cpython.Py_DECREF(self)
+
+    cdef void _on_done(self, int success):
         cdef tuple py_initial_metadata
         if self._recv_initial_metadata.count > 0:
             py_initial_metadata = _metadata(&self._recv_initial_metadata)
@@ -136,8 +143,8 @@ cdef class _UnaryCallContext:
         grpc_slice_unref(self._status_details)
 
         if not self.future.cancelled():
-            if internal_future.exception() is not None:
-                self.future.set_exception(internal_future.exception())
+            if success == 0:
+                self.future.set_exception(InternalError("Failed unary_unary batch"))
             elif self._status_code == StatusCode.ok:
                 self.future.set_result(response_bytes)
             else:
@@ -147,23 +154,30 @@ cdef class _UnaryCallContext:
 cdef class _SendMessageContext:
 
     def __cinit__(self, object future, object loop):
+        self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.future = future
         self._message_buffer = NULL
-        self.internal_future = loop.create_future()
-        self.internal_future.add_done_callback(self._on_done)
-        self.callback_wrapper = CallbackWrapper(
-            self.internal_future,
-            loop,
-            CallbackFailureHandler('send_message', 'Failed send_message', InternalError)
-        )
+        cpython.Py_INCREF(self)
 
-    def _on_done(self, object internal_future):
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept:
+        cdef _DirectFunctorContext *ctx = <_DirectFunctorContext *>functor
+        cdef _SendMessageContext self = <_SendMessageContext>ctx.wrapper
+        try:
+            self._on_done(success)
+        finally:
+            cpython.Py_DECREF(self)
+
+    cdef void _on_done(self, int success):
         if self._message_buffer != NULL:
             grpc_byte_buffer_destroy(self._message_buffer)
             self._message_buffer = NULL
         if not self.future.cancelled():
-            if internal_future.exception() is not None:
-                self.future.set_exception(internal_future.exception())
+            if success == 0:
+                self.future.set_exception(InternalError("Failed send_message"))
             else:
                 self.future.set_result(None)
 
@@ -171,17 +185,24 @@ cdef class _SendMessageContext:
 cdef class _ReceiveMessageContext:
 
     def __cinit__(self, object future, object loop):
+        self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.future = future
         self._message_buffer = NULL
-        self.internal_future = loop.create_future()
-        self.internal_future.add_done_callback(self._on_done)
-        self.callback_wrapper = CallbackWrapper(
-            self.internal_future,
-            loop,
-            CallbackFailureHandler('receive_message', 'Failed receive_message', InternalError)
-        )
+        cpython.Py_INCREF(self)
 
-    def _on_done(self, object internal_future):
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept:
+        cdef _DirectFunctorContext *ctx = <_DirectFunctorContext *>functor
+        cdef _ReceiveMessageContext self = <_ReceiveMessageContext>ctx.wrapper
+        try:
+            self._on_done(success)
+        finally:
+            cpython.Py_DECREF(self)
+
+    cdef void _on_done(self, int success):
         cdef grpc_byte_buffer_reader message_reader
         cdef bint message_reader_status
         cdef grpc_slice message_slice
@@ -209,31 +230,38 @@ cdef class _ReceiveMessageContext:
             self._message_buffer = NULL
 
         if not self.future.cancelled():
-            if internal_future.exception() is not None:
+            if success == 0:
                 self.future.set_result(None)
             else:
                 self.future.set_result(response_bytes)
 
 
-
 cdef class _SendCloseContext:
 
     def __cinit__(self, object future, object loop):
+        self.functor_ctx.functor.functor_run = self._static_functor_run
+        self.functor_ctx.wrapper = <cpython.PyObject*>self
         self.future = future
-        self.internal_future = loop.create_future()
-        self.internal_future.add_done_callback(self._on_done)
-        self.callback_wrapper = CallbackWrapper(
-            self.internal_future,
-            loop,
-            CallbackFailureHandler('send_close', 'Failed send_close', InternalError)
-        )
+        cpython.Py_INCREF(self)
 
-    def _on_done(self, object internal_future):
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept:
+        cdef _DirectFunctorContext *ctx = <_DirectFunctorContext *>functor
+        cdef _SendCloseContext self = <_SendCloseContext>ctx.wrapper
+        try:
+            self._on_done(success)
+        finally:
+            cpython.Py_DECREF(self)
+
+    cdef void _on_done(self, int success):
         if not self.future.cancelled():
-            if internal_future.exception() is not None:
-                self.future.set_exception(internal_future.exception())
+            if success == 0:
+                self.future.set_exception(InternalError("Failed send_close"))
             else:
                 self.future.set_result(None)
+
 
 
 cdef class _AioCall(GrpcCallWrapper):
@@ -593,16 +621,13 @@ cdef class _AioCall(GrpcCallWrapper):
         c_ops[5].data.receive_status_on_client.trailing_metadata = &ctx._recv_trailing_metadata
         c_ops[5].data.receive_status_on_client.error_string = &ctx._status_error_string
 
-        self._references.append(ctx)
-
-        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
         cdef grpc_call_error error
         with nogil:
             error = grpc_call_start_batch(
                 self.call,
                 c_ops,
                 nops,
-                c_functor,
+                &ctx.functor_ctx.functor,
                 NULL
             )
         if error != GRPC_CALL_OK:
@@ -658,11 +683,9 @@ cdef class _AioCall(GrpcCallWrapper):
         else:
             c_op.data.send_message.send_message = NULL
 
-        self._references.append(ctx)
-        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
         cdef grpc_call_error error
         with nogil:
-            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+            error = grpc_call_start_batch(self.call, &c_op, 1, &ctx.functor_ctx.functor, NULL)
         if error != GRPC_CALL_OK:
             grpc_call_error_string = grpc_call_error_to_string(error).decode()
             raise ExecuteBatchError("Failed send_message: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
@@ -678,11 +701,9 @@ cdef class _AioCall(GrpcCallWrapper):
         c_op.flags = _EMPTY_FLAGS
         c_op.data.receive_message.receive_message = &ctx._message_buffer
 
-        self._references.append(ctx)
-        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
         cdef grpc_call_error error
         with nogil:
-            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+            error = grpc_call_start_batch(self.call, &c_op, 1, &ctx.functor_ctx.functor, NULL)
         if error != GRPC_CALL_OK:
             grpc_call_error_string = grpc_call_error_to_string(error).decode()
             raise ExecuteBatchError("Failed receive_message: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
@@ -710,15 +731,14 @@ cdef class _AioCall(GrpcCallWrapper):
         c_op.type = GRPC_OP_SEND_CLOSE_FROM_CLIENT
         c_op.flags = _EMPTY_FLAGS
 
-        self._references.append(ctx)
-        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
         cdef grpc_call_error error
         with nogil:
-            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+            error = grpc_call_start_batch(self.call, &c_op, 1, &ctx.functor_ctx.functor, NULL)
         if error != GRPC_CALL_OK:
             grpc_call_error_string = grpc_call_error_to_string(error).decode()
             raise ExecuteBatchError("Failed send_close: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
         return future
+
 
     async def send_receive_close(self):
         """Half close the RPC on the client-side."""
