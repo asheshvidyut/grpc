@@ -21,8 +21,8 @@ cdef float _POLL_AWAKE_INTERVAL_S = 0.2
 # loop.add_reader method.
 cdef bint _has_fd_monitoring = True
 
-cdef void _unified_socket_write(int fd) noexcept nogil:
-    _unified_socket_write_impl(fd)
+cdef void _unified_notify_write(int fd, int is_eventfd) noexcept nogil:
+    _notify_fd_write_impl(fd, is_eventfd)
 
 
 def _handle_callback_wrapper(CallbackWrapper callback_wrapper, int success):
@@ -45,10 +45,6 @@ cdef class _BoundEventLoop:
             handler,
             loop
         )
-        # NOTE(lidiz) There isn't a way to cleanly pre-check if fd monitoring
-        # support is available or not. Checking the event loop policy is not
-        # good enough. The application can have its own loop implementation, or
-        # uses different types of event loops (e.g., 1 Proactor, 3 Selectors).
         if _has_fd_monitoring:
             try:
                 self.loop.add_reader(self.read_socket, reader_function)
@@ -71,15 +67,21 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
         self._poller_thread = threading.Thread(target=self._poll_wrapper, daemon=True)
         self._poller_thread.start()
 
-        self._read_socket, self._write_socket = socket.socketpair()
-        self._write_fd = self._write_socket.fileno()
+        cdef int read_fd = -1
+        cdef int write_fd = -1
+        self._is_eventfd = _create_eventfd_or_socketpair(&read_fd, &write_fd)
+        if self._is_eventfd:
+            self._read_fd = read_fd
+            self._write_fd = write_fd
+            self._read_socket = read_fd
+            self._write_socket = None
+        else:
+            self._read_socket, self._write_socket = socket.socketpair()
+            self._read_socket.setblocking(False)
+            self._read_fd = self._read_socket.fileno()
+            self._write_fd = self._write_socket.fileno()
+
         self._loops = {}
-
-        # The read socket might be read by multiple threads. But only one of them will
-        # read the 1 byte sent by the poller thread. This setting is essential to allow
-        # multiple loops in multiple threads bound to the same poller.
-        self._read_socket.setblocking(False)
-
         self._queue = cpp_event_queue()
         self._notified = False
 
@@ -112,12 +114,9 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
                 self._queue_mutex.unlock()
                 if _has_fd_monitoring:
                     if need_notify:
-                        _unified_socket_write(self._write_fd)
+                        _unified_notify_write(self._write_fd, self._is_eventfd)
                 else:
                     with gil:
-                        # Event loops can be paused or killed at any time. So,
-                        # instead of delegate to any thread, the polling thread
-                        # should handle the distribution of the event.
                         self._handle_events(None)
         return 0
 
@@ -126,42 +125,37 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
             self._poll()
 
     cdef shutdown(self):
-        # Removes the socket hook from loops
         for loop in self._loops:
             self._loops.get(loop).close()
 
-        # Close the read socket to prevent the `_poller_thread` from blocking on a `write` syscall
-        # when the Unix-domain socket buffer is full. Once the loops above are closed, the read
-        # socket is no longer being read, so close it to avoid `write` syscall hangs.
-        #
-        # See `sock_alloc_send_pskb` for more details about these `write` syscall hangs.
-        self._read_socket.close()
+        if self._is_eventfd:
+            _close_fd_impl(self._read_fd)
+        else:
+            self._read_socket.close()
 
-        # TODO(https://github.com/grpc/grpc/issues/22365) perform graceful shutdown
         grpc_completion_queue_shutdown(self._cq)
         while not self._shutdown:
             self._poller_thread.join(timeout=_POLL_AWAKE_INTERVAL_S)
         grpc_completion_queue_destroy(self._cq)
 
-        # Clean up the write socket
-        self._write_socket.close()
+        if not self._is_eventfd and self._write_socket is not None:
+            self._write_socket.close()
 
     def _handle_events(self, object context_loop):
-        cdef bytes data
         if _has_fd_monitoring:
-            # If fd monitoring is working, clean the socket without blocking.
-            try:
-                # In case of multiple loops, the read socket might be read by multiple threads.
-                # But only one of them will read the 1 byte sent by the poller thread.
-                # So, we need to handle the case where the socket is already empty.
-                data = self._read_socket.recv(65536)
-            except BlockingIOError:
-                pass
+            if not self._is_eventfd:
+                try:
+                    self._read_socket.recv(65536)
+                except BlockingIOError:
+                    pass
+            else:
+                _notify_fd_drain_impl(self._read_fd, self._is_eventfd)
         self._queue_mutex.lock()
         self._notified = False
         self._queue_mutex.unlock()
         cdef grpc_event event
         cdef CallbackContext *context
+
 
         while True:
             self._queue_mutex.lock()
