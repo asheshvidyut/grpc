@@ -296,11 +296,13 @@ class _APIStyle(enum.IntEnum):
 
 class _UnaryResponseMixin(Call[RequestType, ResponseType]):
     _call_response: asyncio.Future
+    _response: Optional[ResponseType]
 
     def _init_unary_response_mixin(
         self, response_future: asyncio.Future
     ):
         self._call_response = response_future
+        self._response = None
 
     def cancel(self) -> bool:
         if super().cancel():
@@ -310,6 +312,9 @@ class _UnaryResponseMixin(Call[RequestType, ResponseType]):
 
     def __await__(self) -> Generator[Any, None, ResponseType]:
         """Wait till the ongoing RPC request finishes."""
+        if self._response is not None:
+            return self._response
+
         try:
             raw_response = yield from self._call_response
         except asyncio.CancelledError:
@@ -336,8 +341,11 @@ class _UnaryResponseMixin(Call[RequestType, ResponseType]):
                 )
         else:
             if self._response_deserializer is not None:
-                return self._response_deserializer(raw_response)
-            return raw_response
+                self._response = self._response_deserializer(raw_response)
+            else:
+                self._response = raw_response
+            return self._response
+
 
 
 
@@ -708,7 +716,7 @@ class StreamUnaryCall(
         self._init_stream_request_mixin(request_iterator)
         self._init_unary_response_mixin(loop.create_task(self._conduct_rpc()))
 
-    async def _conduct_rpc(self) -> Union[ResponseType, EOFType]:
+    async def _conduct_rpc(self) -> Union[bytes, EOFType]:
         try:
             serialized_response = await self._cython_call.stream_unary(
                 self._metadata, self._metadata_sent_observer, self._context
@@ -719,10 +727,9 @@ class StreamUnaryCall(
             raise
 
         if self._cython_call.is_ok():
-            return _common.deserialize(
-                serialized_response, self._response_deserializer
-            )
+            return serialized_response
         return cygrpc.EOF
+
 
 
 class StreamStreamCall(
