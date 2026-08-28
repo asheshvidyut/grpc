@@ -295,12 +295,12 @@ class _APIStyle(enum.IntEnum):
 
 
 class _UnaryResponseMixin(Call[RequestType, ResponseType]):
-    _call_response: asyncio.Task[Union[ResponseType, EOFType]]
+    _call_response: asyncio.Future
 
     def _init_unary_response_mixin(
-        self, response_task: asyncio.Task[Union[ResponseType, EOFType]]
+        self, response_future: asyncio.Future
     ):
-        self._call_response = response_task
+        self._call_response = response_future
 
     def cancel(self) -> bool:
         if super().cancel():
@@ -311,7 +311,7 @@ class _UnaryResponseMixin(Call[RequestType, ResponseType]):
     def __await__(self) -> Generator[Any, None, ResponseType]:
         """Wait till the ongoing RPC request finishes."""
         try:
-            response = yield from self._call_response
+            raw_response = yield from self._call_response
         except asyncio.CancelledError:
             # Even if we caught all other CancelledError, there is still
             # this corner case. If the application cancels immediately after
@@ -326,7 +326,7 @@ class _UnaryResponseMixin(Call[RequestType, ResponseType]):
         # Instead, if we move the exception raising here, the spam stops.
         # Unfortunately, there can only be one 'yield from' in '__await__'. So,
         # we need to access the private instance variable.
-        if response is cygrpc.EOF:
+        if raw_response is None or raw_response is cygrpc.EOF:
             if self._cython_call.is_locally_cancelled():
                 raise asyncio.CancelledError()
             else:
@@ -335,7 +335,10 @@ class _UnaryResponseMixin(Call[RequestType, ResponseType]):
                     self._cython_call._status,
                 )
         else:
-            return response
+            if self._response_deserializer is not None:
+                return self._response_deserializer(raw_response)
+            return raw_response
+
 
 
 class _StreamResponseMixin(Call[RequestType, ResponseType]):
@@ -548,7 +551,7 @@ class UnaryUnaryCall(
     """
 
     _request: RequestType
-    _invocation_task: asyncio.Task[Union[ResponseType, EOFType]]
+    _call_future: asyncio.Future
 
     # pylint: disable=too-many-arguments
     def __init__(
@@ -580,36 +583,19 @@ class UnaryUnaryCall(
         )
         self._request = request
         self._context = cygrpc.build_census_context()
-        self._invocation_task = loop.create_task(self._invoke())
-        self._init_unary_response_mixin(self._invocation_task)
-
-    async def _invoke(self) -> Union[ResponseType, EOFType]:
         serialized_request = _common.serialize(
             self._request, self._request_serializer
         )
-
-        # NOTE(lidiz) asyncio.CancelledError is not a good transport for status,
-        # because the asyncio.Task class do not cache the exception object.
-        # https://github.com/python/cpython/blob/edad4d89e357c92f70c0324b937845d652b20afd/Lib/asyncio/tasks.py#L785
-        try:
-            serialized_response = await self._cython_call.unary_unary(
-                serialized_request, self._metadata, self._context
-            )
-        except asyncio.CancelledError:
-            if not self.cancelled():
-                self.cancel()
-            return cygrpc.EOF
-
-        if self._cython_call.is_ok():
-            return _common.deserialize(
-                serialized_response, self._response_deserializer
-            )
-        return cygrpc.EOF
+        self._call_future = self._cython_call.start_unary_unary(
+            serialized_request, self._metadata, self._context
+        )
+        self._init_unary_response_mixin(self._call_future)
 
     async def wait_for_connection(self) -> None:
-        await self._invocation_task
+        await self._call_future
         if self.done():
             await self._raise_for_status()
+
 
 
 class UnaryStreamCall(

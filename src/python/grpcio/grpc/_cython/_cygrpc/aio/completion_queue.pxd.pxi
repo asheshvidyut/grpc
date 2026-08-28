@@ -54,6 +54,7 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
     cdef bint _shutdown
     cdef cpp_event_queue _queue
     cdef mutex _queue_mutex
+    cdef bint _notified
     cdef object _poller_thread  # threading.Thread
     cdef int _write_fd
     cdef object _read_socket    # socket.socket
@@ -62,3 +63,4 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
 
     cdef int _poll(self) except -1 nogil
     cdef shutdown(self)
+

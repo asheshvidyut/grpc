@@ -13,6 +13,23 @@
 # limitations under the License.
 
 
+cdef class _UnaryCallContext:
+    cdef _AioCall call
+    cdef object future
+    cdef grpc_metadata *_c_send_initial_metadata
+    cdef size_t _c_send_initial_metadata_count
+    cdef grpc_byte_buffer *_send_message_buffer
+    cdef grpc_byte_buffer *_recv_message_buffer
+    cdef grpc_status_code _status_code
+    cdef grpc_slice _status_details
+    cdef const char *_status_error_string
+    cdef grpc_metadata_array _recv_initial_metadata
+    cdef grpc_metadata_array _recv_trailing_metadata
+    cdef CallbackWrapper callback_wrapper
+    cdef object internal_future
+
+
+
 cdef class _AioCall(GrpcCallWrapper):
     cdef:
         readonly AioChannel _channel
@@ -48,3 +65,4 @@ cdef class _AioCall(GrpcCallWrapper):
     cdef void _maybe_set_client_call_tracer_on_call(self, bytes method) except *
     cdef void _set_status(self, AioRpcStatus status) except *
     cdef void _set_initial_metadata(self, tuple initial_metadata) except *
+

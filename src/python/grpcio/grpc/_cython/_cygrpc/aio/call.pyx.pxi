@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from grpc import _observability
+from libc.string cimport memset
 
 _EMPTY_FLAGS = 0
 _EMPTY_MASK = 0
@@ -41,6 +42,99 @@ cdef int _get_send_initial_metadata_flags(object wait_for_ready) except *:
 
     flags &= InitialMetadataFlags.used_mask
     return flags
+
+
+cdef class _UnaryCallContext:
+
+    def __cinit__(self, _AioCall call, object future, object loop):
+        self.call = call
+        self.future = future
+        self._c_send_initial_metadata = NULL
+        self._c_send_initial_metadata_count = 0
+        self._send_message_buffer = NULL
+        self._recv_message_buffer = NULL
+        self._status_code = StatusCode.ok
+        self._status_details = grpc_empty_slice()
+        self._status_error_string = NULL
+        grpc_metadata_array_init(&self._recv_initial_metadata)
+        grpc_metadata_array_init(&self._recv_trailing_metadata)
+        self.internal_future = loop.create_future()
+        self.internal_future.add_done_callback(self._on_internal_done)
+        self.callback_wrapper = CallbackWrapper(
+            self.internal_future,
+            loop,
+            CallbackFailureHandler('unary_unary', 'Failed batch', InternalError)
+        )
+
+    def _on_internal_done(self, object internal_future):
+        cdef tuple py_initial_metadata
+        if self._recv_initial_metadata.count > 0:
+            py_initial_metadata = _metadata(&self._recv_initial_metadata)
+        else:
+            py_initial_metadata = _IMMUTABLE_EMPTY_METADATA
+        self.call._set_initial_metadata(py_initial_metadata)
+
+        cdef tuple py_trailing_metadata
+        if self._recv_trailing_metadata.count > 0:
+            py_trailing_metadata = _metadata(&self._recv_trailing_metadata)
+        else:
+            py_trailing_metadata = _IMMUTABLE_EMPTY_METADATA
+
+        cdef str py_details = _decode(_slice_bytes(self._status_details))
+        cdef str py_error_string = ""
+        if self._status_error_string != NULL:
+            py_error_string = _decode(self._status_error_string)
+            gpr_free(<void*>self._status_error_string)
+            self._status_error_string = NULL
+
+        self.call._set_status(AioRpcStatus(
+            self._status_code,
+            py_details,
+            py_trailing_metadata,
+            py_error_string,
+        ))
+
+        # Decode received message bytes
+        cdef grpc_byte_buffer_reader message_reader
+        cdef bint message_reader_status
+        cdef grpc_slice message_slice
+        cdef size_t message_slice_length
+        cdef list chunks = []
+        cdef bytes response_bytes = None
+
+        if self._recv_message_buffer != NULL:
+            message_reader_status = grpc_byte_buffer_reader_init(
+                &message_reader, self._recv_message_buffer)
+            if message_reader_status:
+                while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
+                    message_slice_length = grpc_slice_length(message_slice)
+                    if message_slice_length > 0:
+                        chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
+                    grpc_slice_unref(message_slice)
+                grpc_byte_buffer_reader_destroy(&message_reader)
+                response_bytes = b"".join(chunks)
+            grpc_byte_buffer_destroy(self._recv_message_buffer)
+            self._recv_message_buffer = NULL
+
+        if self._send_message_buffer != NULL:
+            grpc_byte_buffer_destroy(self._send_message_buffer)
+            self._send_message_buffer = NULL
+
+        if self._c_send_initial_metadata != NULL:
+            _release_c_metadata(self._c_send_initial_metadata, self._c_send_initial_metadata_count)
+            self._c_send_initial_metadata = NULL
+
+        grpc_metadata_array_destroy(&self._recv_initial_metadata)
+        grpc_metadata_array_destroy(&self._recv_trailing_metadata)
+        grpc_slice_unref(self._status_details)
+
+        if not self.future.cancelled():
+            if internal_future.exception() is not None:
+                self.future.set_exception(internal_future.exception())
+            elif self._status_code == StatusCode.ok:
+                self.future.set_result(response_bytes)
+            else:
+                self.future.set_result(None)
 
 
 cdef class _AioCall(GrpcCallWrapper):
@@ -334,6 +428,90 @@ cdef class _AioCall(GrpcCallWrapper):
             error_str,
         ))
 
+    def start_unary_unary(self,
+                          bytes request,
+                          tuple outbound_initial_metadata,
+                          object context = None):
+        """Starts a unary-unary RPC, returning a Future resolving to response bytes."""
+        if context is not None:
+            set_instrumentation_context_on_call_aio(self, context)
+
+        cdef object future = self._loop.create_future()
+        cdef _UnaryCallContext ctx = _UnaryCallContext(self, future, self._loop)
+
+        cdef grpc_op c_ops[6]
+        cdef size_t nops = 6
+        memset(c_ops, 0, sizeof(c_ops))
+
+        # 0: SEND_INITIAL_METADATA
+        c_ops[0].type = GRPC_OP_SEND_INITIAL_METADATA
+        c_ops[0].flags = self._send_initial_metadata_flags
+        if outbound_initial_metadata:
+            _store_c_metadata(
+                outbound_initial_metadata,
+                &ctx._c_send_initial_metadata,
+                &ctx._c_send_initial_metadata_count
+            )
+            c_ops[0].data.send_initial_metadata.metadata = ctx._c_send_initial_metadata
+            c_ops[0].data.send_initial_metadata.count = ctx._c_send_initial_metadata_count
+            c_ops[0].data.send_initial_metadata.maybe_compression_level.is_set = 0
+        else:
+            c_ops[0].data.send_initial_metadata.metadata = NULL
+            c_ops[0].data.send_initial_metadata.count = 0
+            c_ops[0].data.send_initial_metadata.maybe_compression_level.is_set = 0
+
+        # 1: SEND_MESSAGE
+        c_ops[1].type = GRPC_OP_SEND_MESSAGE
+        c_ops[1].flags = _EMPTY_FLAGS
+        cdef grpc_slice message_slice
+        if request is not None:
+            message_slice = grpc_slice_from_copied_buffer(request, len(request))
+            ctx._send_message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
+            grpc_slice_unref(message_slice)
+            c_ops[1].data.send_message.send_message = ctx._send_message_buffer
+        else:
+            c_ops[1].data.send_message.send_message = NULL
+
+        # 2: SEND_CLOSE_FROM_CLIENT
+        c_ops[2].type = GRPC_OP_SEND_CLOSE_FROM_CLIENT
+        c_ops[2].flags = _EMPTY_FLAGS
+
+        # 3: RECV_INITIAL_METADATA
+        c_ops[3].type = GRPC_OP_RECV_INITIAL_METADATA
+        c_ops[3].flags = _EMPTY_FLAGS
+        c_ops[3].data.receive_initial_metadata.receive_initial_metadata = &ctx._recv_initial_metadata
+
+        # 4: RECV_MESSAGE
+        c_ops[4].type = GRPC_OP_RECV_MESSAGE
+        c_ops[4].flags = _EMPTY_FLAGS
+        c_ops[4].data.receive_message.receive_message = &ctx._recv_message_buffer
+
+        # 5: RECV_STATUS_ON_CLIENT
+        c_ops[5].type = GRPC_OP_RECV_STATUS_ON_CLIENT
+        c_ops[5].flags = _EMPTY_FLAGS
+        c_ops[5].data.receive_status_on_client.status = &ctx._status_code
+        c_ops[5].data.receive_status_on_client.status_details = &ctx._status_details
+        c_ops[5].data.receive_status_on_client.trailing_metadata = &ctx._recv_trailing_metadata
+        c_ops[5].data.receive_status_on_client.error_string = &ctx._status_error_string
+
+        self._references.append(ctx)
+
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(
+                self.call,
+                c_ops,
+                nops,
+                c_functor,
+                NULL
+            )
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed grpc_call_start_batch: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+
+        return future
+
     async def unary_unary(self,
                           bytes request,
                           tuple outbound_initial_metadata,
@@ -345,45 +523,7 @@ cdef class _AioCall(GrpcCallWrapper):
           outbound_initial_metadata: optional outbound metadata.
           context: instrumentation context.
         """
-        cdef tuple ops
-
-        cdef SendInitialMetadataOperation initial_metadata_op = SendInitialMetadataOperation(
-            outbound_initial_metadata,
-            self._send_initial_metadata_flags)
-        cdef SendMessageOperation send_message_op = SendMessageOperation(request, _EMPTY_FLAGS)
-        cdef SendCloseFromClientOperation send_close_op = SendCloseFromClientOperation(_EMPTY_FLAGS)
-        cdef ReceiveInitialMetadataOperation receive_initial_metadata_op = ReceiveInitialMetadataOperation(_EMPTY_FLAGS)
-        cdef ReceiveMessageOperation receive_message_op = ReceiveMessageOperation(_EMPTY_FLAGS)
-        cdef ReceiveStatusOnClientOperation receive_status_on_client_op = ReceiveStatusOnClientOperation(_EMPTY_FLAGS)
-
-        if context is not None:
-            set_instrumentation_context_on_call_aio(self, context)
-        ops = (initial_metadata_op, send_message_op, send_close_op,
-               receive_initial_metadata_op, receive_message_op,
-               receive_status_on_client_op)
-
-        # Executes all operations in one batch.
-        # Might raise CancelledError, handling it in Python UnaryUnaryCall.
-        await execute_batch(self,
-                            ops,
-                            self._loop)
-
-        self._set_initial_metadata(receive_initial_metadata_op.initial_metadata())
-
-        cdef grpc_status_code code
-        code = receive_status_on_client_op.code()
-
-        self._set_status(AioRpcStatus(
-            code,
-            receive_status_on_client_op.details(),
-            receive_status_on_client_op.trailing_metadata(),
-            receive_status_on_client_op.error_string(),
-        ))
-
-        if code == StatusCode.ok:
-            return receive_message_op.message()
-        else:
-            return None
+        return await self.start_unary_unary(request, outbound_initial_metadata, context)
 
     async def _handle_status_once_received(self):
         """Handles the status sent by peer once received."""

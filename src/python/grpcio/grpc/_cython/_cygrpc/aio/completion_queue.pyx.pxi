@@ -81,6 +81,7 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
         self._read_socket.setblocking(False)
 
         self._queue = cpp_event_queue()
+        self._notified = False
 
     def bind_loop(self, object loop):
         if loop in self._loops:
@@ -91,6 +92,7 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
     cdef int _poll(self) except -1 nogil:
         cdef grpc_event event
         cdef CallbackContext *context
+        cdef bint need_notify
 
         while not self._shutdown:
             event = grpc_completion_queue_next(self._cq,
@@ -104,10 +106,13 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
                 self._shutdown = True
             else:
                 self._queue_mutex.lock()
+                need_notify = not self._notified
+                self._notified = True
                 self._queue.push(event)
                 self._queue_mutex.unlock()
                 if _has_fd_monitoring:
-                    _unified_socket_write(self._write_fd)
+                    if need_notify:
+                        _unified_socket_write(self._write_fd)
                 else:
                     with gil:
                         # Event loops can be paused or killed at any time. So,
@@ -149,9 +154,12 @@ cdef class PollerCompletionQueue(BaseCompletionQueue):
                 # In case of multiple loops, the read socket might be read by multiple threads.
                 # But only one of them will read the 1 byte sent by the poller thread.
                 # So, we need to handle the case where the socket is already empty.
-                data = self._read_socket.recv(1)
+                data = self._read_socket.recv(65536)
             except BlockingIOError:
                 pass
+        self._queue_mutex.lock()
+        self._notified = False
+        self._queue_mutex.unlock()
         cdef grpc_event event
         cdef CallbackContext *context
 
