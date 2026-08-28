@@ -108,13 +108,14 @@ async def run_streaming_benchmark(target, count=20000):
 
 async def main():
     server = aio.server()
-    handlers = {
-        "/Benchmark/Unary": grpc.unary_unary_rpc_method_handler(unary_handler),
-        "/Benchmark/Stream": grpc.stream_stream_rpc_method_handler(
-            stream_handler
-        ),
-    }
-    server.add_registered_method_handlers(handlers)
+    server.add_registered_method_handlers(
+        "Benchmark",
+        {
+            "Unary": grpc.unary_unary_rpc_method_handler(unary_handler),
+            "Stream": grpc.stream_stream_rpc_method_handler(stream_handler),
+        },
+    )
+
     port = server.add_insecure_port("127.0.0.1:0")
     await server.start()
     target = f"127.0.0.1:{port}"
