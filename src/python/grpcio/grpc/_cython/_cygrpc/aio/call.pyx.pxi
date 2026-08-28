@@ -44,6 +44,60 @@ cdef int _get_send_initial_metadata_flags(object wait_for_ready) except *:
     return flags
 
 
+cdef void _py_decref_user_data(void *user_data) noexcept:
+    cpython.Py_DECREF(<cpython.PyObject *>user_data)
+
+
+cdef inline grpc_slice _slice_from_bytes_fast(object py_bytes):
+    if py_bytes is None or len(py_bytes) == 0:
+        return grpc_empty_slice()
+    cdef char* buf = <char*>cpython.PyBytes_AS_STRING(py_bytes)
+    cdef size_t length = <size_t>cpython.PyBytes_GET_SIZE(py_bytes)
+    cpython.Py_INCREF(py_bytes)
+    return grpc_slice_new_with_user_data(buf, length, _py_decref_user_data, <void*>py_bytes)
+
+
+cdef inline bytes _extract_bytes_from_byte_buffer(grpc_byte_buffer *byte_buffer):
+    cdef grpc_byte_buffer_reader message_reader
+    cdef bint message_reader_status
+    cdef grpc_slice message_slice
+    cdef size_t message_slice_length
+    cdef list chunks = None
+    cdef bytes response_bytes = None
+
+    if byte_buffer != NULL:
+        message_reader_status = grpc_byte_buffer_reader_init(
+            &message_reader, byte_buffer)
+        if message_reader_status:
+            if grpc_byte_buffer_reader_next(&message_reader, &message_slice):
+                message_slice_length = grpc_slice_length(message_slice)
+                if message_slice_length > 0:
+                    response_bytes = cpython.PyBytes_FromStringAndSize(
+                        <const char *>grpc_slice_start_ptr(message_slice),
+                        message_slice_length)
+                else:
+                    response_bytes = b""
+                grpc_slice_unref(message_slice)
+
+                while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
+                    if chunks is None:
+                        chunks = [response_bytes]
+                    message_slice_length = grpc_slice_length(message_slice)
+                    if message_slice_length > 0:
+                        chunks.append(cpython.PyBytes_FromStringAndSize(
+                            <const char *>grpc_slice_start_ptr(message_slice),
+                            message_slice_length))
+                    grpc_slice_unref(message_slice)
+
+                if chunks is not None:
+                    response_bytes = b"".join(chunks)
+            else:
+                response_bytes = b""
+            grpc_byte_buffer_reader_destroy(&message_reader)
+        grpc_byte_buffer_destroy(byte_buffer)
+    return response_bytes
+
+
 cdef class _UnaryCallContext:
 
     def __cinit__(self, _AioCall call, object future, object loop):
@@ -104,31 +158,10 @@ cdef class _UnaryCallContext:
             py_error_string,
         ))
 
-        # Decode received message bytes
-        cdef grpc_byte_buffer_reader message_reader
-        cdef bint message_reader_status
-        cdef grpc_slice message_slice
-        cdef size_t message_slice_length
-        cdef list chunks = []
+        # Decode received message bytes (fast zero copy path)
         cdef bytes response_bytes = None
-
         if self._recv_message_buffer != NULL:
-            message_reader_status = grpc_byte_buffer_reader_init(
-                &message_reader, self._recv_message_buffer)
-            if message_reader_status:
-                while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
-                    message_slice_length = grpc_slice_length(message_slice)
-                    if message_slice_length > 0:
-                        chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
-                    grpc_slice_unref(message_slice)
-                grpc_byte_buffer_reader_destroy(&message_reader)
-                if len(chunks) == 1:
-                    response_bytes = chunks[0]
-                elif len(chunks) > 1:
-                    response_bytes = b"".join(chunks)
-                else:
-                    response_bytes = b""
-            grpc_byte_buffer_destroy(self._recv_message_buffer)
+            response_bytes = _extract_bytes_from_byte_buffer(self._recv_message_buffer)
             self._recv_message_buffer = NULL
 
         if self._send_message_buffer != NULL:
@@ -150,6 +183,7 @@ cdef class _UnaryCallContext:
                 self.future.set_result(response_bytes)
             else:
                 self.future.set_result(None)
+
 
 
 cdef class _SendMessageContext:
@@ -206,30 +240,9 @@ cdef class _ReceiveMessageContext:
             cpython.Py_DECREF(self)
 
     cdef void _on_done(self, int success):
-        cdef grpc_byte_buffer_reader message_reader
-        cdef bint message_reader_status
-        cdef grpc_slice message_slice
-        cdef size_t message_slice_length
-        cdef list chunks = []
         cdef bytes response_bytes = None
-
         if self._message_buffer != NULL:
-            message_reader_status = grpc_byte_buffer_reader_init(
-                &message_reader, self._message_buffer)
-            if message_reader_status:
-                while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
-                    message_slice_length = grpc_slice_length(message_slice)
-                    if message_slice_length > 0:
-                        chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
-                    grpc_slice_unref(message_slice)
-                grpc_byte_buffer_reader_destroy(&message_reader)
-                if len(chunks) == 1:
-                    response_bytes = chunks[0]
-                elif len(chunks) > 1:
-                    response_bytes = b"".join(chunks)
-                else:
-                    response_bytes = b""
-            grpc_byte_buffer_destroy(self._message_buffer)
+            response_bytes = _extract_bytes_from_byte_buffer(self._message_buffer)
             self._message_buffer = NULL
 
         if not self.future.cancelled():
@@ -237,6 +250,7 @@ cdef class _ReceiveMessageContext:
                 self.future.set_result(None)
             else:
                 self.future.set_result(response_bytes)
+
 
 
 cdef class _SendCloseContext:
@@ -597,7 +611,7 @@ cdef class _AioCall(GrpcCallWrapper):
         c_ops[1].flags = _EMPTY_FLAGS
         cdef grpc_slice message_slice
         if request is not None:
-            message_slice = grpc_slice_from_copied_buffer(request, len(request))
+            message_slice = _slice_from_bytes_fast(request)
             ctx._send_message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
             grpc_slice_unref(message_slice)
             c_ops[1].data.send_message.send_message = ctx._send_message_buffer
@@ -681,12 +695,13 @@ cdef class _AioCall(GrpcCallWrapper):
         c_op.flags = _EMPTY_FLAGS
         cdef grpc_slice message_slice
         if message is not None:
-            message_slice = grpc_slice_from_copied_buffer(message, len(message))
+            message_slice = _slice_from_bytes_fast(message)
             ctx._message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
             grpc_slice_unref(message_slice)
             c_op.data.send_message.send_message = ctx._message_buffer
         else:
             c_op.data.send_message.send_message = NULL
+
 
         cdef grpc_call_error error
         with nogil:

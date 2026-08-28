@@ -170,7 +170,7 @@ cdef class RPCState:
         c_ops[nops].flags = self.get_write_flag()
         cdef grpc_slice message_slice
         if response_raw is not None and len(response_raw) > 0:
-            message_slice = grpc_slice_from_copied_buffer(response_raw, len(response_raw))
+            message_slice = _slice_from_bytes_fast(response_raw)
             ctx._message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
             grpc_slice_unref(message_slice)
             c_ops[nops].data.send_message.send_message = ctx._message_buffer
@@ -244,7 +244,7 @@ cdef class RPCState:
         c_ops[nops].flags = self.get_write_flag()
         cdef grpc_slice message_slice
         if message is not None and len(message) > 0:
-            message_slice = grpc_slice_from_copied_buffer(message, len(message))
+            message_slice = _slice_from_bytes_fast(message)
             ctx._message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
             grpc_slice_unref(message_slice)
             c_ops[nops].data.send_message.send_message = ctx._message_buffer
@@ -252,6 +252,7 @@ cdef class RPCState:
             ctx._message_buffer = grpc_raw_byte_buffer_create(NULL, 0)
             c_ops[nops].data.send_message.send_message = ctx._message_buffer
         nops += 1
+
 
         cdef grpc_call_error error
         with nogil:

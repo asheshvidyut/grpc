@@ -111,8 +111,10 @@ cdef extern from "grpc/grpc.h":
   void grpc_slice_unref(grpc_slice s) nogil
   grpc_slice grpc_empty_slice() nogil
   grpc_slice grpc_slice_new(void *p, size_t len, void (*destroy)(void *)) nogil
+  grpc_slice grpc_slice_new_with_user_data(void *p, size_t len, void (*destroy)(void *), void *user_data) nogil
   grpc_slice grpc_slice_new_with_len(
       void *p, size_t len, void (*destroy)(void *, size_t)) nogil
+
   grpc_slice grpc_slice_malloc(size_t length) nogil
   grpc_slice grpc_slice_from_copied_string(const char *source) nogil
   grpc_slice grpc_slice_from_copied_buffer(const char *source, size_t len) nogil
