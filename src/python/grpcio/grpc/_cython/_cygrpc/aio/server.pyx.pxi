@@ -16,6 +16,7 @@
 import inspect
 import traceback
 import functools
+from libc.string cimport memset
 
 
 cdef int _EMPTY_FLAG = 0
@@ -40,6 +41,37 @@ cdef class _HandlerCallDetails:
 
 class _ServerStoppedError(BaseError):
     """Raised if the server is stopped."""
+
+
+cdef class _ServerUnaryResponseContext:
+
+    def __cinit__(self, object future, object loop):
+        self.future = future
+        self._message_buffer = NULL
+        self._c_trailing_metadata = NULL
+        self._c_trailing_metadata_count = 0
+        self._status_details = grpc_empty_slice()
+        self.internal_future = loop.create_future()
+        self.internal_future.add_done_callback(self._on_done)
+        self.callback_wrapper = CallbackWrapper(
+            self.internal_future,
+            loop,
+            CallbackFailureHandler('server_unary_response', 'Failed batch', InternalError)
+        )
+
+    def _on_done(self, object internal_future):
+        if self._message_buffer != NULL:
+            grpc_byte_buffer_destroy(self._message_buffer)
+            self._message_buffer = NULL
+        if self._c_trailing_metadata != NULL:
+            _release_c_metadata(self._c_trailing_metadata, self._c_trailing_metadata_count)
+            self._c_trailing_metadata = NULL
+        grpc_slice_unref(self._status_details)
+        if not self.future.cancelled():
+            if internal_future.exception() is not None:
+                self.future.set_exception(internal_future.exception())
+            else:
+                self.future.set_result(None)
 
 
 cdef class RPCState:
@@ -103,6 +135,124 @@ cdef class RPCState:
             )
             return op
 
+    def send_unary_response_fast(self, bytes response_raw, object loop):
+        cdef object future = loop.create_future()
+        cdef _ServerUnaryResponseContext ctx = _ServerUnaryResponseContext(future, loop)
+
+        cdef grpc_op c_ops[3]
+        cdef size_t nops = 0
+        memset(c_ops, 0, sizeof(c_ops))
+
+        # 1. SEND_INITIAL_METADATA (if not sent)
+        if not self.metadata_sent:
+            c_ops[nops].type = GRPC_OP_SEND_INITIAL_METADATA
+            c_ops[nops].flags = _EMPTY_FLAGS
+            c_ops[nops].data.send_initial_metadata.count = 0
+            c_ops[nops].data.send_initial_metadata.metadata = NULL
+            c_ops[nops].data.send_initial_metadata.maybe_compression_level.is_set = 0
+            nops += 1
+            self.metadata_sent = True
+
+        # 2. SEND_MESSAGE
+        c_ops[nops].type = GRPC_OP_SEND_MESSAGE
+        c_ops[nops].flags = self.get_write_flag()
+        cdef grpc_slice message_slice
+        if response_raw is not None and len(response_raw) > 0:
+            message_slice = grpc_slice_from_copied_buffer(response_raw, len(response_raw))
+            ctx._message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
+            grpc_slice_unref(message_slice)
+            c_ops[nops].data.send_message.send_message = ctx._message_buffer
+        else:
+            ctx._message_buffer = grpc_raw_byte_buffer_create(NULL, 0)
+            c_ops[nops].data.send_message.send_message = ctx._message_buffer
+        nops += 1
+
+        # 3. SEND_STATUS_FROM_SERVER
+        c_ops[nops].type = GRPC_OP_SEND_STATUS_FROM_SERVER
+        c_ops[nops].flags = _EMPTY_FLAGS
+        _store_c_metadata(
+            self.trailing_metadata,
+            &ctx._c_trailing_metadata,
+            &ctx._c_trailing_metadata_count
+        )
+        c_ops[nops].data.send_status_from_server.trailing_metadata = ctx._c_trailing_metadata
+        c_ops[nops].data.send_status_from_server.trailing_metadata_count = ctx._c_trailing_metadata_count
+        c_ops[nops].data.send_status_from_server.status = self.status_code
+        ctx._status_details = _slice_from_bytes(_encode(self.status_details))
+        c_ops[nops].data.send_status_from_server.status_details = &ctx._status_details
+        nops += 1
+
+        self.status_sent = True
+
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(self.call, c_ops, nops, c_functor, NULL)
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed send_unary_response: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+        return future
+
+    def receive_message_fast(self, object loop):
+        cdef object future = loop.create_future()
+        cdef _ReceiveMessageContext ctx = _ReceiveMessageContext(future, loop)
+
+        cdef grpc_op c_op
+        memset(&c_op, 0, sizeof(c_op))
+        c_op.type = GRPC_OP_RECV_MESSAGE
+        c_op.flags = _EMPTY_FLAGS
+        c_op.data.receive_message.receive_message = &ctx._message_buffer
+
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed receive_message: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+        return future
+
+    def send_message_fast(self, bytes message, object loop):
+        cdef object future = loop.create_future()
+        cdef _SendMessageContext ctx = _SendMessageContext(future, loop)
+
+        cdef grpc_op c_ops[2]
+        cdef size_t nops = 0
+        memset(c_ops, 0, sizeof(c_ops))
+
+        # 1. Initial metadata if needed
+        if not self.metadata_sent:
+            c_ops[nops].type = GRPC_OP_SEND_INITIAL_METADATA
+            c_ops[nops].flags = _EMPTY_FLAGS
+            c_ops[nops].data.send_initial_metadata.count = 0
+            c_ops[nops].data.send_initial_metadata.metadata = NULL
+            c_ops[nops].data.send_initial_metadata.maybe_compression_level.is_set = 0
+            nops += 1
+            self.metadata_sent = True
+
+        # 2. Message
+        c_ops[nops].type = GRPC_OP_SEND_MESSAGE
+        c_ops[nops].flags = self.get_write_flag()
+        cdef grpc_slice message_slice
+        if message is not None and len(message) > 0:
+            message_slice = grpc_slice_from_copied_buffer(message, len(message))
+            ctx._message_buffer = grpc_raw_byte_buffer_create(&message_slice, 1)
+            grpc_slice_unref(message_slice)
+            c_ops[nops].data.send_message.send_message = ctx._message_buffer
+        else:
+            ctx._message_buffer = grpc_raw_byte_buffer_create(NULL, 0)
+            c_ops[nops].data.send_message.send_message = ctx._message_buffer
+        nops += 1
+
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(self.call, c_ops, nops, c_functor, NULL)
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed send_message: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+        return future
+
     def __dealloc__(self):
         """Cleans the Core objects."""
         grpc_call_details_destroy(&self.details)
@@ -128,7 +278,7 @@ cdef class _ServicerContext:
         cdef bytes raw_message
         self._rpc_state.raise_for_termination()
 
-        raw_message = await _receive_message(self._rpc_state, self._loop)
+        raw_message = await self._rpc_state.receive_message_fast(self._loop)
         self._rpc_state.raise_for_termination()
 
         if raw_message is None:
@@ -140,12 +290,9 @@ cdef class _ServicerContext:
     async def write(self, object message):
         self._rpc_state.raise_for_termination()
 
-        await _send_message(self._rpc_state,
-                            serialize(self._response_serializer, message),
-                            self._rpc_state.create_send_initial_metadata_op_if_not_sent(),
-                            self._rpc_state.get_write_flag(),
-                            self._loop)
-        self._rpc_state.metadata_sent = True
+        cdef bytes raw_response = serialize(self._response_serializer, message)
+        await self._rpc_state.send_message_fast(raw_response, self._loop)
+
 
     async def send_initial_metadata(self, object metadata):
         self._rpc_state.raise_for_termination()
@@ -454,25 +601,10 @@ async def _finish_handler_with_unary_response(RPCState rpc_state,
         # Discards the response message if the status code is non-OK.
         response_raw = b''
 
-    # Assembles the batch operations
-    cdef tuple finish_ops
-    finish_ops = (
-        SendMessageOperation(response_raw, rpc_state.get_write_flag()),
-        SendStatusFromServerOperation(
-            rpc_state.trailing_metadata,
-            rpc_state.status_code,
-            rpc_state.status_details,
-            _EMPTY_FLAGS,
-        ),
-    )
-    if not rpc_state.metadata_sent:
-        finish_ops = prepend_send_initial_metadata_op(
-            finish_ops,
-            None)
-    rpc_state.metadata_sent = True
-    rpc_state.status_sent = True
-    await execute_batch(rpc_state, finish_ops, loop)
+    # Dispatches the batch operations
+    await rpc_state.send_unary_response_fast(response_raw, loop)
     uninstall_context()
+
 
 
 async def _finish_handler_with_stream_responses(RPCState rpc_state,
@@ -549,7 +681,7 @@ async def _handle_unary_unary_rpc(object method_handler,
                                   RPCState rpc_state,
                                   object loop):
     # Receives request message
-    cdef bytes request_raw = await _receive_message(rpc_state, loop)
+    cdef bytes request_raw = await rpc_state.receive_message_fast(loop)
     if request_raw is None:
         # The RPC was cancelled immediately after start on client side.
         return

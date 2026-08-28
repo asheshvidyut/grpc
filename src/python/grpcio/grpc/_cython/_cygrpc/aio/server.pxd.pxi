@@ -17,6 +17,16 @@ cdef class _HandlerCallDetails:
     cdef readonly tuple invocation_metadata
 
 
+cdef class _ServerUnaryResponseContext:
+    cdef object future
+    cdef grpc_byte_buffer *_message_buffer
+    cdef grpc_metadata *_c_trailing_metadata
+    cdef size_t _c_trailing_metadata_count
+    cdef grpc_slice _status_details
+    cdef CallbackWrapper callback_wrapper
+    cdef object internal_future
+
+
 cdef class RPCState(GrpcCallWrapper):
     cdef grpc_call_details details
     cdef grpc_metadata_array request_metadata

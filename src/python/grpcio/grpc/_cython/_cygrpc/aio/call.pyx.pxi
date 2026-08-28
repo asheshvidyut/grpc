@@ -203,6 +203,26 @@ cdef class _ReceiveMessageContext:
                 self.future.set_result(response_bytes)
 
 
+cdef class _SendCloseContext:
+
+    def __cinit__(self, object future, object loop):
+        self.future = future
+        self.internal_future = loop.create_future()
+        self.internal_future.add_done_callback(self._on_done)
+        self.callback_wrapper = CallbackWrapper(
+            self.internal_future,
+            loop,
+            CallbackFailureHandler('send_close', 'Failed send_close', InternalError)
+        )
+
+    def _on_done(self, object internal_future):
+        if not self.future.cancelled():
+            if internal_future.exception() is not None:
+                self.future.set_exception(internal_future.exception())
+            else:
+                self.future.set_result(None)
+
+
 cdef class _AioCall(GrpcCallWrapper):
 
     def __cinit__(self, AioChannel channel, object deadline,
@@ -668,11 +688,29 @@ cdef class _AioCall(GrpcCallWrapper):
         await self.send_serialized_message_fast(message)
 
 
+    def send_receive_close_fast(self):
+        cdef object future = self._loop.create_future()
+        cdef _SendCloseContext ctx = _SendCloseContext(future, self._loop)
+
+        cdef grpc_op c_op
+        memset(&c_op, 0, sizeof(c_op))
+        c_op.type = GRPC_OP_SEND_CLOSE_FROM_CLIENT
+        c_op.flags = _EMPTY_FLAGS
+
+        self._references.append(ctx)
+        cdef grpc_completion_queue_functor *c_functor = ctx.callback_wrapper.c_functor()
+        cdef grpc_call_error error
+        with nogil:
+            error = grpc_call_start_batch(self.call, &c_op, 1, c_functor, NULL)
+        if error != GRPC_CALL_OK:
+            grpc_call_error_string = grpc_call_error_to_string(error).decode()
+            raise ExecuteBatchError("Failed send_close: {} with grpc_call_error value: '{}'".format(error, grpc_call_error_string))
+        return future
+
     async def send_receive_close(self):
         """Half close the RPC on the client-side."""
-        cdef SendCloseFromClientOperation op = SendCloseFromClientOperation(_EMPTY_FLAGS)
-        cdef tuple ops = (op,)
-        await execute_batch(self, ops, self._loop)
+        await self.send_receive_close_fast()
+
 
     async def initiate_unary_stream(self,
                            bytes request,

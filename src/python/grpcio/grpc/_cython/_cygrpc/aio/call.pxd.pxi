@@ -43,6 +43,10 @@ cdef class _ReceiveMessageContext:
     cdef object internal_future
 
 
+cdef class _SendCloseContext:
+    cdef object future
+    cdef CallbackWrapper callback_wrapper
+    cdef object internal_future
 
 
 cdef class _AioCall(GrpcCallWrapper):

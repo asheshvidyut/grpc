@@ -388,7 +388,8 @@ class _StreamResponseMixin(Call[RequestType, ResponseType]):
 
     async def _read(self) -> Union[ResponseType, EOFType]:
         # Wait for the request being sent
-        await self._preparation
+        if not self._preparation.done():
+            await self._preparation
 
         # Reads response message from Core
         try:
@@ -400,7 +401,9 @@ class _StreamResponseMixin(Call[RequestType, ResponseType]):
 
         if raw_response is cygrpc.EOF:
             return cygrpc.EOF
-        return _common.deserialize(raw_response, self._response_deserializer)
+        if self._response_deserializer is not None:
+            return self._response_deserializer(raw_response)
+        return raw_response
 
     async def read(self) -> Union[ResponseType, EOFType]:
         if self.done():
@@ -504,11 +507,12 @@ class _StreamRequestMixin(Call[RequestType, ResponseType]):
             if self.done():
                 await self._raise_for_status()
 
-        serialized_request = _common.serialize(
-            request, self._request_serializer
-        )
+        if self._request_serializer is not None:
+            serialized_request = self._request_serializer(request)
+        else:
+            serialized_request = request
         try:
-            await self._cython_call.send_serialized_message(serialized_request)
+            await self._cython_call.send_serialized_message_fast(serialized_request)
         except cygrpc.InternalError as err:
             self._cython_call.set_internal_error(str(err))
             await self._raise_for_status()
@@ -525,11 +529,12 @@ class _StreamRequestMixin(Call[RequestType, ResponseType]):
             # If the done writing is not sent before, try to send it.
             self._done_writing_flag = True
             try:
-                await self._cython_call.send_receive_close()
+                await self._cython_call.send_receive_close_fast()
             except asyncio.CancelledError:
                 if not self.cancelled():
                     self.cancel()
                 raise
+
 
     async def write(self, request: RequestType) -> None:
         self._raise_for_different_style(_APIStyle.READER_WRITER)
@@ -591,13 +596,15 @@ class UnaryUnaryCall(
         )
         self._request = request
         self._context = cygrpc.build_census_context()
-        serialized_request = _common.serialize(
-            self._request, self._request_serializer
-        )
+        if self._request_serializer is not None:
+            serialized_request = self._request_serializer(self._request)
+        else:
+            serialized_request = self._request
         self._call_future = self._cython_call.start_unary_unary(
             serialized_request, self._metadata, self._context
         )
         self._init_unary_response_mixin(self._call_future)
+
 
     async def wait_for_connection(self) -> None:
         await self._call_future
