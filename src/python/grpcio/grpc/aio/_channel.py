@@ -16,7 +16,7 @@
 
 import asyncio
 import types
-from typing import Any, Generic, List, Optional, Sequence, TypeVar
+from typing import Any, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
 import weakref
 
 import grpc
@@ -45,7 +45,9 @@ from ._metadata import Metadata
 from ._typing import ChannelArgumentType
 from ._typing import DeserializingFunction
 from ._typing import MetadataType
+from ._typing import MetadatumType
 from ._typing import RequestIterableType
+
 from ._typing import RequestType
 from ._typing import ResponseType
 from ._typing import SerializingFunction
@@ -132,10 +134,12 @@ class _BaseMultiCallable(
     def _init_metadata(
         metadata: Optional[MetadataType] = None,
         compression: Optional[grpc.Compression] = None,
-    ) -> Metadata:
+    ) -> Union[Metadata, Tuple[MetadatumType, ...]]:
         """Based on the provided values for <metadata> or <compression> initialise the final
         metadata, as it should be used for the current call.
         """
+        if metadata is None and compression is None:
+            return ()
         metadata = metadata or Metadata()
         if not isinstance(
             metadata, Metadata
@@ -150,6 +154,7 @@ class _BaseMultiCallable(
             if augmented_metadata is not None:
                 metadata = Metadata(*augmented_metadata)
         return metadata
+
 
 
 class UnaryUnaryMultiCallable(

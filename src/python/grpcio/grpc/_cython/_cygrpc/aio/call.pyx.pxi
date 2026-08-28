@@ -80,7 +80,9 @@ cdef class _UnaryCallContext:
         else:
             py_trailing_metadata = _IMMUTABLE_EMPTY_METADATA
 
-        cdef str py_details = _decode(_slice_bytes(self._status_details))
+        cdef str py_details = ""
+        if grpc_slice_length(self._status_details) > 0:
+            py_details = _decode(_slice_bytes(self._status_details))
         cdef str py_error_string = ""
         if self._status_error_string != NULL:
             py_error_string = _decode(self._status_error_string)
@@ -112,7 +114,12 @@ cdef class _UnaryCallContext:
                         chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
                     grpc_slice_unref(message_slice)
                 grpc_byte_buffer_reader_destroy(&message_reader)
-                response_bytes = b"".join(chunks)
+                if len(chunks) == 1:
+                    response_bytes = chunks[0]
+                elif len(chunks) > 1:
+                    response_bytes = b"".join(chunks)
+                else:
+                    response_bytes = b""
             grpc_byte_buffer_destroy(self._recv_message_buffer)
             self._recv_message_buffer = NULL
 
@@ -192,7 +199,12 @@ cdef class _ReceiveMessageContext:
                         chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
                     grpc_slice_unref(message_slice)
                 grpc_byte_buffer_reader_destroy(&message_reader)
-                response_bytes = b"".join(chunks)
+                if len(chunks) == 1:
+                    response_bytes = chunks[0]
+                elif len(chunks) > 1:
+                    response_bytes = b"".join(chunks)
+                else:
+                    response_bytes = b""
             grpc_byte_buffer_destroy(self._message_buffer)
             self._message_buffer = NULL
 
@@ -201,6 +213,7 @@ cdef class _ReceiveMessageContext:
                 self.future.set_result(None)
             else:
                 self.future.set_result(response_bytes)
+
 
 
 cdef class _SendCloseContext:

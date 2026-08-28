@@ -214,9 +214,13 @@ class Call(Generic[RequestType, ResponseType]):
     ) -> None:
         self._loop = loop
         self._cython_call = cython_call
-        self._metadata = tuple(metadata)
+        if isinstance(metadata, tuple):
+            self._metadata = metadata
+        else:
+            self._metadata = tuple(metadata)
         self._request_serializer = request_serializer
         self._response_deserializer = response_deserializer
+
 
     def __del__(self) -> None:
         # The '_cython_call' object might be destructed before Call object
