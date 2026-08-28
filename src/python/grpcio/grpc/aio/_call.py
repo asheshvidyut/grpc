@@ -207,11 +207,12 @@ class Call(Generic[RequestType, ResponseType]):
     def __init__(
         self,
         cython_call: cygrpc._AioCall,
-        metadata: Metadata,
+        metadata: MetadataType,
         request_serializer: Optional[SerializingFunction[RequestType]],
         response_deserializer: Optional[DeserializingFunction[ResponseType]],
         loop: asyncio.AbstractEventLoop,
     ) -> None:
+
         self._loop = loop
         self._cython_call = cython_call
         if isinstance(metadata, tuple):
@@ -570,12 +571,11 @@ class UnaryUnaryCall(
     _request: RequestType
     _call_future: asyncio.Future
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         request: RequestType,
         deadline: Optional[float],
-        metadata: Metadata,
+        metadata: MetadataType,
         credentials: Optional[grpc.CallCredentials],
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
@@ -634,7 +634,7 @@ class UnaryStreamCall(
         self,
         request: RequestType,
         deadline: Optional[float],
-        metadata: Metadata,
+        metadata: MetadataType,
         credentials: Optional[grpc.CallCredentials],
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
@@ -699,7 +699,7 @@ class StreamUnaryCall(
         self,
         request_iterator: Optional[RequestIterableType[RequestType]],
         deadline: Optional[float],
-        metadata: Metadata,
+        metadata: MetadataType,
         credentials: Optional[grpc.CallCredentials],
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
@@ -760,7 +760,7 @@ class StreamStreamCall(
         self,
         request_iterator: Optional[RequestIterableType[RequestType]],
         deadline: Optional[float],
-        metadata: Metadata,
+        metadata: MetadataType,
         credentials: Optional[grpc.CallCredentials],
         wait_for_ready: Optional[bool],
         channel: cygrpc.AioChannel,
@@ -770,6 +770,7 @@ class StreamStreamCall(
         loop: asyncio.AbstractEventLoop,
         registered_call_handle: int = 0,
     ) -> None:
+
         super().__init__(
             channel.call(
                 method,
