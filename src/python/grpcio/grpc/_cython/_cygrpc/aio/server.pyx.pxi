@@ -943,11 +943,79 @@ async def _schedule_rpc_coro(object rpc_coro,
             rpc_state.call = NULL
 
 
+async def _serve_registered_unary_unary(object method_handler,
+                                        RPCState rpc_state,
+                                        object loop,
+                                        str method_name):
+    cdef bytes request_raw = await rpc_state.receive_message_fast(loop)
+    if request_raw is None:
+        if rpc_state.call:
+            grpc_call_unref(rpc_state.call)
+            rpc_state.call = NULL
+        return
+
+    cdef object request_message = deserialize(
+        method_handler.request_deserializer,
+        request_raw,
+    )
+
+    cdef _ServicerContext servicer_context = _ServicerContext(
+        rpc_state,
+        None,
+        None,
+        loop,
+    )
+
+    cdef object response_message
+    try:
+        if inspect.iscoroutinefunction(method_handler.unary_unary):
+            response_message = await method_handler.unary_unary(
+                request_message,
+                servicer_context,
+            )
+        else:
+            response_message = method_handler.unary_unary(
+                request_message,
+                servicer_context,
+            )
+
+        cdef bytes response_raw = serialize(
+            method_handler.response_serializer,
+            response_message,
+        )
+
+        await rpc_state.send_unary_response_fast(response_raw, loop)
+    except Exception as e:
+        if not rpc_state.status_sent and rpc_state.server._status != AIO_SERVER_STATUS_STOPPED:
+            rpc_state.status_sent = True
+            try:
+                await _send_error_status_from_server(
+                    rpc_state,
+                    StatusCode.unknown,
+                    'Unexpected %s: %s' % (type(e), e),
+                    rpc_state.trailing_metadata,
+                    rpc_state.create_send_initial_metadata_op_if_not_sent(),
+                    loop
+                )
+            except ExecuteBatchError:
+                pass
+    finally:
+        if rpc_state.callbacks:
+            try:
+                for callback in rpc_state.callbacks:
+                    callback()
+            except:
+                pass
+        if rpc_state.call:
+            grpc_call_unref(rpc_state.call)
+            rpc_state.call = NULL
+
 
 async def _handle_rpc(str method_name,
                       object method_resolver,
                       tuple interceptors,
                       RPCState rpc_state, object loop, bint concurrency_exceeded):
+
     cdef object method_handler
     # Finds the method handler (application logic)
     method_handler = await _find_method_handler(
@@ -1168,6 +1236,14 @@ cdef class AioServer:
         cdef str method_name
         cdef bint concurrency_exceeded
         cdef object rpc_coro, rpc_task
+        cdef object method_handler = None
+        cdef bint is_fast_unary = False
+
+        if method_bytes is not None and not self._interceptors:
+            method_name = method_bytes.decode()
+            method_handler = self._registered_method_handlers.get(method_name, None)
+            if method_handler is not None and not method_handler.request_streaming and not method_handler.response_streaming:
+                is_fast_unary = True
 
         while self._status == AIO_SERVER_STATUS_RUNNING:
             try:
@@ -1185,32 +1261,45 @@ cdef class AioServer:
                 self._limiter.check_before_request_call()
                 concurrency_exceeded = self._limiter.limiter_concurrency_exceeded
 
-            if method_bytes is not None:
-                method_name = method_bytes.decode()
+            if is_fast_unary and not concurrency_exceeded:
+                rpc_task = self._loop.create_task(
+                    _serve_registered_unary_unary(
+                        method_handler,
+                        rpc_state,
+                        self._loop,
+                        method_name,
+                    ),
+                    name="fast_rpc_task",
+                )
             else:
-                method_name = rpc_state.method().decode()
+                if method_bytes is not None:
+                    method_name = method_bytes.decode()
+                else:
+                    method_name = rpc_state.method().decode()
 
-            rpc_coro = _handle_rpc(method_name,
-                                   method_resolver,
-                                   self._interceptors,
-                                   rpc_state,
-                                   self._loop,
-                                   concurrency_exceeded)
+                rpc_coro = _handle_rpc(method_name,
+                                       method_resolver,
+                                       self._interceptors,
+                                       rpc_state,
+                                       self._loop,
+                                       concurrency_exceeded)
 
-            rpc_task = self._loop.create_task(
-                _schedule_rpc_coro(
-                    rpc_coro,
-                    rpc_state,
-                    self._loop,
-                    method_name,
-                ),
-                name="rpc_task",
-            )
+                rpc_task = self._loop.create_task(
+                    _schedule_rpc_coro(
+                        rpc_coro,
+                        rpc_state,
+                        self._loop,
+                        method_name,
+                    ),
+                    name="rpc_task",
+                )
+
             rpc_tasks.add(rpc_task)
             rpc_task.add_done_callback(rpc_tasks.discard)
 
             if self._limiter is not None and not concurrency_exceeded:
                 self._limiter.decrease_once_finished(rpc_task)
+
 
 
     async def _server_main_loop(self,
