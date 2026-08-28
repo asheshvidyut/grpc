@@ -19,26 +19,20 @@ import grpc
 from grpc.experimental import aio
 
 
-class BenchmarkHandler(grpc.GenericRpcHandler):
+async def unary_handler(request, context):
+    return request
 
-    def service(self, handler_call_details):
-        if handler_call_details.method == "/Benchmark/Unary":
-            return grpc.unary_unary_rpc_method_handler(self.unary_handler)
-        elif handler_call_details.method == "/Benchmark/Stream":
-            return grpc.stream_stream_rpc_method_handler(self.stream_handler)
-        return None
 
-    async def unary_handler(self, request, context):
-        return request
-
-    async def stream_handler(self, request_iterator, context):
-        async for req in request_iterator:
-            yield req
+async def stream_handler(request_iterator, context):
+    async for req in request_iterator:
+        yield req
 
 
 async def run_unary_benchmark(target, concurrency=100, duration=3.0):
     channel = aio.insecure_channel(target)
-    unary_call = channel.unary_unary("/Benchmark/Unary")
+    unary_call = channel.unary_unary(
+        "/Benchmark/Unary", _registered_method=True
+    )
 
     payload = b"x" * 100
     stop_event = asyncio.Event()
@@ -84,7 +78,9 @@ async def run_unary_benchmark(target, concurrency=100, duration=3.0):
 
 async def run_streaming_benchmark(target, count=20000):
     channel = aio.insecure_channel(target)
-    stream_call = channel.stream_stream("/Benchmark/Stream")
+    stream_call = channel.stream_stream(
+        "/Benchmark/Stream", _registered_method=True
+    )
 
     payload = b"x" * 100
     call = stream_call()
@@ -112,10 +108,17 @@ async def run_streaming_benchmark(target, count=20000):
 
 async def main():
     server = aio.server()
-    server.add_generic_rpc_handlers([BenchmarkHandler()])
+    handlers = {
+        "/Benchmark/Unary": grpc.unary_unary_rpc_method_handler(unary_handler),
+        "/Benchmark/Stream": grpc.stream_stream_rpc_method_handler(
+            stream_handler
+        ),
+    }
+    server.add_registered_method_handlers(handlers)
     port = server.add_insecure_port("127.0.0.1:0")
     await server.start()
     target = f"127.0.0.1:{port}"
+
 
     print(f"\n============================================================")
     print(f"  gRPC Python AsyncIO Performance Benchmark")
