@@ -376,35 +376,21 @@ class _StreamResponseMixin(Call[RequestType, ResponseType]):
             return True
         return False
 
+    async def _fetch_stream_responses(self) -> AsyncIterator[ResponseType]:
+        message = await self._read()
+        while message is not cygrpc.EOF:
+            yield message
+            message = await self._read()
+
+        # If the read operation failed, Core should explain why.
+        await self._raise_for_status()
+
     def __aiter__(self) -> AsyncIterator[ResponseType]:
         self._update_response_style(_APIStyle.ASYNC_GENERATOR)
+        if self._message_aiter is None:
+            self._message_aiter = self._fetch_stream_responses()
+        return self._message_aiter
 
-        return self
-
-    async def __anext__(self) -> ResponseType:
-        if not self._preparation.done():
-            await self._preparation
-
-        if self.done():
-            await self._raise_for_status()
-            raise StopAsyncIteration
-
-        try:
-            raw_response = (
-                await self._cython_call.receive_serialized_message_fast()
-            )
-        except asyncio.CancelledError:
-            if not self.cancelled():
-                self.cancel()
-            raise
-
-        if raw_response is cygrpc.EOF or raw_response is None:
-            await self._raise_for_status()
-            raise StopAsyncIteration
-
-        if self._response_deserializer is not None:
-            return self._response_deserializer(raw_response)
-        return raw_response
 
     async def _read(self) -> Union[ResponseType, EOFType]:
         # Wait for the request being sent
