@@ -100,14 +100,3 @@ _FLAKY_TESTS = [
     for test_file_name in GRPC_ASYNC_TESTS
 ]
 
-py_binary(
-    name = "aio_bench",
-    srcs = ["aio_bench.py"],
-    main = "aio_bench.py",
-    imports = ["../../"],
-    srcs_version = "PY3",
-    deps = [
-        "//src/python/grpcio/grpc:grpcio",
-    ],
-)
-
