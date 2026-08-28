@@ -38,6 +38,7 @@ cdef class _ServerUnaryResponseContext:
 cdef class RPCState(GrpcCallWrapper):
     cdef grpc_call_details details
     cdef grpc_metadata_array request_metadata
+    cdef grpc_byte_buffer *request_message_buffer
     cdef AioServer server
     # NOTE(lidiz) Under certain corner case, receiving the client close
     # operation won't immediately fail ongoing RECV_MESSAGE operations. Here I
@@ -56,9 +57,11 @@ cdef class RPCState(GrpcCallWrapper):
 
     cdef bytes method(self)
     cdef tuple invocation_metadata(self)
+    cdef bytes extract_request_message(self)
     cdef void raise_for_termination(self) except *
     cdef int get_write_flag(self)
     cdef Operation create_send_initial_metadata_op_if_not_sent(self)
+
 
 
 cdef class _ServicerContext:

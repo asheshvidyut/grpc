@@ -92,6 +92,7 @@ cdef class RPCState:
         self.server = server
         grpc_metadata_array_init(&self.request_metadata)
         grpc_call_details_init(&self.details)
+        self.request_message_buffer = NULL
         self.client_closed = False
         self.abort_exception = None
         self.metadata_sent = False
@@ -109,6 +110,35 @@ cdef class RPCState:
 
     cdef tuple invocation_metadata(self):
         return _metadata(&self.request_metadata)
+
+    cdef bytes extract_request_message(self):
+        cdef grpc_byte_buffer_reader message_reader
+        cdef bint message_reader_status
+        cdef grpc_slice message_slice
+        cdef size_t message_slice_length
+        cdef list chunks = []
+        cdef bytes response_bytes = None
+
+        if self.request_message_buffer != NULL:
+            message_reader_status = grpc_byte_buffer_reader_init(
+                &message_reader, self.request_message_buffer)
+            if message_reader_status:
+                while grpc_byte_buffer_reader_next(&message_reader, &message_slice):
+                    message_slice_length = grpc_slice_length(message_slice)
+                    if message_slice_length > 0:
+                        chunks.append((<char *>grpc_slice_start_ptr(message_slice))[:message_slice_length])
+                    grpc_slice_unref(message_slice)
+                grpc_byte_buffer_reader_destroy(&message_reader)
+                if len(chunks) == 1:
+                    response_bytes = chunks[0]
+                elif len(chunks) > 1:
+                    response_bytes = b"".join(chunks)
+                else:
+                    response_bytes = b""
+            grpc_byte_buffer_destroy(self.request_message_buffer)
+            self.request_message_buffer = NULL
+        return response_bytes
+
 
     cdef void raise_for_termination(self) except *:
         """Raise exceptions if RPC is not running.
@@ -264,9 +294,13 @@ cdef class RPCState:
         """Cleans the Core objects."""
         grpc_call_details_destroy(&self.details)
         grpc_metadata_array_destroy(&self.request_metadata)
+        if self.request_message_buffer != NULL:
+            grpc_byte_buffer_destroy(self.request_message_buffer)
+            self.request_message_buffer = NULL
         if self.call:
             grpc_call_unref(self.call)
         shutdown_grpc_aio()
+
 
 
 cdef class _ServicerContext:
@@ -687,11 +721,14 @@ async def _finish_handler_with_stream_responses(RPCState rpc_state,
 async def _handle_unary_unary_rpc(object method_handler,
                                   RPCState rpc_state,
                                   object loop):
-    # Receives request message
-    cdef bytes request_raw = await rpc_state.receive_message_fast(loop)
+    # Receives request message (fast path if delivered with registered call)
+    cdef bytes request_raw = rpc_state.extract_request_message()
+    if request_raw is None:
+        request_raw = await rpc_state.receive_message_fast(loop)
     if request_raw is None:
         # The RPC was cancelled immediately after start on client side.
         return
+
 
     # Deserializes the request message
     cdef object request_message = deserialize(
@@ -862,12 +899,15 @@ async def _schedule_rpc_coro(object rpc_coro,
                              RPCState rpc_state,
                              object loop,
                              str method_name):
-    # Start background task that listens on cancellation from client.
-    cdef object current_task = asyncio.current_task()
-    cdef object cancel_task = loop.create_task(
-        _handle_cancellation_from_core(current_task, rpc_state, loop),
-        name="HandleCancellation[%s]" % method_name
-    )
+    # Only spawn cancellation listening task if servicer callbacks are registered
+    cdef object cancel_task = None
+    cdef object current_task
+    if rpc_state.callbacks:
+        current_task = asyncio.current_task()
+        cancel_task = loop.create_task(
+            _handle_cancellation_from_core(current_task, rpc_state, loop),
+            name="HandleCancellation[%s]" % method_name
+        )
     try:
         try:
             await rpc_coro
@@ -920,7 +960,7 @@ async def _schedule_rpc_coro(object rpc_coro,
                 _LOGGER.exception('Failed sending error status from server')
                 traceback.print_exc()
     finally:
-        if not cancel_task.done():
+        if cancel_task is not None and not cancel_task.done():
             cancel_task.cancel()
         if rpc_state.callbacks:
             try:
@@ -932,6 +972,7 @@ async def _schedule_rpc_coro(object rpc_coro,
         if rpc_state.call:
             grpc_call_unref(rpc_state.call)
             rpc_state.call = NULL
+
 
 
 async def _handle_rpc(str method_name,
@@ -1117,11 +1158,12 @@ cdef class AioServer:
             &rpc_state.call,
             &rpc_state.details.deadline,
             &rpc_state.request_metadata,
-            NULL,
+            &rpc_state.request_message_buffer,
             global_completion_queue(),
             global_completion_queue(),
             wrapper.c_functor()
         )
+
         if error != GRPC_CALL_OK:
             raise InternalError("Error in grpc_server_request_registered_call: %s" % error)
 
