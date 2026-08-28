@@ -25,7 +25,13 @@ cdef class _ServerUnaryResponseContext:
     cdef size_t _c_trailing_metadata_count
     cdef grpc_slice _status_details
 
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept
+
     cdef void _on_done(self, int success)
+
 
 
 

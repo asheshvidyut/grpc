@@ -27,6 +27,11 @@ cdef class _UnaryCallContext:
     cdef grpc_metadata_array _recv_initial_metadata
     cdef grpc_metadata_array _recv_trailing_metadata
 
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept
+
     cdef void _on_done(self, int success)
 
 
@@ -34,6 +39,11 @@ cdef class _SendMessageContext:
     cdef _DirectFunctorContext functor_ctx
     cdef object future
     cdef grpc_byte_buffer *_message_buffer
+
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept
 
     cdef void _on_done(self, int success)
 
@@ -43,6 +53,11 @@ cdef class _ReceiveMessageContext:
     cdef object future
     cdef grpc_byte_buffer *_message_buffer
 
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept
+
     cdef void _on_done(self, int success)
 
 
@@ -50,7 +65,13 @@ cdef class _SendCloseContext:
     cdef _DirectFunctorContext functor_ctx
     cdef object future
 
+    @staticmethod
+    cdef void _static_functor_run(
+            grpc_completion_queue_functor* functor,
+            int success) noexcept
+
     cdef void _on_done(self, int success)
+
 
 
 
