@@ -134,13 +134,12 @@ class _BaseMultiCallable(
     def _init_metadata(
         metadata: Optional[MetadataType] = None,
         compression: Optional[grpc.Compression] = None,
-    ) -> Union[Metadata, Tuple[MetadatumType, ...]]:
+    ) -> Metadata:
         """Based on the provided values for <metadata> or <compression> initialise the final
         metadata, as it should be used for the current call.
         """
-        if metadata is None and compression is None:
-            return ()
         metadata = metadata or Metadata()
+
         if not isinstance(
             metadata, Metadata
         ) and isinstance(  # pyright: ignore[reportUnnecessaryIsInstance]
