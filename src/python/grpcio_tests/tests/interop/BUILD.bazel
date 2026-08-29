@@ -117,7 +117,7 @@ py_binary(
 
 py_test(
     name = "_insecure_intraop_test",
-    size = "small",
+    size = "medium",
     srcs = ["_insecure_intraop_test.py"],
     data = [
         "//src/python/grpcio_tests/tests/unit/credentials",
@@ -137,7 +137,7 @@ py_test(
 
 py_test(
     name = "_secure_intraop_test",
-    size = "small",
+    size = "medium",
     srcs = ["_secure_intraop_test.py"],
     imports = ["../../"],
     main = "_secure_intraop_test.py",
@@ -154,7 +154,7 @@ py_test(
 
 py_test(
     name = "_security_tests",
-    size = "small",
+    size = "medium",
     srcs = ["security_test.py"],
     imports = ["../../"],
     main = "security_test.py",

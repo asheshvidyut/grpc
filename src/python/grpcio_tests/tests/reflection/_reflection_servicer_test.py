@@ -48,6 +48,9 @@ _EMPTY_EXTENSIONS_NUMBERS = (
 )
 
 
+_HOST = "127.0.0.1"
+
+
 def _file_descriptor_to_proto(descriptor):
     proto = descriptor_pb2.FileDescriptorProto()
     descriptor.CopyToProto(proto)
@@ -58,15 +61,21 @@ class ReflectionServicerTest(unittest.TestCase):
     def setUp(self):
         self._server = test_common.test_server()
         reflection.enable_server_reflection(_SERVICE_NAMES, self._server)
-        port = self._server.add_insecure_port("localhost:0")
+        port = self._server.add_insecure_port("{}:0".format(_HOST))
         self._server.start()
 
-        self._channel = grpc.insecure_channel("localhost:%d" % port)
+        self._channel = grpc.insecure_channel(
+            "{}:{}".format(_HOST, port),
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        grpc.channel_ready_future(self._channel).result(timeout=10)
         self._stub = reflection_pb2_grpc.ServerReflectionStub(self._channel)
 
     def tearDown(self):
         self._channel.close()
-        self._server.stop(None)
+        event = self._server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
     def testFileByName(self):
         requests = (

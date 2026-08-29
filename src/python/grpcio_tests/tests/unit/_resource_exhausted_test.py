@@ -123,9 +123,14 @@ def get_method_handlers(trigger):
     }
 
 
+_HOST = "127.0.0.1"
+
+
 class ResourceExhaustedTest(unittest.TestCase):
     def setUp(self):
-        self._server_pool = logging_pool.pool(test_constants.THREAD_CONCURRENCY)
+        self._server_pool = logging_pool.pool(
+            test_constants.THREAD_CONCURRENCY
+        )
         self._trigger = _TestTrigger(test_constants.THREAD_CONCURRENCY)
         self._server = grpc.server(
             self._server_pool,
@@ -135,13 +140,19 @@ class ResourceExhaustedTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(self._trigger)
         )
-        port = self._server.add_insecure_port("localhost:0")
+        port = self._server.add_insecure_port("{}:0".format(_HOST))
         self._server.start()
-        self._channel = grpc.insecure_channel("localhost:%d" % port)
+        self._channel = grpc.insecure_channel(
+            "{}:{}".format(_HOST, port),
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
     def tearDown(self):
         self._channel.close()
-        self._server.stop(None)
+        event = self._server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
     def testUnaryUnary(self):
         multi_callable = self._channel.unary_unary(

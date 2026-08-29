@@ -54,7 +54,7 @@ if __name__ == "__main__":
     unittest_path = sys.argv[2]
 
     loader = SingleLoader(target_module, unittest_path)
-    runner = unittest.TextTestRunner(verbosity=0)
+    runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(loader.suite)
     
     if not result.wasSuccessful():

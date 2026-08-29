@@ -83,23 +83,26 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 
 async def _start_test_server():
-    server = aio.server()
-    port = server.add_insecure_port("[::]:0")
+    server = aio.server(options=(("grpc.so_reuseport", 0),))
+    port = server.add_insecure_port("127.0.0.1:0")
     server.add_generic_rpc_handlers((_GenericHandler(),))
     await server.start()
-    return f"localhost:{port}", server
+    return f"127.0.0.1:{port}", server
 
 
 class TestTimeout(AioTestBase):
     async def setUp(self):
         address, self._server = await _start_test_server()
-        self._client = aio.insecure_channel(address)
-        self.assertEqual(
-            grpc.ChannelConnectivity.IDLE, self._client.get_state(True)
+        self._client = aio.insecure_channel(
+            address,
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
         )
-        await _common.block_until_certain_state(
-            self._client, grpc.ChannelConnectivity.READY
-        )
+        await self._client.channel_ready()
 
     async def tearDown(self):
         await self._client.close()
@@ -107,7 +110,7 @@ class TestTimeout(AioTestBase):
 
     async def test_unary_unary_success_with_timeout(self):
         multicallable = self._client.unary_unary(_TEST_SLEEPY_UNARY_UNARY)
-        call = multicallable(_REQUEST, timeout=2 * _SLEEP_TIME_UNIT_S)
+        call = multicallable(_REQUEST, timeout=5 * _SLEEP_TIME_UNIT_S)
         self.assertEqual(_RESPONSE, await call)
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
@@ -123,9 +126,10 @@ class TestTimeout(AioTestBase):
 
     async def test_unary_stream_success_with_timeout(self):
         multicallable = self._client.unary_stream(_TEST_SLEEPY_UNARY_STREAM)
-        call = multicallable(_REQUEST, timeout=2 * _SLEEP_TIME_UNIT_S)
+        call = multicallable(_REQUEST, timeout=5 * _SLEEP_TIME_UNIT_S)
         self.assertEqual(_RESPONSE, await call.read())
         self.assertEqual(_RESPONSE, await call.read())
+        self.assertEqual(aio.EOF, await call.read())
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def test_unary_stream_deadline_exceeded(self):
@@ -141,9 +145,12 @@ class TestTimeout(AioTestBase):
 
     async def test_stream_unary_success_with_timeout(self):
         multicallable = self._client.stream_unary(_TEST_SLEEPY_STREAM_UNARY)
-        call = multicallable(timeout=2 * _SLEEP_TIME_UNIT_S)
+        call = multicallable(timeout=5 * _SLEEP_TIME_UNIT_S)
         await call.write(_REQUEST)
         await call.write(_REQUEST)
+        await call.done_writing()
+        response = await call
+        self.assertEqual(_RESPONSE, response)
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def test_stream_unary_deadline_exceeded(self):
@@ -160,8 +167,9 @@ class TestTimeout(AioTestBase):
 
     async def test_stream_stream_success_with_timeout(self):
         multicallable = self._client.stream_stream(_TEST_SLEEPY_STREAM_STREAM)
-        call = multicallable(timeout=2 * _SLEEP_TIME_UNIT_S)
+        call = multicallable(timeout=5 * _SLEEP_TIME_UNIT_S)
         await call.write(_REQUEST)
+        await call.done_writing()
         self.assertEqual(_RESPONSE, await call.read())
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 

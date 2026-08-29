@@ -138,23 +138,29 @@ class TestWaitForReady(AioTestBase):
         """RPC will wait until the connection is ready."""
         for action in _RPC_ACTIONS:
             with self.subTest(name=action.__name__):
+                address, port, socket = get_socket(listen=False)
+                channel = aio.insecure_channel(f"{address}:{port}")
+                stub = test_pb2_grpc.TestServiceStub(channel)
+                socket.close()
+
                 # Starts the RPC
-                action_task = self.loop.create_task(action(self._stub, True))
+                action_task = self.loop.create_task(action(stub, True))
 
                 # Wait for TRANSIENT_FAILURE, and RPC is not aborting
                 await _common.block_until_certain_state(
-                    self._channel, grpc.ChannelConnectivity.TRANSIENT_FAILURE
+                    channel, grpc.ChannelConnectivity.TRANSIENT_FAILURE
                 )
 
                 server = None
 
                 try:
                     # Start the server
-                    _, server = await start_test_server(port=self._port)
+                    _, server = await start_test_server(port=port)
 
                     # The RPC should recover itself
                     await action_task
                 finally:
+                    await channel.close()
                     if server is not None:
                         await server.stop(None)
 

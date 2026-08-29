@@ -105,39 +105,55 @@ class _Pipe:
         self.close()
 
 
+_CHANNEL_OPTIONS = (
+    ("grpc.enable_http_proxy", 0),
+    ("grpc.initial_reconnect_backoff_ms", 100),
+    ("grpc.min_reconnect_backoff_ms", 100),
+    ("grpc.max_reconnect_backoff_ms", 500),
+)
+
+
 class ChannelCloseTest(unittest.TestCase):
     def setUp(self):
         self._server = test_common.test_server(
             max_workers=test_constants.THREAD_CONCURRENCY
         )
         self._server.add_registered_method_handlers("", _METHOD_HANDLERS)
-        self._port = self._server.add_insecure_port("localhost:0")
+        self._port = self._server.add_insecure_port("127.0.0.1:0")
         self._server.start()
 
     def tearDown(self):
-        self._server.stop(None)
+        event = self._server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
     def test_close_immediately_after_call_invocation(self):
-        channel = grpc.insecure_channel("localhost:{}".format(self._port))
+        channel = grpc.insecure_channel(
+            "127.0.0.1:{}".format(self._port),
+            options=_CHANNEL_OPTIONS,
+        )
         multi_callable = channel.stream_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
             _registered_method=True,
         )
         request_iterator = _Pipe(())
-        response_iterator = multi_callable(request_iterator)
+        response_iterator = multi_callable(request_iterator, wait_for_ready=True)
         channel.close()
         request_iterator.close()
 
         self.assertIs(response_iterator.code(), grpc.StatusCode.CANCELLED)
 
     def test_close_while_call_active(self):
-        channel = grpc.insecure_channel("localhost:{}".format(self._port))
+        channel = grpc.insecure_channel(
+            "127.0.0.1:{}".format(self._port),
+            options=_CHANNEL_OPTIONS,
+        )
         multi_callable = channel.stream_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
             _registered_method=True,
         )
         request_iterator = _Pipe((b"abc",))
-        response_iterator = multi_callable(request_iterator)
+        response_iterator = multi_callable(request_iterator, wait_for_ready=True)
         next(response_iterator)
         channel.close()
         request_iterator.close()
@@ -146,14 +162,15 @@ class ChannelCloseTest(unittest.TestCase):
 
     def test_context_manager_close_while_call_active(self):
         with grpc.insecure_channel(
-            "localhost:{}".format(self._port)
+            "127.0.0.1:{}".format(self._port),
+            options=_CHANNEL_OPTIONS,
         ) as channel:
             multi_callable = channel.stream_stream(
                 grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
                 _registered_method=True,
             )
             request_iterator = _Pipe((b"abc",))
-            response_iterator = multi_callable(request_iterator)
+            response_iterator = multi_callable(request_iterator, wait_for_ready=True)
             next(response_iterator)
         request_iterator.close()
 
@@ -161,7 +178,8 @@ class ChannelCloseTest(unittest.TestCase):
 
     def test_context_manager_close_while_many_calls_active(self):
         with grpc.insecure_channel(
-            "localhost:{}".format(self._port)
+            "127.0.0.1:{}".format(self._port),
+            options=_CHANNEL_OPTIONS,
         ) as channel:
             multi_callable = channel.stream_stream(
                 grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
@@ -173,7 +191,7 @@ class ChannelCloseTest(unittest.TestCase):
             )
             response_iterators = []
             for request_iterator in request_iterators:
-                response_iterator = multi_callable(request_iterator)
+                response_iterator = multi_callable(request_iterator, wait_for_ready=True)
                 next(response_iterator)
                 response_iterators.append(response_iterator)
         for request_iterator in request_iterators:
@@ -183,13 +201,16 @@ class ChannelCloseTest(unittest.TestCase):
             self.assertIs(response_iterator.code(), grpc.StatusCode.CANCELLED)
 
     def test_many_concurrent_closes(self):
-        channel = grpc.insecure_channel("localhost:{}".format(self._port))
+        channel = grpc.insecure_channel(
+            "127.0.0.1:{}".format(self._port),
+            options=_CHANNEL_OPTIONS,
+        )
         multi_callable = channel.stream_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
             _registered_method=True,
         )
         request_iterator = _Pipe((b"abc",))
-        response_iterator = multi_callable(request_iterator)
+        response_iterator = multi_callable(request_iterator, wait_for_ready=True)
         next(response_iterator)
         start = time.time()
         end = start + _MORE_TIME
@@ -212,18 +233,19 @@ class ChannelCloseTest(unittest.TestCase):
 
     def test_exception_in_callback(self):
         with grpc.insecure_channel(
-            "localhost:{}".format(self._port)
+            "127.0.0.1:{}".format(self._port),
+            options=_CHANNEL_OPTIONS,
         ) as channel:
             stream_multi_callable = channel.stream_stream(
                 grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_URI),
                 _registered_method=True,
             )
             endless_iterator = itertools.repeat(b"abc")
-            stream_response_iterator = stream_multi_callable(endless_iterator)
+            stream_response_iterator = stream_multi_callable(endless_iterator, wait_for_ready=True)
             future = channel.unary_unary(
                 grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_URI),
                 _registered_method=True,
-            ).future(b"abc")
+            ).future(b"abc", wait_for_ready=True)
 
             def on_done_callback(future):
                 raise Exception("This should not cause a deadlock.")

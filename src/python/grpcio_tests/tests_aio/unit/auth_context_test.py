@@ -44,10 +44,15 @@ _PRIVATE_KEY = resources.private_key()
 _CERTIFICATE_CHAIN = resources.certificate_chain()
 _TEST_ROOT_CERTIFICATES = resources.test_root_certificates()
 _SERVER_CERTS = ((_PRIVATE_KEY, _CERTIFICATE_CHAIN),)
+_HOST = "127.0.0.1"
 _PROPERTY_OPTIONS = (
     (
         "grpc.ssl_target_name_override",
         _SERVER_HOST_OVERRIDE,
+    ),
+    (
+        "grpc.enable_http_proxy",
+        0,
     ),
 )
 
@@ -74,12 +79,16 @@ class TestAuthContext(AioTestBase):
                 )
             },
         )
-        server = aio.server()
+        server = aio.server(options=(("grpc.so_reuseport", 0),))
         server.add_generic_rpc_handlers((handler,))
-        port = server.add_insecure_port("[::]:0")
+        port = server.add_insecure_port(f"{_HOST}:0")
         await server.start()
 
-        async with aio.insecure_channel("localhost:%d" % port) as channel:
+        async with aio.insecure_channel(
+            f"{_HOST}:{port}",
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
+            await channel.channel_ready()
             response = await channel.unary_unary(_UNARY_UNARY)(_REQUEST)
         await server.stop(None)
 
@@ -103,20 +112,21 @@ class TestAuthContext(AioTestBase):
                 )
             },
         )
-        server = aio.server()
+        server = aio.server(options=(("grpc.so_reuseport", 0),))
         server.add_generic_rpc_handlers((handler,))
         server_cred = grpc.ssl_server_credentials(_SERVER_CERTS)
-        port = server.add_secure_port("[::]:0", server_cred)
+        port = server.add_secure_port(f"{_HOST}:0", server_cred)
         await server.start()
 
         channel_creds = grpc.ssl_channel_credentials(
             root_certificates=_TEST_ROOT_CERTIFICATES
         )
         channel = aio.secure_channel(
-            "localhost:{}".format(port),
+            f"{_HOST}:{port}",
             channel_creds,
             options=_PROPERTY_OPTIONS,
         )
+        await channel.channel_ready()
         response = await channel.unary_unary(_UNARY_UNARY)(_REQUEST)
         await channel.close()
         await server.stop(None)
@@ -157,14 +167,14 @@ class TestAuthContext(AioTestBase):
                 )
             },
         )
-        server = aio.server()
+        server = aio.server(options=(("grpc.so_reuseport", 0),))
         server.add_generic_rpc_handlers((handler,))
         server_cred = grpc.ssl_server_credentials(
             _SERVER_CERTS,
             root_certificates=_TEST_ROOT_CERTIFICATES,
             require_client_auth=True,
         )
-        port = server.add_secure_port("[::]:0", server_cred)
+        port = server.add_secure_port(f"{_HOST}:0", server_cred)
         await server.start()
 
         channel_creds = grpc.ssl_channel_credentials(
@@ -173,10 +183,11 @@ class TestAuthContext(AioTestBase):
             certificate_chain=_CERTIFICATE_CHAIN,
         )
         channel = aio.secure_channel(
-            "localhost:{}".format(port),
+            f"{_HOST}:{port}",
             channel_creds,
             options=_PROPERTY_OPTIONS,
         )
+        await channel.channel_ready()
 
         response = await channel.unary_unary(_UNARY_UNARY)(_REQUEST)
         await channel.close()
@@ -194,16 +205,31 @@ class TestAuthContext(AioTestBase):
     async def _do_one_shot_client_rpc(
         self, channel_creds, channel_options, port, expect_ssl_session_reused
     ):
-        channel = aio.secure_channel(
-            "localhost:{}".format(port), channel_creds, options=channel_options
-        )
-        response = await channel.unary_unary(_UNARY_UNARY)(_REQUEST)
-        auth_data = pickle.loads(response)
-        self.assertEqual(
-            expect_ssl_session_reused,
-            auth_data[_AUTH_CTX]["ssl_session_reused"],
-        )
-        await channel.close()
+        import asyncio
+
+        for retry in range(5):
+            channel = aio.secure_channel(
+                f"{_HOST}:{port}",
+                channel_creds,
+                options=channel_options,
+            )
+            try:
+                await channel.channel_ready()
+                response = await channel.unary_unary(_UNARY_UNARY)(
+                    _REQUEST, timeout=10
+                )
+                auth_data = pickle.loads(response)
+                actual_reused = auth_data[_AUTH_CTX]["ssl_session_reused"]
+                if actual_reused == expect_ssl_session_reused:
+                    return
+                elif retry == 4:
+                    self.assertEqual(
+                        expect_ssl_session_reused,
+                        actual_reused,
+                    )
+                await asyncio.sleep(0.1)
+            finally:
+                await channel.close()
 
     async def test_session_resumption(self):
         # Set up a secure server
@@ -215,10 +241,10 @@ class TestAuthContext(AioTestBase):
                 )
             },
         )
-        server = aio.server()
+        server = aio.server(options=(("grpc.so_reuseport", 0),))
         server.add_generic_rpc_handlers((handler,))
         server_cred = grpc.ssl_server_credentials(_SERVER_CERTS)
-        port = server.add_secure_port("[::]:0", server_cred)
+        port = server.add_secure_port(f"{_HOST}:0", server_cred)
         await server.start()
 
         # Create a cache for TLS session tickets

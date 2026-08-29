@@ -1197,10 +1197,13 @@ cdef class AioServer:
             global_completion_queue(),
             self._shutdown_callback_wrapper.c_functor())
 
+        if self._serving_task is not None and not self._serving_task.done():
+            self._serving_task.cancel()
+
         # Ensures the serving task (coroutine) exits.
         try:
             await self._serving_task
-        except _RequestCallError:
+        except (asyncio.CancelledError, _RequestCallError):
             pass
 
     async def shutdown(self, grace):
@@ -1215,6 +1218,10 @@ cdef class AioServer:
         if self._status == AIO_SERVER_STATUS_READY or self._status == AIO_SERVER_STATUS_STOPPED:
             return
 
+        if grace is None:
+            # Directly cancels all calls before waiting for shutdown
+            grpc_server_cancel_all_calls(self._server.c_server)
+
         async with self._shutdown_lock:
             if self._status == AIO_SERVER_STATUS_RUNNING:
                 self._server.is_shutting_down = True
@@ -1222,8 +1229,6 @@ cdef class AioServer:
                 await self._start_shutting_down()
 
         if grace is None:
-            # Directly cancels all calls
-            grpc_server_cancel_all_calls(self._server.c_server)
             await self._shutdown_completed
         else:
             try:

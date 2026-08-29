@@ -280,6 +280,7 @@ def _start_rpc(
     futures: Mapping[int, Tuple[FutureFromCallType, str]],
     request_payload_size: int,
     response_payload_size: int,
+    print_response: bool = False,
 ) -> None:
     logger.debug(f"Sending {method} request to backend: {request_id}")
     if method == "UnaryCall":
@@ -306,6 +307,9 @@ def _start_rpc(
     else:
         raise ValueError(f"Unrecognized method '{method}'.")
     futures[request_id] = (future, method)
+    future.add_done_callback(
+        lambda f: _on_rpc_done(request_id, f, method, print_response)
+    )
 
 
 def _on_rpc_done(
@@ -354,21 +358,21 @@ def _on_rpc_done(
 
 
 def _remove_completed_rpcs(
-    rpc_futures: Mapping[int, FutureFromCallType], print_response: bool
+    rpc_futures: Mapping[int, FutureFromCallType]
 ) -> None:
     logger.debug("Removing completed RPCs")
-    done = []
-    for future_id, (future, method) in rpc_futures.items():
-        if future.done():
-            _on_rpc_done(future_id, future, method, args.print_response)
-            done.append(future_id)
+    done = [
+        future_id
+        for future_id, (future, _) in rpc_futures.items()
+        if future.done()
+    ]
     for rpc_id in done:
         del rpc_futures[rpc_id]
 
 
 def _cancel_all_rpcs(futures: Mapping[int, Tuple[grpc.Future, str]]) -> None:
     logger.info("Cancelling all remaining RPCs")
-    for future, _ in futures.values():
+    for future, _ in list(futures.values()):
         future.cancel()
 
 
@@ -414,18 +418,27 @@ def _run_single_channel(config: _ChannelConfiguration) -> None:
     if config.secure_mode:
         fallback_creds = grpc.experimental.insecure_channel_credentials()
         channel_creds = grpc.xds_channel_credentials(fallback_creds)
-        channel = grpc.secure_channel(server, channel_creds)
+        channel = grpc.secure_channel(
+            server,
+            channel_creds,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
     else:
-        channel = grpc.insecure_channel(server)
+        channel = grpc.insecure_channel(
+            server,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
     with channel:
         stub = test_pb2_grpc.TestServiceStub(channel)
         futures: Dict[int, Tuple[FutureFromCallType, str]] = {}
         while not _stop_event.is_set():
             with config.condition:
                 if config.qps == 0:
+                    _remove_completed_rpcs(futures)
                     config.condition.wait(
                         timeout=_CONFIG_CHANGE_TIMEOUT.total_seconds()
                     )
+                    _remove_completed_rpcs(futures)
                     continue
                 else:
                     duration_per_query = 1.0 / float(config.qps)
@@ -445,9 +458,9 @@ def _run_single_channel(config: _ChannelConfiguration) -> None:
                     futures,
                     config.request_payload_size,
                     config.response_payload_size,
+                    config.print_response,
                 )
-                print_response = config.print_response
-            _remove_completed_rpcs(futures, config.print_response)
+            _remove_completed_rpcs(futures)
             logger.debug(f"Currently {len(futures)} in-flight RPCs")
             now = time.time()
             while now < end:
@@ -557,7 +570,7 @@ def _run(
         channel_configs[method] = channel_config
         method_handles.append(_MethodHandle(args.num_channels, channel_config))
     _global_server = grpc.server(concurrent.futures.ThreadPoolExecutor())
-    _global_server.add_insecure_port(f"0.0.0.0:{args.stats_port}")
+    _global_server.add_insecure_port(f"127.0.0.1:{args.stats_port}")
     test_pb2_grpc.add_LoadBalancerStatsServiceServicer_to_server(
         _LoadBalancerStatsServicer(), _global_server
     )

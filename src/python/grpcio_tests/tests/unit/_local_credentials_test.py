@@ -38,7 +38,7 @@ class LocalCredentialsTest(unittest.TestCase):
         os.name == "nt", "TODO(https://github.com/grpc/grpc/issues/20078)"
     )
     def test_local_tcp(self):
-        server_addr = "localhost:{}"
+        server_addr = "127.0.0.1:{}"
         channel_creds = grpc.local_channel_credentials(
             grpc.LocalConnectionType.LOCAL_TCP
         )
@@ -50,8 +50,11 @@ class LocalCredentialsTest(unittest.TestCase):
         port = server.add_secure_port(server_addr.format(0), server_creds)
         server.start()
         with grpc.secure_channel(
-            server_addr.format(port), channel_creds
+            server_addr.format(port),
+            channel_creds,
+            options=(("grpc.enable_http_proxy", 0),),
         ) as channel:
+            grpc.channel_ready_future(channel).result(timeout=10)
             self.assertEqual(
                 b"abc",
                 channel.unary_unary(

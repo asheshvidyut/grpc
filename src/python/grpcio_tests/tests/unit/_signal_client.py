@@ -48,10 +48,15 @@ def handle_sigint(unused_signum, unused_frame):
     sys.exit(0)
 
 
+_CHANNEL_OPTIONS = (("grpc.enable_http_proxy", 0),)
+
+
 def main_unary(server_target):
     """Initiate a unary RPC to be interrupted by a SIGINT."""
     global per_process_rpc_future  # pylint: disable=global-statement
-    with grpc.insecure_channel(server_target) as channel:
+    with grpc.insecure_channel(
+        server_target, options=_CHANNEL_OPTIONS
+    ) as channel:
         multicallable = channel.unary_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, UNARY_UNARY),
             _registered_method=True,
@@ -67,7 +72,9 @@ def main_unary(server_target):
 def main_streaming(server_target):
     """Initiate a streaming RPC to be interrupted by a SIGINT."""
     global per_process_rpc_future  # pylint: disable=global-statement
-    with grpc.insecure_channel(server_target) as channel:
+    with grpc.insecure_channel(
+        server_target, options=_CHANNEL_OPTIONS
+    ) as channel:
         signal.signal(signal.SIGINT, handle_sigint)
         per_process_rpc_future = channel.unary_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, UNARY_STREAM),
@@ -80,7 +87,7 @@ def main_streaming(server_target):
 
 def main_unary_with_exception(server_target):
     """Initiate a unary RPC with a signal handler that will raise."""
-    channel = grpc.insecure_channel(server_target)
+    channel = grpc.insecure_channel(server_target, options=_CHANNEL_OPTIONS)
     try:
         channel.unary_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, UNARY_UNARY),
@@ -96,7 +103,7 @@ def main_unary_with_exception(server_target):
 
 def main_streaming_with_exception(server_target):
     """Initiate a streaming RPC with a signal handler that will raise."""
-    channel = grpc.insecure_channel(server_target)
+    channel = grpc.insecure_channel(server_target, options=_CHANNEL_OPTIONS)
     try:
         for _ in channel.unary_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, UNARY_STREAM),

@@ -35,8 +35,8 @@ _REQUEST = b"\x00\x00\x00"
 _RESPONSE = b"\x01\x01\x01"
 
 _DISABLE_REUSE_PORT = (("grpc.so_reuseport", 0),)
-_ENABLE_CHANNELZ = (("grpc.enable_channelz", 1),)
-_DISABLE_CHANNELZ = (("grpc.enable_channelz", 0),)
+_ENABLE_CHANNELZ = (("grpc.enable_channelz", 1), ("grpc.enable_http_proxy", 0))
+_DISABLE_CHANNELZ = (("grpc.enable_channelz", 0), ("grpc.enable_http_proxy", 0))
 
 _LARGE_UNASSIGNED_ID = 10000
 
@@ -80,8 +80,8 @@ class _ChannelServerPair:
     async def start(self):
         # Server will enable channelz service
         self.server = aio.server(options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ)
-        port = self.server.add_insecure_port("localhost:0")
-        self.address = "localhost:%d" % port
+        port = self.server.add_insecure_port("127.0.0.1:0")
+        self.address = "127.0.0.1:%d" % port
         self.server.add_generic_rpc_handlers((_GenericHandler(),))
         await self.server.start()
 
@@ -95,7 +95,7 @@ class _ChannelServerPair:
             channelz_pb2.GetTopChannelsRequest(start_channel_id=0)
         )
         for channel in resp.channel:
-            if channel.data.target == "dns:///" + self.address:
+            if self.address in channel.data.target:
                 self.channel_ref_id = channel.ref.channel_id
 
         resp = await channelz_stub.GetServers(
@@ -130,15 +130,16 @@ class ChannelzServicerTest(AioTestBase):
         self._server = aio.server(
             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ
         )
-        port = self._server.add_insecure_port("localhost:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         channelz.add_channelz_servicer(self._server)
         await self._server.start()
 
         # This channel is used to fetch Channelz info only
         # Channelz should not be enabled
         self._channel = aio.insecure_channel(
-            "localhost:%d" % port, options=_DISABLE_CHANNELZ
+            "127.0.0.1:%d" % port, options=_DISABLE_CHANNELZ
         )
+        await self._channel.channel_ready()
         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
 
     async def tearDown(self):

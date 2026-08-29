@@ -57,18 +57,23 @@ class BaseWatchTests:
                 _NOT_SERVING_SERVICE, health_pb2.HealthCheckResponse.NOT_SERVING
             )
             self._server = test_common.test_server()
-            port = self._server.add_insecure_port("localhost:0")
+            port = self._server.add_insecure_port("127.0.0.1:0")
             health_pb2_grpc.add_HealthServicer_to_server(
                 self._servicer, self._server
             )
             self._server.start()
 
-            self._channel = grpc.insecure_channel("localhost:%d" % port)
+            self._channel = grpc.insecure_channel(
+                "127.0.0.1:%d" % port,
+                options=(("grpc.enable_http_proxy", 0),),
+            )
             self._stub = health_pb2_grpc.HealthStub(self._channel)
 
         def tearDown(self):
             self._channel.close()
-            self._server.stop(None)
+            event = self._server.stop(None)
+            if event is not None:
+                event.wait(timeout=10)
 
         def test_watch_empty_service(self):
             request = health_pb2.HealthCheckRequest(service="")

@@ -114,8 +114,8 @@ REGISTERED_RPC_METHOD_HANDLERS = {
 
 
 async def start_server(register_method=False) -> Tuple[grpc.aio.Server, int]:
-    server = grpc.aio.server()
-    port = server.add_insecure_port("[::]:0")
+    server = grpc.aio.server(options=(("grpc.so_reuseport", 0),))
+    port = server.add_insecure_port("127.0.0.1:0")
     generic_handler = grpc.method_handlers_generic_handler(
         _SERVICE_NAME, RPC_METHOD_HANDLERS
     )
@@ -132,8 +132,11 @@ async def unary_unary_call(
     port, registered_method=False, metadata=None, interceptors=None
 ):
     async with grpc.aio.insecure_channel(
-        f"localhost:{port}", interceptors=interceptors
+        f"127.0.0.1:{port}",
+        interceptors=interceptors,
+        options=(("grpc.enable_http_proxy", 0),),
     ) as channel:
+        await channel.channel_ready()
         multi_callable = channel.unary_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
             _registered_method=registered_method,
@@ -145,8 +148,11 @@ async def unary_stream_call(
     port, registered_method=False, metadata=None, interceptors=None
 ):
     async with grpc.aio.insecure_channel(
-        f"localhost:{port}", interceptors=interceptors
+        f"127.0.0.1:{port}",
+        interceptors=interceptors,
+        options=(("grpc.enable_http_proxy", 0),),
     ) as channel:
+        await channel.channel_ready()
         multi_callable = channel.unary_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_STREAM),
             _registered_method=registered_method,
@@ -158,8 +164,11 @@ async def unary_stream_call(
 
 async def stream_unary_call(port, registered_method=False, interceptors=None):
     async with grpc.aio.insecure_channel(
-        f"localhost:{port}", interceptors=interceptors
+        f"127.0.0.1:{port}",
+        interceptors=interceptors,
+        options=(("grpc.enable_http_proxy", 0),),
     ) as channel:
+        await channel.channel_ready()
         multi_callable = channel.stream_unary(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_UNARY),
             _registered_method=registered_method,
@@ -170,8 +179,11 @@ async def stream_unary_call(port, registered_method=False, interceptors=None):
 
 async def stream_stream_call(port, registered_method=False, interceptors=None):
     async with grpc.aio.insecure_channel(
-        f"localhost:{port}", interceptors=interceptors
+        f"127.0.0.1:{port}",
+        interceptors=interceptors,
+        options=(("grpc.enable_http_proxy", 0),),
     ) as channel:
+        await channel.channel_ready()
         multi_callable = channel.stream_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_STREAM),
             _registered_method=registered_method,
@@ -182,7 +194,11 @@ async def stream_stream_call(port, registered_method=False, interceptors=None):
 
 
 async def stream_stream_call_with_client_cancel(port, registered_method=False):
-    async with grpc.aio.insecure_channel(f"localhost:{port}") as channel:
+    async with grpc.aio.insecure_channel(
+        f"127.0.0.1:{port}",
+        options=(("grpc.enable_http_proxy", 0),),
+    ) as channel:
+        await channel.channel_ready()
         multi_callable = channel.stream_stream(
             grpc._common.fully_qualified_method(_SERVICE_NAME, _STREAM_STREAM),
             _registered_method=registered_method,

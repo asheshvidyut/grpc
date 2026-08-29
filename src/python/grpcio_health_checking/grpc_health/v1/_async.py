@@ -28,12 +28,12 @@ class HealthServicer(_health_pb2_grpc.HealthServicer):
     _server_status: MutableMapping[
         str, "_health_pb2.HealthCheckResponse.ServingStatus"
     ]
-    _server_watchers: MutableMapping[str, asyncio.Condition]
+    _server_watchers: MutableMapping[str, set]
     _gracefully_shutting_down: bool
 
     def __init__(self) -> None:
         self._server_status = {"": _health_pb2.HealthCheckResponse.SERVING}
-        self._server_watchers = collections.defaultdict(asyncio.Condition)
+        self._server_watchers = collections.defaultdict(set)
         self._gracefully_shutting_down = False
 
     async def Check(
@@ -49,7 +49,8 @@ class HealthServicer(_health_pb2_grpc.HealthServicer):
     async def Watch(
         self, request: _health_pb2.HealthCheckRequest, context
     ) -> None:
-        condition = self._server_watchers[request.service]
+        condition = asyncio.Condition()
+        self._server_watchers[request.service].add(condition)
         last_status = None
         try:
             async with condition:
@@ -75,20 +76,20 @@ class HealthServicer(_health_pb2_grpc.HealthServicer):
                     await condition.wait()
         finally:
             if request.service in self._server_watchers:
-                del self._server_watchers[request.service]
+                self._server_watchers[request.service].discard(condition)
+                if not self._server_watchers[request.service]:
+                    del self._server_watchers[request.service]
 
     async def _set(
         self,
         service: str,
         status: _health_pb2.HealthCheckResponse.ServingStatus,
     ) -> None:
+        self._server_status[service] = status
         if service in self._server_watchers:
-            condition = self._server_watchers.get(service)
-            async with condition:
-                self._server_status[service] = status
-                condition.notify_all()
-        else:
-            self._server_status[service] = status
+            for condition in list(self._server_watchers[service]):
+                async with condition:
+                    condition.notify_all()
 
     async def set(
         self,

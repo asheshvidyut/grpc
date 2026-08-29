@@ -58,7 +58,10 @@ class TestOutsideInit(unittest.TestCase):
 
         async def ping_pong():
             address, server = await start_test_server()
-            channel = aio.insecure_channel(address)
+            channel = aio.insecure_channel(
+                address, options=(("grpc.enable_http_proxy", 0),)
+            )
+            await channel.channel_ready()
             logging.info(f"Channel loop: {id(channel._loop)=}")
 
             stub = test_pb2_grpc.TestServiceStub(channel)

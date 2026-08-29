@@ -19,12 +19,15 @@ import functools
 import itertools
 import logging
 import os
+import threading
+import time
 import unittest
 
 import grpc
 from grpc import _grpcio_metadata
 
 from tests.unit import _tcp_proxy
+from tests.unit import test_common
 from tests.unit.framework.common import test_constants
 
 _SERVICE_NAME = "test"
@@ -168,22 +171,30 @@ def _instrumented_client_server_pair(
     )
     merged_server_kwargs = dict(server_kwargs)
     merged_server_kwargs["options"] = server_options
-    server = grpc.server(futures.ThreadPoolExecutor(), **merged_server_kwargs)
+    server_pool = futures.ThreadPoolExecutor()
+    server = grpc.server(server_pool, **merged_server_kwargs)
     server.add_registered_method_handlers(_SERVICE_NAME, server_handler)
     server_port = server.add_insecure_port("{}:0".format(_HOST))
     server.start()
     try:
         with _tcp_proxy.TcpProxy(_HOST, _HOST, server_port) as proxy:
             proxy_port = proxy.get_port()
+            merged_channel_kwargs = dict(channel_kwargs)
+            merged_channel_kwargs["options"] = (
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ) + tuple(channel_kwargs.get("options", ()))
             with grpc.insecure_channel(
-                "{}:{}".format(_HOST, proxy_port), **channel_kwargs
+                "{}:{}".format(_HOST, proxy_port), **merged_channel_kwargs
             ) as client_channel:
-                grpc.channel_ready_future(client_channel).result(timeout=10)
                 yield client_channel, proxy, server
     finally:
         event = server.stop(None)
         if event is not None:
             event.wait(timeout=10)
+        server_pool.shutdown(wait=True)
 
 
 def _get_byte_counts(
@@ -242,7 +253,9 @@ def _unary_unary_client(channel, multicallable_kwargs, message):
         grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
         _registered_method=True,
     )
-    response = multi_callable(message, **multicallable_kwargs)
+    kwargs = dict(multicallable_kwargs)
+    kwargs.setdefault("wait_for_ready", True)
+    response = multi_callable(message, **kwargs)
     if response != message:
         raise RuntimeError(
             "Request '{}' != Response '{}'".format(message, response)
@@ -254,7 +267,9 @@ def _unary_stream_client(channel, multicallable_kwargs, message):
         grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_STREAM),
         _registered_method=True,
     )
-    response_iterator = multi_callable(message, **multicallable_kwargs)
+    kwargs = dict(multicallable_kwargs)
+    kwargs.setdefault("wait_for_ready", True)
+    response_iterator = multi_callable(message, **kwargs)
     for response in response_iterator:
         if response != message:
             raise RuntimeError(
@@ -268,7 +283,9 @@ def _stream_unary_client(channel, multicallable_kwargs, message):
         _registered_method=True,
     )
     requests = (_REQUEST for _ in range(_STREAM_LENGTH))
-    response = multi_callable(requests, **multicallable_kwargs)
+    kwargs = dict(multicallable_kwargs)
+    kwargs.setdefault("wait_for_ready", True)
+    response = multi_callable(requests, **kwargs)
     if response != message:
         raise RuntimeError(
             "Request '{}' != Response '{}'".format(message, response)
@@ -284,7 +301,9 @@ def _stream_stream_client(channel, multicallable_kwargs, message):
     requests = (
         request_prefix + str(i).encode("ascii") for i in range(_STREAM_LENGTH)
     )
-    response_iterator = multi_callable(requests, **multicallable_kwargs)
+    kwargs = dict(multicallable_kwargs)
+    kwargs.setdefault("wait_for_ready", True)
+    response_iterator = multi_callable(requests, **kwargs)
     for i, response in enumerate(response_iterator):
         if int(response.decode("ascii")) != i:
             raise RuntimeError(

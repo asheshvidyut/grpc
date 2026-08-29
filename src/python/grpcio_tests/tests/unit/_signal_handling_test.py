@@ -40,7 +40,7 @@ else:
         os.path.join(os.path.dirname(os.path.abspath(__file__)), client_name)
     )
 
-_HOST = "localhost"
+_HOST = "127.0.0.1"
 
 # The gevent test harness cannot run the monkeypatch code for the child process,
 # so we need to instrument it manually.
@@ -71,9 +71,9 @@ class _GenericHandler:
             if self._connected_clients == 0:
                 self._connected_clients_event.clear()
 
-    def await_connected_client(self):
+    def await_connected_client(self, timeout=15):
         """Blocks until a client connects to the server."""
-        self._connected_clients_event.wait()
+        self._connected_clients_event.wait(timeout=timeout)
 
     def _handle_unary_unary(self, request, servicer_context):
         """Handles a unary RPC.
@@ -140,7 +140,9 @@ class SignalHandlingTest(unittest.TestCase):
         self._server.start()
 
     def tearDown(self):
-        self._server.stop(None)
+        event = self._server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
     @unittest.skipIf(os.name == "nt", "SIGINT not supported on windows")
     def testUnary(self):
@@ -155,7 +157,9 @@ class SignalHandlingTest(unittest.TestCase):
                 )
                 self._handler.await_connected_client()
                 client.send_signal(signal.SIGINT)
-                self.assertFalse(client.wait(), msg=_read_stream(client_stderr))
+                self.assertFalse(
+                    client.wait(timeout=15), msg=_read_stream(client_stderr)
+                )
                 client_stdout.seek(0)
                 self.assertIn(
                     _signal_client.SIGTERM_MESSAGE, client_stdout.read()
@@ -174,7 +178,9 @@ class SignalHandlingTest(unittest.TestCase):
                 )
                 self._handler.await_connected_client()
                 client.send_signal(signal.SIGINT)
-                self.assertFalse(client.wait(), msg=_read_stream(client_stderr))
+                self.assertFalse(
+                    client.wait(timeout=15), msg=_read_stream(client_stderr)
+                )
                 client_stdout.seek(0)
                 self.assertIn(
                     _signal_client.SIGTERM_MESSAGE, client_stdout.read()
@@ -192,7 +198,7 @@ class SignalHandlingTest(unittest.TestCase):
                 )
                 self._handler.await_connected_client()
                 client.send_signal(signal.SIGINT)
-                client.wait()
+                client.wait(timeout=15)
                 self.assertEqual(0, client.returncode)
 
     @unittest.skipIf(os.name == "nt", "SIGINT not supported on windows")
@@ -207,7 +213,7 @@ class SignalHandlingTest(unittest.TestCase):
                 )
                 self._handler.await_connected_client()
                 client.send_signal(signal.SIGINT)
-                client.wait()
+                client.wait(timeout=15)
                 client_stderr_output = _read_stream(client_stderr)
                 try:
                     self.assertEqual(0, client.returncode)

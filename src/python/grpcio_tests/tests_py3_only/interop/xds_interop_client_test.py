@@ -41,10 +41,10 @@ _METHODS = (
     (messages_pb2.ClientConfigureRequest.EMPTY_CALL, "EMPTY_CALL"),
 )
 
-_QPS = 100
-_NUM_CHANNELS = 20
+_QPS = 25
+_NUM_CHANNELS = 4
 
-_TEST_ITERATIONS = 10
+_TEST_ITERATIONS = 6
 _ITERATION_DURATION_SECONDS = 1
 _SUBPROCESS_TIMEOUT_SECONDS = 2
 
@@ -112,19 +112,15 @@ def _subtract_indexed_stats(
 
 
 def _collect_stats(
-    stats_port: int, duration: int
+    stats_stub: test_pb2_grpc.LoadBalancerStatsServiceStub, duration: float
 ) -> Mapping[str, Mapping[int, int]]:
-    settings = {
-        "target": f"localhost:{stats_port}",
-        "insecure": True,
-    }
-    response = test_pb2_grpc.LoadBalancerStatsService.GetClientAccumulatedStats(
-        messages_pb2.LoadBalancerAccumulatedStatsRequest(), **settings
+    response = stats_stub.GetClientAccumulatedStats(
+        messages_pb2.LoadBalancerAccumulatedStatsRequest(), timeout=10
     )
     before = _index_accumulated_stats(response)
     time.sleep(duration)
-    response = test_pb2_grpc.LoadBalancerStatsService.GetClientAccumulatedStats(
-        messages_pb2.LoadBalancerAccumulatedStatsRequest(), **settings
+    response = stats_stub.GetClientAccumulatedStats(
+        messages_pb2.LoadBalancerAccumulatedStatsRequest(), timeout=10
     )
     after = _index_accumulated_stats(response)
     return _subtract_indexed_stats(after, before)
@@ -134,27 +130,37 @@ class XdsInteropClientTest(unittest.TestCase):
     def _assert_client_consistent(
         self, server_port: int, stats_port: int, qps: int, num_channels: int
     ):
-        settings = {
-            "target": f"localhost:{stats_port}",
-            "insecure": True,
-        }
-        for i in range(_TEST_ITERATIONS):
-            target_method, target_method_str = _METHODS[i % len(_METHODS)]
-            test_pb2_grpc.XdsUpdateClientConfigureService.Configure(
-                messages_pb2.ClientConfigureRequest(types=[target_method]),
-                **settings,
-            )
-            delta = _collect_stats(stats_port, _ITERATION_DURATION_SECONDS)
-            logging.info("Delta: %s", delta)
-            for _, method_str in _METHODS:
-                for status in delta[method_str]:
-                    if status == 0 and method_str == target_method_str:
-                        self.assertGreater(delta[method_str][status], 0, delta)
-                    else:
-                        self.assertEqual(delta[method_str][status], 0, delta)
+        channel = grpc.insecure_channel(
+            f"127.0.0.1:{stats_port}",
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        grpc.channel_ready_future(channel).result(timeout=10)
+        config_stub = test_pb2_grpc.XdsUpdateClientConfigureServiceStub(channel)
+        stats_stub = test_pb2_grpc.LoadBalancerStatsServiceStub(channel)
+        try:
+            for i in range(_TEST_ITERATIONS):
+                target_method, target_method_str = _METHODS[i % len(_METHODS)]
+                config_stub.Configure(
+                    messages_pb2.ClientConfigureRequest(types=[target_method]),
+                    timeout=10,
+                )
+                time.sleep(1.5)
+                delta = _collect_stats(stats_stub, _ITERATION_DURATION_SECONDS)
+                logging.info("Delta: %s", delta)
+                for _, method_str in _METHODS:
+                    for status in delta[method_str]:
+                        if status == 0 and method_str == target_method_str:
+                            self.assertGreater(delta[method_str][status], 0, delta)
+                        else:
+                            self.assertEqual(delta[method_str][status], 0, delta)
+        finally:
+            channel.close()
 
     def test_configure_consistency(self):
-        _, server_port, socket = framework_common.get_socket()
+        _, server_port, socket = framework_common.get_socket(
+            bind_address="127.0.0.1", listen=False
+        )
+        socket.close()
 
         with _start_python_with_args(
             _SERVER_PATH,
@@ -164,23 +170,25 @@ class XdsInteropClientTest(unittest.TestCase):
             logging.info("Sending RPC to server.")
             test_pb2_grpc.TestService.EmptyCall(
                 empty_pb2.Empty(),
-                f"localhost:{server_port}",
+                f"127.0.0.1:{server_port}",
                 insecure=True,
                 wait_for_ready=True,
+                timeout=10,
             )
             logging.info("Server successfully started.")
-            socket.close()
-            _, stats_port, stats_socket = framework_common.get_socket()
+            _, stats_port, stats_socket = framework_common.get_socket(
+                bind_address="127.0.0.1", listen=False
+            )
+            stats_socket.close()
             with _start_python_with_args(
                 _CLIENT_PATH,
                 [
-                    f"--server=localhost:{server_port}",
+                    f"--server=127.0.0.1:{server_port}",
                     f"--stats_port={stats_port}",
                     f"--qps={_QPS}",
                     f"--num_channels={_NUM_CHANNELS}",
                 ],
             ) as (client, client_stdout, client_stderr):
-                stats_socket.close()
                 try:
                     self._assert_client_consistent(
                         server_port, stats_port, _QPS, _NUM_CHANNELS

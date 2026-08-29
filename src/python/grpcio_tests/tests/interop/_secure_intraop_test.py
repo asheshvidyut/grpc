@@ -34,7 +34,7 @@ class SecureIntraopTest(_intraop_test_case.IntraopTestCase, unittest.TestCase):
             service.TestService(), self.server
         )
         port = self.server.add_secure_port(
-            "localhost:0",
+            "127.0.0.1:0",
             grpc.ssl_server_credentials(
                 [
                     (
@@ -46,20 +46,27 @@ class SecureIntraopTest(_intraop_test_case.IntraopTestCase, unittest.TestCase):
         )
         self.server.start()
         self.channel = grpc.secure_channel(
-            "localhost:{}".format(port),
+            "127.0.0.1:{}".format(port),
             grpc.ssl_channel_credentials(resources.test_root_certificates()),
             (
                 (
                     "grpc.ssl_target_name_override",
                     _SERVER_HOST_OVERRIDE,
                 ),
+                (
+                    "grpc.enable_http_proxy",
+                    0,
+                ),
             ),
         )
         self.stub = test_pb2_grpc.TestServiceStub(self.channel)
+        grpc.channel_ready_future(self.channel).result(timeout=10)
 
     def tearDown(self):
         self.channel.close()
-        self.server.stop(None)
+        event = self.server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
 
 class SecureInteropWithSyncPrivateKeyOffloadingTest(
@@ -73,7 +80,7 @@ class SecureInteropWithSyncPrivateKeyOffloadingTest(
         )
         # Configure the server for mTLS so the client will do Private Key signing
         port = self.server.add_secure_port(
-            "localhost:0",
+            "127.0.0.1:0",
             grpc.ssl_server_credentials(
                 [
                     (
@@ -87,7 +94,7 @@ class SecureInteropWithSyncPrivateKeyOffloadingTest(
         )
         self.server.start()
         self.channel = grpc.secure_channel(
-            "localhost:{}".format(port),
+            "127.0.0.1:{}".format(port),
             grpc.experimental.ssl_channel_credentials_with_custom_signer(
                 private_key_sign_fn=resources.sync_client_private_key_signer,
                 root_certificates=resources.test_root_certificates(),
@@ -98,13 +105,20 @@ class SecureInteropWithSyncPrivateKeyOffloadingTest(
                     "grpc.ssl_target_name_override",
                     _SERVER_HOST_OVERRIDE,
                 ),
+                (
+                    "grpc.enable_http_proxy",
+                    0,
+                ),
             ),
         )
         self.stub = test_pb2_grpc.TestServiceStub(self.channel)
+        grpc.channel_ready_future(self.channel).result(timeout=10)
 
     def tearDown(self):
         self.channel.close()
-        self.server.stop(None)
+        event = self.server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
 
 class SecureInteropWithAsyncPrivateKeyOffloadingTest(
@@ -118,7 +132,7 @@ class SecureInteropWithAsyncPrivateKeyOffloadingTest(
         )
         # Configure the server for mTLS so the client will do Private Key signing
         port = self.server.add_secure_port(
-            "localhost:0",
+            "127.0.0.1:0",
             grpc.ssl_server_credentials(
                 [
                     (
@@ -132,7 +146,7 @@ class SecureInteropWithAsyncPrivateKeyOffloadingTest(
         )
         self.server.start()
         self.channel = grpc.secure_channel(
-            "localhost:{}".format(port),
+            "127.0.0.1:{}".format(port),
             grpc.experimental.ssl_channel_credentials_with_custom_signer(
                 private_key_sign_fn=resources.async_client_private_key_signer,
                 root_certificates=resources.test_root_certificates(),
@@ -143,13 +157,20 @@ class SecureInteropWithAsyncPrivateKeyOffloadingTest(
                     "grpc.ssl_target_name_override",
                     _SERVER_HOST_OVERRIDE,
                 ),
+                (
+                    "grpc.enable_http_proxy",
+                    0,
+                ),
             ),
         )
         self.stub = test_pb2_grpc.TestServiceStub(self.channel)
+        grpc.channel_ready_future(self.channel).result(timeout=10)
 
     def tearDown(self):
         self.channel.close()
-        self.server.stop(None)
+        event = self.server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
 
 if __name__ == "__main__":

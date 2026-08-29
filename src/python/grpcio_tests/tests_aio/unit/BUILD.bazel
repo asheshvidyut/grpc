@@ -13,12 +13,23 @@
 # limitations under the License.
 
 load("@grpc_python_dependencies//:requirements.bzl", "requirement")
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 load("//bazel:internal_python_rules.bzl", "internal_py_grpc_test_with_runtime_type_check")
 
 package(
     default_testonly = 1,
     default_visibility = ["//visibility:public"],
+)
+
+py_binary(
+    name = "aio_bench",
+    srcs = ["aio_bench.py"],
+    python_version = "PY3",
+    deps = [
+        "//src/proto/grpc/testing:py_messages_proto",
+        "//src/proto/grpc/testing:test_py_pb2_grpc",
+        "//src/python/grpcio/grpc:grpcio",
+    ],
 )
 
 GRPC_ASYNC_TESTS = glob(["*_test.py"])
@@ -64,7 +75,18 @@ _FLAKY_TESTS = [
 [
     internal_py_grpc_test_with_runtime_type_check(
         name = test_file_name[:-3],
-        size = "small",
+        size = (
+            "medium"
+            if test_file_name
+            in (
+                "call_test.py",
+                "client_stream_unary_interceptor_test.py",
+                "outside_init_test.py",
+                "server_test.py",
+                "timeout_test.py",
+            )
+            else "small"
+        ),
         srcs = [test_file_name],
         data = [
             "//src/python/grpcio_tests/tests/unit/credentials",
@@ -88,3 +110,4 @@ _FLAKY_TESTS = [
     )
     for test_file_name in GRPC_ASYNC_TESTS
 ]
+

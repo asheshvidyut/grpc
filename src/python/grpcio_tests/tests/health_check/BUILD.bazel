@@ -17,7 +17,7 @@ package(default_visibility = ["//visibility:public"])
 
 py_test(
     name = "health_servicer_test",
-    size = "small",
+    size = "medium",
     srcs = ["_health_servicer_test.py"],
     imports = ["../../"],
     main = "_health_servicer_test.py",

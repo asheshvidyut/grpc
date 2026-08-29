@@ -42,7 +42,10 @@ class TestConnectivityState(AioTestBase):
         "The transient failure propagation is slower on aarch64",
     )
     async def test_unavailable_backend(self):
-        async with aio.insecure_channel(UNREACHABLE_TARGET) as channel:
+        async with aio.insecure_channel(
+            UNREACHABLE_TARGET,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
             self.assertEqual(
                 grpc.ChannelConnectivity.IDLE, channel.get_state(False)
             )
@@ -59,7 +62,10 @@ class TestConnectivityState(AioTestBase):
             )
 
     async def test_normal_backend(self):
-        async with aio.insecure_channel(self._server_address) as channel:
+        async with aio.insecure_channel(
+            self._server_address,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
             current_state = channel.get_state(True)
             self.assertEqual(grpc.ChannelConnectivity.IDLE, current_state)
 
@@ -72,7 +78,10 @@ class TestConnectivityState(AioTestBase):
             )
 
     async def test_timeout(self):
-        async with aio.insecure_channel(self._server_address) as channel:
+        async with aio.insecure_channel(
+            self._server_address,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
             self.assertEqual(
                 grpc.ChannelConnectivity.IDLE, channel.get_state(False)
             )
@@ -87,7 +96,10 @@ class TestConnectivityState(AioTestBase):
                 )
 
     async def test_shutdown(self):
-        channel = aio.insecure_channel(self._server_address)
+        channel = aio.insecure_channel(
+            self._server_address,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
 
         self.assertEqual(
             grpc.ChannelConnectivity.IDLE, channel.get_state(False)

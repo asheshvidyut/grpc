@@ -111,12 +111,16 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 class StatusTest(AioTestBase):
     async def setUp(self):
-        self._server = aio.server()
+        self._server = aio.server(options=(("grpc.so_reuseport", 0),))
         self._server.add_generic_rpc_handlers((_GenericHandler(),))
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         await self._server.start()
 
-        self._channel = aio.insecure_channel("localhost:%d" % port)
+        self._channel = aio.insecure_channel(
+            "127.0.0.1:%d" % port,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        await self._channel.channel_ready()
 
     async def tearDown(self):
         await self._server.stop(None)

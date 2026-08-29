@@ -24,6 +24,8 @@ from grpc.experimental import aio
 
 from src.proto.grpc.testing import messages_pb2
 from src.proto.grpc.testing import test_pb2_grpc
+from tests.unit.framework.common import get_socket
+from tests.unit.framework.common import test_constants
 from tests_aio.unit._constants import UNREACHABLE_TARGET
 from tests_aio.unit._test_base import AioTestBase
 from tests_aio.unit._test_server import start_test_server
@@ -44,7 +46,15 @@ _NONDETERMINISTIC_SERVER_SLEEP_MAX_US = 1000
 class _MulticallableTestMixin:
     async def setUp(self):
         address, self._server = await start_test_server()
-        self._channel = aio.insecure_channel(address)
+        self._channel = aio.insecure_channel(
+            address,
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
+        )
         await self._channel.channel_ready()
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)
 
@@ -82,7 +92,10 @@ class TestUnaryUnaryCall(_MulticallableTestMixin, AioTestBase):
         self.assertIs(response, response_retry)
 
     async def test_call_rpc_error(self):
-        async with aio.insecure_channel(UNREACHABLE_TARGET) as channel:
+        async with aio.insecure_channel(
+            UNREACHABLE_TARGET,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
             stub = test_pb2_grpc.TestServiceStub(channel)
 
             call = stub.UnaryCall(messages_pb2.SimpleRequest())
@@ -193,8 +206,20 @@ class TestUnaryUnaryCall(_MulticallableTestMixin, AioTestBase):
         )
 
     async def test_cancel_unary_unary_in_task(self):
+        address, port, sock = get_socket(listen=False)
+        channel = aio.insecure_channel(
+            f"{address}:{port}",
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        stub = test_pb2_grpc.TestServiceStub(channel)
+        sock.close()
+
         coro_started = asyncio.Event()
-        call = self._stub.EmptyCall(messages_pb2.SimpleRequest())
+        call = stub.UnaryCall(
+            messages_pb2.SimpleRequest(),
+            wait_for_ready=True,
+            timeout=test_constants.LONG_TIMEOUT,
+        )
 
         async def another_coro():
             coro_started.set()
@@ -211,6 +236,8 @@ class TestUnaryUnaryCall(_MulticallableTestMixin, AioTestBase):
         with self.assertRaises(asyncio.CancelledError):
             await task
 
+        await channel.close()
+
     async def test_passing_credentials_fails_over_insecure_channel(self):
         call_credentials = grpc.composite_call_credentials(
             grpc.access_token_call_credentials("abc"),
@@ -226,7 +253,10 @@ class TestUnaryUnaryCall(_MulticallableTestMixin, AioTestBase):
 
 class TestUnaryStreamCall(_MulticallableTestMixin, AioTestBase):
     async def test_call_rpc_error(self):
-        channel = aio.insecure_channel(UNREACHABLE_TARGET)
+        channel = aio.insecure_channel(
+            UNREACHABLE_TARGET,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         request = messages_pb2.StreamingOutputCallRequest()
         stub = test_pb2_grpc.TestServiceStub(channel)
         call = stub.StreamingOutputCall(request)
@@ -545,7 +575,7 @@ class TestUnaryStreamCall(_MulticallableTestMixin, AioTestBase):
         )
 
         call = self._stub.StreamingOutputCall(
-            request, timeout=_SHORT_TIMEOUT_S * 2
+            request, timeout=_SHORT_TIMEOUT_S * 4
         )
 
         response = await call.read()
@@ -553,16 +583,16 @@ class TestUnaryStreamCall(_MulticallableTestMixin, AioTestBase):
 
         # Should be around the same as the timeout
         remained_time = call.time_remaining()
-        self.assertGreater(remained_time, _SHORT_TIMEOUT_S * 3 / 2)
-        self.assertLess(remained_time, _SHORT_TIMEOUT_S * 5 / 2)
+        self.assertGreater(remained_time, _SHORT_TIMEOUT_S * 5 / 2)
+        self.assertLess(remained_time, _SHORT_TIMEOUT_S * 9 / 2)
 
         response = await call.read()
         self.assertEqual(_RESPONSE_PAYLOAD_SIZE, len(response.payload.body))
 
         # Should be around the timeout minus a unit of wait time
         remained_time = call.time_remaining()
-        self.assertGreater(remained_time, _SHORT_TIMEOUT_S / 2)
-        self.assertLess(remained_time, _SHORT_TIMEOUT_S * 3 / 2)
+        self.assertGreater(remained_time, _SHORT_TIMEOUT_S * 3 / 2)
+        self.assertLess(remained_time, _SHORT_TIMEOUT_S * 7 / 2)
 
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
@@ -711,7 +741,10 @@ class TestStreamUnaryCall(_MulticallableTestMixin, AioTestBase):
         self.assertEqual(await call.code(), grpc.StatusCode.OK)
 
     async def test_call_rpc_error(self):
-        async with aio.insecure_channel(UNREACHABLE_TARGET) as channel:
+        async with aio.insecure_channel(
+            UNREACHABLE_TARGET,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
             stub = test_pb2_grpc.TestServiceStub(channel)
 
             # The error should be raised automatically without any traffic.

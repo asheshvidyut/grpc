@@ -40,7 +40,7 @@ _REQUEST = b"\x03\x07"
 
 
 def _unique_options() -> Sequence[Tuple[str, float]]:
-    return (("iv", random.random()),)
+    return (("iv", random.random()), ("grpc.enable_http_proxy", 0))
 
 
 @unittest.skipIf(
@@ -60,8 +60,8 @@ class TestCompatibility(AioTestBase):
         self._adhoc_handlers = _common.AdhocGenericHandler()
         self._async_server.add_generic_rpc_handlers((self._adhoc_handlers,))
 
-        port = self._async_server.add_insecure_port("[::]:0")
-        address = "localhost:%d" % port
+        port = self._async_server.add_insecure_port("127.0.0.1:0")
+        address = "127.0.0.1:%d" % port
         await self._async_server.start()
 
         # Create async stub
@@ -83,15 +83,23 @@ class TestCompatibility(AioTestBase):
 
     async def _run_in_another_thread(self, func: Callable[[], None]):
         work_done = asyncio.Event()
+        exception = None
 
         def thread_work():
-            func()
-            self.loop.call_soon_threadsafe(work_done.set)
+            nonlocal exception
+            try:
+                func()
+            except Exception as e:
+                exception = e
+            finally:
+                self.loop.call_soon_threadsafe(work_done.set)
 
         thread = threading.Thread(target=thread_work, daemon=True)
         thread.start()
         await work_done.wait()
         thread.join()
+        if exception:
+            raise exception
 
     async def test_unary_unary(self):
         # Calling async API in this thread
@@ -196,12 +204,15 @@ class TestCompatibility(AioTestBase):
         server = grpc.server(
             ThreadPoolExecutor(), handlers=(GenericHandlers(),)
         )
-        port = server.add_insecure_port("localhost:0")
+        port = server.add_insecure_port("127.0.0.1:0")
         server.start()
 
         def sync_work() -> None:
             for _ in range(100):
-                with grpc.insecure_channel("localhost:%d" % port) as channel:
+                with grpc.insecure_channel(
+                    "127.0.0.1:%d" % port,
+                    options=(("grpc.enable_http_proxy", 0),),
+                ) as channel:
                     response = channel.unary_unary("/test/test")(b"\x07\x08")
                     self.assertEqual(response, b"\x07\x08")
 
@@ -214,21 +225,28 @@ class TestCompatibility(AioTestBase):
         def sync_work():
             async def async_work():
                 # Create async stub
-                async_channel = aio.insecure_channel(
+                async with aio.insecure_channel(
                     address, options=_unique_options()
-                )
-                async_stub = test_pb2_grpc.TestServiceStub(async_channel)
+                ) as async_channel:
+                    await async_channel.channel_ready()
+                    async_stub = test_pb2_grpc.TestServiceStub(async_channel)
 
-                call = async_stub.UnaryCall(messages_pb2.SimpleRequest())
-                response = await call
-                self.assertIsInstance(response, messages_pb2.SimpleResponse)
-                self.assertEqual(grpc.StatusCode.OK, await call.code())
+                    call = async_stub.UnaryCall(messages_pb2.SimpleRequest())
+                    response = await call
+                    self.assertIsInstance(response, messages_pb2.SimpleResponse)
+                    self.assertEqual(grpc.StatusCode.OK, await call.code())
 
             loop = asyncio.new_event_loop()
-            loop.run_until_complete(async_work())
+            try:
+                loop.run_until_complete(async_work())
+            finally:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
 
-        await self._run_in_another_thread(sync_work)
-        await server.stop(None)
+        try:
+            await self._run_in_another_thread(sync_work)
+        finally:
+            await server.stop(None)
 
     async def test_sync_unary_unary_success(self):
         @grpc.unary_unary_rpc_method_handler

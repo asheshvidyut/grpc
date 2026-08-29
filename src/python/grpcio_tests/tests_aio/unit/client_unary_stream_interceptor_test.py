@@ -551,7 +551,7 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
 
     async def setUp(self):
         self._server = aio.server(options=(("grpc.so_reuseport", 0),))
-        self._port = self._server.add_insecure_port("[::]:0")
+        self._port = self._server.add_insecure_port("127.0.0.1:0")
         self._method_handlers = {
             self._METHOD_NAME: grpc.unary_stream_rpc_method_handler(
                 self._unary_stream_handler
@@ -574,9 +574,11 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
         fully_qualified_method = f"/{self._SERVICE_NAME}/{self._METHOD_NAME}"
 
         async with grpc.aio.insecure_channel(
-            f"localhost:{self._port}",
+            f"127.0.0.1:{self._port}",
             interceptors=[_RecordingUnaryStreamInterceptor(record)],
+            options=(("grpc.enable_http_proxy", 0),),
         ) as channel:
+            await channel.channel_ready()
             multi_callable = channel.unary_stream(
                 fully_qualified_method, _registered_method=True
             )

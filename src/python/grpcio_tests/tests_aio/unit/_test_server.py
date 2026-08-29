@@ -81,6 +81,12 @@ class TestServiceServicer(test_pb2_grpc.TestServiceServicer):
         self._append_to_log()
         return empty_pb2.Empty()
 
+    async def UnimplementedCall(self, request, context):
+        self._append_to_log()
+        await context.abort(
+            grpc.StatusCode.UNIMPLEMENTED, "Method not implemented!"
+        )
+
     async def StreamingOutputCall(
         self, request: messages_pb2.StreamingOutputCallRequest, unused_context
     ):
@@ -179,12 +185,12 @@ async def start_test_server(
                 [(resources.private_key(), resources.certificate_chain())]
             )
         port = server.add_secure_port(
-            "localhost:%d" % port, server_credentials
+            "127.0.0.1:%d" % port, server_credentials
         )
     else:
-        port = server.add_insecure_port("localhost:%d" % port)
+        port = server.add_insecure_port("127.0.0.1:%d" % port)
 
     await server.start()
 
     # NOTE(lidizheng) returning the server to prevent it from deallocation
-    return "localhost:%d" % port, server
+    return "127.0.0.1:%d" % port, server

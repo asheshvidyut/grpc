@@ -33,8 +33,14 @@ _REQUEST = b"\x00\x00\x00"
 _RESPONSE = b"\x01\x01\x01"
 
 _DISABLE_REUSE_PORT = (("grpc.so_reuseport", 0),)
-_ENABLE_CHANNELZ = (("grpc.enable_channelz", 1),)
-_DISABLE_CHANNELZ = (("grpc.enable_channelz", 0),)
+_ENABLE_CHANNELZ = (
+    ("grpc.enable_channelz", 1),
+    ("grpc.enable_http_proxy", 0),
+)
+_DISABLE_CHANNELZ = (
+    ("grpc.enable_channelz", 0),
+    ("grpc.enable_http_proxy", 0),
+)
 
 
 def _successful_unary_unary(request, servicer_context):
@@ -72,13 +78,13 @@ class _ChannelServerPair:
             futures.ThreadPoolExecutor(max_workers=3),
             options=_DISABLE_REUSE_PORT + _ENABLE_CHANNELZ,
         )
-        port = self.server.add_insecure_port("localhost:0")
+        port = self.server.add_insecure_port("127.0.0.1:0")
         self.server.add_generic_rpc_handlers((_GenericHandler(),))
         self.server.start()
 
         # Channel will enable channelz service...
         self.channel = grpc.insecure_channel(
-            "localhost:%d" % port, _ENABLE_CHANNELZ
+            "127.0.0.1:%d" % port, _ENABLE_CHANNELZ
         )
 
 
@@ -145,14 +151,14 @@ class ChannelzServicerTest(unittest.TestCase):
             futures.ThreadPoolExecutor(max_workers=3),
             options=_DISABLE_REUSE_PORT + _DISABLE_CHANNELZ,
         )
-        port = self._server.add_insecure_port("localhost:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         channelz.add_channelz_servicer(self._server)
         self._server.start()
 
         # This channel is used to fetch Channelz info only
         # Channelz should not be enabled
         self._channel = grpc.insecure_channel(
-            "localhost:%d" % port, _DISABLE_CHANNELZ
+            "127.0.0.1:%d" % port, _DISABLE_CHANNELZ
         )
         self._channelz_stub = channelz_pb2_grpc.ChannelzStub(self._channel)
 

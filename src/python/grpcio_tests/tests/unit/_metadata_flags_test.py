@@ -97,7 +97,9 @@ def get_method_handlers(test):
 
 def create_phony_channel():
     """Creating phony channels is a workaround for retries"""
-    return grpc.insecure_channel("localhost:1")
+    return grpc.insecure_channel(
+        "127.0.0.1:1", options=(("grpc.enable_http_proxy", 0),)
+    )
 
 
 def perform_unary_unary_call(channel, wait_for_ready=None):
@@ -236,31 +238,41 @@ class MetadataFlagsTest(unittest.TestCase):
         #   exceptions and raise them again in main thread.
         unhandled_exceptions = queue.Queue()
 
-        # We just need an unused TCP port
-        host, port, sock = get_socket(sock_options=(socket.SO_REUSEADDR,))
+        host, port, sock = get_socket(
+            bind_address="127.0.0.1", listen=False
+        )
         sock.close()
 
         addr = "{}:{}".format(host, port)
         wg = test_common.WaitGroup(len(_ALL_CALL_CASES))
 
-        def wait_for_transient_failure(channel_connectivity):
-            if (
-                channel_connectivity
-                == grpc.ChannelConnectivity.TRANSIENT_FAILURE
-            ):
-                wg.done()
-
         def test_call(perform_call):
-            with grpc.insecure_channel(addr) as channel:
+            with grpc.insecure_channel(
+                addr, options=(("grpc.enable_http_proxy", 0),)
+            ) as channel:
+                state_notified = threading.Event()
+
+                def wait_for_transient_failure(channel_connectivity):
+                    if (
+                        channel_connectivity
+                        == grpc.ChannelConnectivity.TRANSIENT_FAILURE
+                        and not state_notified.is_set()
+                    ):
+                        state_notified.set()
+                        wg.done()
+
                 try:
-                    channel.subscribe(wait_for_transient_failure)
+                    channel.subscribe(
+                        wait_for_transient_failure, try_to_connect=True
+                    )
                     perform_call(channel, wait_for_ready=True)
                 except BaseException as e:  # pylint: disable=broad-except
-                    # If the call failed, the thread would be destroyed. The
-                    # channel object can be collected before calling the
-                    # callback, which will result in a deadlock.
-                    wg.done()
+                    if not state_notified.is_set():
+                        state_notified.set()
+                        wg.done()
                     unhandled_exceptions.put(e, True)
+                finally:
+                    channel.unsubscribe(wait_for_transient_failure)
 
         test_threads = []
         for perform_call in _ALL_CALL_CASES:
@@ -274,7 +286,7 @@ class MetadataFlagsTest(unittest.TestCase):
 
         # Start the server after the connections are waiting
         wg.wait()
-        server = test_common.test_server(reuse_port=True)
+        server = test_common.test_server(reuse_port=False)
         server.add_registered_method_handlers(
             _SERVICE_NAME, get_method_handlers(weakref.proxy(self))
         )
@@ -285,7 +297,9 @@ class MetadataFlagsTest(unittest.TestCase):
             test_thread.join()
 
         # Stop the server to make test end properly
-        server.stop(None)
+        event = server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
         if not unhandled_exceptions.empty():
             raise unhandled_exceptions.get(True)
