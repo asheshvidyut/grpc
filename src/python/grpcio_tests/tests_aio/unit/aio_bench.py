@@ -15,6 +15,7 @@
 
 import asyncio
 import time
+
 import grpc
 from grpc.experimental import aio
 
@@ -127,11 +128,17 @@ async def main():
         qps, avg, p50, p90, p99, total = await run_unary_benchmark(
             target, concurrency=concurrency, duration=3.0
         )
-        print(f"  Concurrency = {concurrency:3d}: {qps:8.1f} QPS | Latency: avg={avg:5.2f}ms p50={p50:5.2f}ms p90={p90:5.2f}ms p99={p99:5.2f}ms ({total:,} reqs)")
+        print(
+            f"  Concurrency = {concurrency:3d}: {qps:8.1f} QPS | Latency: avg={avg:5.2f}ms p50={p50:5.2f}ms p90={p90:5.2f}ms p99={p99:5.2f}ms ({total:,} reqs)"
+        )
 
     print("\n--- 2. BiDi Streaming Throughput Benchmark ---")
-    msg_rate, count, duration = await run_streaming_benchmark(target, count=30000)
-    print(f"  Streaming: {msg_rate:,.1f} msgs/sec ({count:,} msgs in {duration:.2f}s)")
+    msg_rate, count, duration = await run_streaming_benchmark(
+        target, count=30000
+    )
+    print(
+        f"  Streaming: {msg_rate:,.1f} msgs/sec ({count:,} msgs in {duration:.2f}s)"
+    )
     print(f"============================================================\n")
 
     await server.stop(None)
@@ -139,4 +146,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

@@ -147,9 +147,9 @@ class TestCloseChannel(AioTestBase):
             options=(("grpc.enable_http_proxy", 0),),
         ) as channel1:
             async with aio.insecure_channel(
-            self._server_target,
-            options=(("grpc.enable_http_proxy", 0),),
-        ) as channel2:
+                self._server_target,
+                options=(("grpc.enable_http_proxy", 0),),
+            ) as channel2:
                 stub1 = test_pb2_grpc.TestServiceStub(channel1)
                 stub2 = test_pb2_grpc.TestServiceStub(channel2)
 
