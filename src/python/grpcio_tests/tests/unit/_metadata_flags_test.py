@@ -238,9 +238,7 @@ class MetadataFlagsTest(unittest.TestCase):
         #   exceptions and raise them again in main thread.
         unhandled_exceptions = queue.Queue()
 
-        host, port, sock = get_socket(
-            bind_address="127.0.0.1", listen=False
-        )
+        host, port, sock = get_socket(bind_address="127.0.0.1", listen=False)
         sock.close()
 
         addr = "{}:{}".format(host, port)

@@ -63,7 +63,9 @@ class DNSResolverTest(unittest.TestCase):
             ) as channel:
                 self.assertEqual(
                     channel.unary_unary(
-                        grpc._common.fully_qualified_method(_SERVICE_NAME, _METHOD),
+                        grpc._common.fully_qualified_method(
+                            _SERVICE_NAME, _METHOD
+                        ),
                         _registered_method=True,
                     )(
                         _REQUEST,
