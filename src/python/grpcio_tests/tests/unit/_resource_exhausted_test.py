@@ -128,9 +128,7 @@ _HOST = "127.0.0.1"
 
 class ResourceExhaustedTest(unittest.TestCase):
     def setUp(self):
-        self._server_pool = logging_pool.pool(
-            test_constants.THREAD_CONCURRENCY
-        )
+        self._server_pool = logging_pool.pool(test_constants.THREAD_CONCURRENCY)
         self._trigger = _TestTrigger(test_constants.THREAD_CONCURRENCY)
         self._server = grpc.server(
             self._server_pool,

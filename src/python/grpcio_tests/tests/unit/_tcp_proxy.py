@@ -22,7 +22,6 @@ import datetime
 import select
 import socket
 import threading
-
 import time
 
 from tests.unit.framework.common import get_socket
