@@ -38,8 +38,9 @@ class TestConnectivityState(AioTestBase):
         await self._server.stop(None)
 
     @unittest.skipIf(
-        "aarch64" in platform.machine(),
-        "The transient failure propagation is slower on aarch64",
+        platform.machine() in ("aarch64", "arm64"),
+        "The transient failure propagation is slower on aarch64/arm64 "
+        "(macOS reports 'arm64', Linux reports 'aarch64')",
     )
     async def test_unavailable_backend(self):
         async with aio.insecure_channel(

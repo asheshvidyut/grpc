@@ -14,6 +14,7 @@
 import asyncio
 import datetime
 import logging
+import platform
 import unittest
 
 import grpc
@@ -314,6 +315,11 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
 
                 await channel.close()
 
+    @unittest.skipIf(
+        platform.machine() in ("aarch64", "arm64"),
+        "Unreachable-target RPC failure is slow/flaky on aarch64/arm64 "
+        "(macOS resolver delay resolving the bogus UNREACHABLE_TARGET name)",
+    )
     async def test_intercepts_response_iterator_rpc_error(self):
         for interceptor_class in (
             _UnaryStreamInterceptorEmpty,
