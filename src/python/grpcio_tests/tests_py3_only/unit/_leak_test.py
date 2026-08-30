@@ -61,18 +61,21 @@ def _start_a_test_server():
         ThreadPoolExecutor(max_workers=1), options=(("grpc.so_reuseport", 0),)
     )
     server.add_generic_rpc_handlers((_GenericHandler(),))
-    port = server.add_insecure_port("localhost:0")
+    port = server.add_insecure_port("127.0.0.1:0")
     server.start()
-    return "localhost:%d" % port, server
+    return "127.0.0.1:%d" % port, server
 
 
 def _perform_an_rpc(address):
-    channel = grpc.insecure_channel(address)
+    channel = grpc.insecure_channel(
+        address,
+        options=(("grpc.enable_http_proxy", 0),),
+    )
     multicallable = channel.unary_unary(
         _TEST_METHOD,
         _registered_method=True,
     )
-    response = multicallable(_REQUEST)
+    response = multicallable(_REQUEST, wait_for_ready=True)
     assert _REQUEST == response
 
 

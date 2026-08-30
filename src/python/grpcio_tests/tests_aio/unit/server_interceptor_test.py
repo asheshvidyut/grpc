@@ -528,8 +528,11 @@ class TestServerInterceptorWithRegisteredMethods(AioTestBase):
     async def _start_server_with_registered_methods(
         self, *interceptors: aio.ServerInterceptor
     ) -> Tuple[aio.Server, int]:
-        server = aio.server(interceptors=interceptors)
-        port = server.add_insecure_port("[::]:0")
+        server = aio.server(
+            interceptors=interceptors,
+            options=(("grpc.so_reuseport", 0),),
+        )
+        port = server.add_insecure_port("127.0.0.1:0")
         server.add_registered_method_handlers(
             self._SERVICE_NAME, self._method_handlers
         )
@@ -547,8 +550,10 @@ class TestServerInterceptorWithRegisteredMethods(AioTestBase):
 
         try:
             async with grpc.aio.insecure_channel(
-                f"localhost:{port}"
+                f"127.0.0.1:{port}",
+                options=(("grpc.enable_http_proxy", 0),),
             ) as channel:
+                await channel.channel_ready()
                 multi_callable = channel.unary_unary(
                     fully_qualified_method, _registered_method=True
                 )
@@ -570,8 +575,10 @@ class TestServerInterceptorWithRegisteredMethods(AioTestBase):
 
         try:
             async with grpc.aio.insecure_channel(
-                f"localhost:{port}"
+                f"127.0.0.1:{port}",
+                options=(("grpc.enable_http_proxy", 0),),
             ) as channel:
+                await channel.channel_ready()
                 multi_callable = channel.unary_stream(
                     fully_qualified_method, _registered_method=True
                 )
@@ -594,8 +601,10 @@ class TestServerInterceptorWithRegisteredMethods(AioTestBase):
 
         try:
             async with grpc.aio.insecure_channel(
-                f"localhost:{port}"
+                f"127.0.0.1:{port}",
+                options=(("grpc.enable_http_proxy", 0),),
             ) as channel:
+                await channel.channel_ready()
                 multi_callable = channel.stream_unary(
                     fully_qualified_method, _registered_method=True
                 )
@@ -619,8 +628,10 @@ class TestServerInterceptorWithRegisteredMethods(AioTestBase):
 
         try:
             async with grpc.aio.insecure_channel(
-                f"localhost:{port}"
+                f"127.0.0.1:{port}",
+                options=(("grpc.enable_http_proxy", 0),),
             ) as channel:
+                await channel.channel_ready()
                 multi_callable = channel.stream_stream(
                     fully_qualified_method, _registered_method=True
                 )
@@ -649,8 +660,10 @@ class TestServerInterceptorWithRegisteredMethods(AioTestBase):
 
         try:
             async with grpc.aio.insecure_channel(
-                f"localhost:{port}"
+                f"127.0.0.1:{port}",
+                options=(("grpc.enable_http_proxy", 0),),
             ) as channel:
+                await channel.channel_ready()
                 multi_callable = channel.unary_unary(
                     fully_qualified_method, _registered_method=True
                 )

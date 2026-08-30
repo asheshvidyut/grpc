@@ -38,7 +38,7 @@ py_library(
 
 py_test(
     name = "local_interop_test",
-    size = "small",
+    size = "medium",
     srcs = ["local_interop_test.py"],
     imports = ["../../"],
     python_version = "PY3",

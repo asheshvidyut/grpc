@@ -245,8 +245,8 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 
 async def _start_test_server():
-    server = aio.server()
-    port = server.add_insecure_port("[::]:0")
+    server = aio.server(options=(("grpc.so_reuseport", 0),))
+    port = server.add_insecure_port("127.0.0.1:0")
     generic_handler = _GenericHandler()
     server.add_generic_rpc_handlers((generic_handler,))
 
@@ -263,13 +263,17 @@ async def _start_test_server():
     server.add_registered_method_handlers("test", registered_handlers)
 
     await server.start()
-    return "localhost:%d" % port, server, generic_handler
+    return "127.0.0.1:%d" % port, server, generic_handler
 
 
 class TestServer(AioTestBase):
     async def setUp(self):
         addr, self._server, self._generic_handler = await _start_test_server()
-        self._channel = aio.insecure_channel(addr)
+        self._channel = aio.insecure_channel(
+            addr,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        await self._channel.channel_ready()
 
     async def tearDown(self):
         await self._channel.close()
@@ -579,8 +583,8 @@ class TestServer(AioTestBase):
 
     async def test_port_binding_exception(self):
         server = aio.server(options=(("grpc.so_reuseport", 0),))
-        port = server.add_insecure_port("localhost:0")
-        bind_address = "localhost:%d" % port
+        port = server.add_insecure_port("127.0.0.1:0")
+        bind_address = "127.0.0.1:%d" % port
 
         with self.assertRaises(RuntimeError):
             server.add_insecure_port(bind_address)
@@ -596,13 +600,19 @@ class TestServer(AioTestBase):
             return await awaitable
 
         # Build the server with concurrent rpc argument
-        server = aio.server(maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS)
-        port = server.add_insecure_port("localhost:0")
-        bind_address = "localhost:%d" % port
+        server = aio.server(
+            maximum_concurrent_rpcs=_MAXIMUM_CONCURRENT_RPCS,
+            options=(("grpc.so_reuseport", 0),),
+        )
+        port = server.add_insecure_port("127.0.0.1:0")
+        bind_address = "127.0.0.1:%d" % port
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
         # Build the channel
-        channel = aio.insecure_channel(bind_address)
+        channel = aio.insecure_channel(
+            bind_address,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         # Deplete the concurrent quota with 3 times of max RPCs
         rpc_tasks = []
         for _ in range(3 * _MAXIMUM_CONCURRENT_RPCS):
@@ -651,12 +661,18 @@ class TestServer(AioTestBase):
 
         # Use a limit of 1 to make the test deterministic
         max_concurrent = 1
-        server = aio.server(maximum_concurrent_rpcs=max_concurrent)
-        port = server.add_insecure_port("[::]:0")
-        bind_address = f"localhost:{port}"
+        server = aio.server(
+            maximum_concurrent_rpcs=max_concurrent,
+            options=(("grpc.so_reuseport", 0),),
+        )
+        port = server.add_insecure_port("127.0.0.1:0")
+        bind_address = f"127.0.0.1:{port}"
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
-        channel = aio.insecure_channel(bind_address)
+        channel = aio.insecure_channel(
+            bind_address,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
 
         async def send_requests(num_requests):
             """Send concurrent requests and return (successes, exhausted)."""

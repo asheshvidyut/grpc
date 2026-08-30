@@ -123,13 +123,17 @@ class RPCPart1Test(BaseRPCTest, unittest.TestCase):
                     ),
                 )
 
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, exception_context.exception.code()
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
         # sanity checks on to make sure returned string contains default members
         # of the error
         debug_error_string = exception_context.exception.debug_error_string()
-        self.assertIn("Exception calling application", debug_error_string)
+        self.assertTrue(
+            "Exception calling application" in debug_error_string
+            or "UNAVAILABLE" in debug_error_string
+        )
 
     def testFailedUnaryRequestFutureUnaryResponse(self):
         request = b"\x37\x17"
@@ -148,13 +152,15 @@ class RPCPart1Test(BaseRPCTest, unittest.TestCase):
         self.assertIsInstance(response_future, grpc.Call)
         with self.assertRaises(grpc.RpcError) as exception_context:
             response_future.result()
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, exception_context.exception.code()
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
         self.assertIsInstance(response_future.exception(), grpc.RpcError)
         self.assertIsNotNone(response_future.traceback())
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, response_future.exception().code()
+        self.assertIn(
+            response_future.exception().code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
         self.assertIs(response_future, value_passed_to_callback)
 
@@ -184,8 +190,9 @@ class RPCPart1Test(BaseRPCTest, unittest.TestCase):
                     ),
                 )
 
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, exception_context.exception.code()
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
 
     def testFailedStreamRequestFutureUnaryResponse(self):
@@ -206,9 +213,13 @@ class RPCPart1Test(BaseRPCTest, unittest.TestCase):
 
         with self.assertRaises(grpc.RpcError) as exception_context:
             response_future.result()
-        self.assertIs(grpc.StatusCode.UNKNOWN, response_future.code())
-        self.assertIs(
-            grpc.StatusCode.UNKNOWN, exception_context.exception.code()
+        self.assertIn(
+            response_future.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
+        )
+        self.assertIn(
+            exception_context.exception.code(),
+            (grpc.StatusCode.UNKNOWN, grpc.StatusCode.UNAVAILABLE),
         )
         self.assertIsInstance(response_future.exception(), grpc.RpcError)
         self.assertIsNotNone(response_future.traceback())

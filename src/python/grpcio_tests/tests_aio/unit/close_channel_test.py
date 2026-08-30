@@ -38,7 +38,10 @@ class TestCloseChannel(AioTestBase):
         await self._server.stop(None)
 
     async def test_graceful_close(self):
-        channel = aio.insecure_channel(self._server_target)
+        channel = aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         UnaryCallWithSleep = channel.unary_unary(
             _UNARY_CALL_METHOD_WITH_SLEEP,
             request_serializer=messages_pb2.SimpleRequest.SerializeToString,
@@ -52,7 +55,10 @@ class TestCloseChannel(AioTestBase):
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def test_none_graceful_close(self):
-        channel = aio.insecure_channel(self._server_target)
+        channel = aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         UnaryCallWithSleep = channel.unary_unary(
             _UNARY_CALL_METHOD_WITH_SLEEP,
             request_serializer=messages_pb2.SimpleRequest.SerializeToString,
@@ -66,7 +72,10 @@ class TestCloseChannel(AioTestBase):
         self.assertEqual(grpc.StatusCode.CANCELLED, await call.code())
 
     async def test_close_unary_unary(self):
-        channel = aio.insecure_channel(self._server_target)
+        channel = aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         stub = test_pb2_grpc.TestServiceStub(channel)
 
         calls = [stub.UnaryCall(messages_pb2.SimpleRequest()) for _ in range(2)]
@@ -77,7 +86,10 @@ class TestCloseChannel(AioTestBase):
             self.assertTrue(call.cancelled())
 
     async def test_close_unary_stream(self):
-        channel = aio.insecure_channel(self._server_target)
+        channel = aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         stub = test_pb2_grpc.TestServiceStub(channel)
 
         request = messages_pb2.StreamingOutputCallRequest()
@@ -89,7 +101,10 @@ class TestCloseChannel(AioTestBase):
             self.assertTrue(call.cancelled())
 
     async def test_close_stream_unary(self):
-        channel = aio.insecure_channel(self._server_target)
+        channel = aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         stub = test_pb2_grpc.TestServiceStub(channel)
 
         calls = [stub.StreamingInputCall() for _ in range(2)]
@@ -100,7 +115,10 @@ class TestCloseChannel(AioTestBase):
             self.assertTrue(call.cancelled())
 
     async def test_close_stream_stream(self):
-        channel = aio.insecure_channel(self._server_target)
+        channel = aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         stub = test_pb2_grpc.TestServiceStub(channel)
 
         calls = [stub.FullDuplexCall() for _ in range(2)]
@@ -111,7 +129,10 @@ class TestCloseChannel(AioTestBase):
             self.assertTrue(call.cancelled())
 
     async def test_close_async_context(self):
-        async with aio.insecure_channel(self._server_target) as channel:
+        async with aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
             stub = test_pb2_grpc.TestServiceStub(channel)
             calls = [
                 stub.UnaryCall(messages_pb2.SimpleRequest()) for _ in range(2)
@@ -121,8 +142,14 @@ class TestCloseChannel(AioTestBase):
             self.assertTrue(call.cancelled())
 
     async def test_channel_isolation(self):
-        async with aio.insecure_channel(self._server_target) as channel1:
-            async with aio.insecure_channel(self._server_target) as channel2:
+        async with aio.insecure_channel(
+            self._server_target,
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel1:
+            async with aio.insecure_channel(
+                self._server_target,
+                options=(("grpc.enable_http_proxy", 0),),
+            ) as channel2:
                 stub1 = test_pb2_grpc.TestServiceStub(channel1)
                 stub2 = test_pb2_grpc.TestServiceStub(channel2)
 

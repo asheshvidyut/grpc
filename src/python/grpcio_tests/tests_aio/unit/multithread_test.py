@@ -32,7 +32,7 @@ class GenericService:
 
 class MultithreadTest(AioTestBase):
     async def _start_server(self):
-        server = grpc.aio.server()
+        server = grpc.aio.server(options=(("grpc.so_reuseport", 0),))
         rpc_method_handlers = {
             "UnaryCall": grpc.unary_unary_rpc_method_handler(
                 GenericService.UnaryCall,
@@ -42,12 +42,16 @@ class MultithreadTest(AioTestBase):
             "grpc.testing.TestService", rpc_method_handlers
         )
         server.add_generic_rpc_handlers((generic_handler,))
-        port = server.add_insecure_port("[::]:0")
+        port = server.add_insecure_port("127.0.0.1:0")
         await server.start()
         return port, server
 
     async def run_client(self, port):
-        async with aio.insecure_channel(f"localhost:{port}") as channel:
+        async with aio.insecure_channel(
+            f"127.0.0.1:{port}",
+            options=(("grpc.enable_http_proxy", 0),),
+        ) as channel:
+            await channel.channel_ready()
             unary_call = channel.unary_unary(
                 "/grpc.testing.TestService/UnaryCall"
             )

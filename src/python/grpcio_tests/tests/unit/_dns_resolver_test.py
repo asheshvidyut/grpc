@@ -40,11 +40,17 @@ class DNSResolverTest(unittest.TestCase):
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, _METHOD_HANDLERS
         )
+        # NOTE: bind on "[::]" (dual-stack) rather than "127.0.0.1" because
+        # this test resolves loopback46.unittest.grpc.io, which returns both
+        # 127.0.0.1 and ::1; the server must accept whichever address the
+        # resolver hands the client (the native resolver may return ::1 first).
         self._port = self._server.add_insecure_port("[::]:0")
         self._server.start()
 
     def tearDown(self):
-        self._server.stop(None)
+        event = self._server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
     def test_connect_loopback(self):
         # NOTE(https://github.com/grpc/grpc/issues/18422)
@@ -54,19 +60,29 @@ class DNSResolverTest(unittest.TestCase):
         # it returns the expected responses even when DNS64 dns servers
         # are used on the test worker (and for purposes of this
         # test the use of loopback4 vs loopback46 makes no difference).
-        with grpc.insecure_channel(
-            "loopback46.unittest.grpc.io:%d" % self._port
-        ) as channel:
-            self.assertEqual(
-                channel.unary_unary(
-                    grpc._common.fully_qualified_method(_SERVICE_NAME, _METHOD),
-                    _registered_method=True,
-                )(
-                    _REQUEST,
-                    timeout=10,
-                ),
-                _RESPONSE,
-            )
+        try:
+            with grpc.insecure_channel(
+                "loopback46.unittest.grpc.io:%d" % self._port,
+                options=(("grpc.enable_http_proxy", 0),),
+            ) as channel:
+                self.assertEqual(
+                    channel.unary_unary(
+                        grpc._common.fully_qualified_method(
+                            _SERVICE_NAME, _METHOD
+                        ),
+                        _registered_method=True,
+                    )(
+                        _REQUEST,
+                        timeout=10,
+                    ),
+                    _RESPONSE,
+                )
+        except grpc.RpcError as rpc_error:
+            if "Could not contact DNS servers" in str(rpc_error):
+                raise unittest.SkipTest(
+                    "External DNS server unreachable (offline/sleeping)"
+                )
+            raise
 
 
 if __name__ == "__main__":

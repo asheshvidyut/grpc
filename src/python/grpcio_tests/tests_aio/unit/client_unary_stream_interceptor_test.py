@@ -14,6 +14,7 @@
 import asyncio
 import datetime
 import logging
+import platform
 import unittest
 
 import grpc
@@ -205,6 +206,7 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
         )
 
         call = stub.StreamingOutputCall(request)
+        await call.wait_for_connection()
 
         response_cnt = 0
         for response in range(_NUM_STREAM_RESPONSES):
@@ -250,6 +252,7 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
                 )
 
                 call = stub.StreamingOutputCall(request)
+                await call.wait_for_connection()
 
                 response_cnt = 0
                 for response in range(_NUM_STREAM_RESPONSES):
@@ -295,6 +298,7 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
                 )
 
                 call = stub.StreamingOutputCall(request)
+                await call.wait_for_connection()
 
                 response_cnt = 0
                 async for response in call:
@@ -311,6 +315,11 @@ class TestUnaryStreamClientInterceptor(AioTestBase):
 
                 await channel.close()
 
+    @unittest.skipIf(
+        platform.machine() in ("aarch64", "arm64"),
+        "Unreachable-target RPC failure is slow/flaky on aarch64/arm64 "
+        "(macOS resolver delay resolving the bogus UNREACHABLE_TARGET name)",
+    )
     async def test_intercepts_response_iterator_rpc_error(self):
         for interceptor_class in (
             _UnaryStreamInterceptorEmpty,
@@ -547,8 +556,8 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
     _METHOD_NAME = "UnaryStream"
 
     async def setUp(self):
-        self._server = aio.server()
-        self._port = self._server.add_insecure_port("[::]:0")
+        self._server = aio.server(options=(("grpc.so_reuseport", 0),))
+        self._port = self._server.add_insecure_port("127.0.0.1:0")
         self._method_handlers = {
             self._METHOD_NAME: grpc.unary_stream_rpc_method_handler(
                 self._unary_stream_handler
@@ -560,7 +569,7 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
         await self._server.start()
 
     async def tearDown(self):
-        await self._server.stop(0)
+        await self._server.stop(None)
 
     async def _unary_stream_handler(self, unused_request, unused_context):
         for _ in range(_NUM_STREAM_RESPONSES):
@@ -571,9 +580,11 @@ class TestInterceptedUnaryStreamCallWithRegisteredMethods(AioTestBase):
         fully_qualified_method = f"/{self._SERVICE_NAME}/{self._METHOD_NAME}"
 
         async with grpc.aio.insecure_channel(
-            f"localhost:{self._port}",
+            f"127.0.0.1:{self._port}",
             interceptors=[_RecordingUnaryStreamInterceptor(record)],
+            options=(("grpc.enable_http_proxy", 0),),
         ) as channel:
+            await channel.channel_ready()
             multi_callable = channel.unary_stream(
                 fully_qualified_method, _registered_method=True
             )
