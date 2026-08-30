@@ -49,6 +49,9 @@ _EMPTY_EXTENSIONS_NUMBERS = (
 )
 
 
+_HOST = "127.0.0.1"
+
+
 def _file_descriptor_to_proto(descriptor):
     proto = descriptor_pb2.FileDescriptorProto()
     descriptor.CopyToProto(proto)
@@ -57,17 +60,21 @@ def _file_descriptor_to_proto(descriptor):
 
 class ReflectionServicerTest(AioTestBase):
     async def setUp(self):
-        self._server = aio.server()
+        self._server = aio.server(options=(("grpc.so_reuseport", 0),))
         reflection.enable_server_reflection(_SERVICE_NAMES, self._server)
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("{}:0".format(_HOST))
         await self._server.start()
 
-        self._channel = aio.insecure_channel("localhost:%d" % port)
+        self._channel = aio.insecure_channel(
+            "{}:{}".format(_HOST, port),
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        await self._channel.channel_ready()
         self._stub = reflection_pb2_grpc.ServerReflectionStub(self._channel)
 
     async def tearDown(self):
-        await self._server.stop(None)
         await self._channel.close()
+        await self._server.stop(None)
 
     async def test_file_by_name(self):
         requests = (

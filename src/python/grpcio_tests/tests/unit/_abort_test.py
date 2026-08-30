@@ -91,17 +91,23 @@ RPC_METHOD_HANDLERS = {
 class AbortTest(unittest.TestCase):
     def setUp(self):
         self._server = test_common.test_server()
-        port = self._server.add_insecure_port("[::]:0")
+        port = self._server.add_insecure_port("127.0.0.1:0")
         self._server.add_registered_method_handlers(
             _SERVICE_NAME, RPC_METHOD_HANDLERS
         )
         self._server.start()
 
-        self._channel = grpc.insecure_channel("localhost:%d" % port)
+        self._channel = grpc.insecure_channel(
+            "127.0.0.1:%d" % port,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        grpc.channel_ready_future(self._channel).result(timeout=10)
 
     def tearDown(self):
         self._channel.close()
-        self._server.stop(0)
+        event = self._server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
     def test_abort(self):
         with self.assertRaises(grpc.RpcError) as exception_context:

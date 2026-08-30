@@ -102,6 +102,10 @@ def test_secure_channel(target, channel_credentials, server_host_override):
                 "grpc.ssl_target_name_override",
                 server_host_override,
             ),
+            (
+                "grpc.enable_http_proxy",
+                0,
+            ),
         ),
     )
     return channel

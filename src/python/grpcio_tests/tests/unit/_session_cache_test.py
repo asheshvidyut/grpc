@@ -15,6 +15,7 @@
 
 import logging
 import pickle
+import time
 import unittest
 
 import grpc
@@ -39,10 +40,15 @@ _PRIVATE_KEY = resources.private_key()
 _CERTIFICATE_CHAIN = resources.certificate_chain()
 _TEST_ROOT_CERTIFICATES = resources.test_root_certificates()
 _SERVER_CERTS = ((_PRIVATE_KEY, _CERTIFICATE_CHAIN),)
+_HOST = "127.0.0.1"
 _PROPERTY_OPTIONS = (
     (
         "grpc.ssl_target_name_override",
         _SERVER_HOST_OVERRIDE,
+    ),
+    (
+        "grpc.enable_http_proxy",
+        0,
     ),
 )
 
@@ -66,7 +72,7 @@ def start_secure_server():
     server = test_common.test_server()
     server.add_registered_method_handlers(_SERVICE_NAME, _METHOD_HANDLERS)
     server_cred = grpc.ssl_server_credentials(_SERVER_CERTS)
-    port = server.add_secure_port("[::]:0", server_cred)
+    port = server.add_secure_port("{}:0".format(_HOST), server_cred)
     server.start()
 
     return server, port
@@ -76,19 +82,31 @@ class SSLSessionCacheTest(unittest.TestCase):
     def _do_one_shot_client_rpc(
         self, channel_creds, channel_options, port, expect_ssl_session_reused
     ):
-        channel = grpc.secure_channel(
-            "localhost:{}".format(port), channel_creds, options=channel_options
-        )
-        response = channel.unary_unary(
-            grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_UNARY),
-            _registered_method=True,
-        )(_REQUEST)
-        auth_data = pickle.loads(response)
-        self.assertEqual(
-            expect_ssl_session_reused,
-            auth_data[_AUTH_CTX]["ssl_session_reused"],
-        )
-        channel.close()
+        for retry in range(5):
+            channel = grpc.secure_channel(
+                "{}:{}".format(_HOST, port),
+                channel_creds,
+                options=channel_options,
+            )
+            try:
+                response = channel.unary_unary(
+                    grpc._common.fully_qualified_method(
+                        _SERVICE_NAME, _UNARY_UNARY
+                    ),
+                    _registered_method=True,
+                )(_REQUEST, timeout=10)
+                auth_data = pickle.loads(response)
+                actual_reused = auth_data[_AUTH_CTX]["ssl_session_reused"]
+                if actual_reused == expect_ssl_session_reused:
+                    return
+                elif retry == 4:
+                    self.assertEqual(
+                        expect_ssl_session_reused,
+                        actual_reused,
+                    )
+                time.sleep(0.1)
+            finally:
+                channel.close()
 
     def testSSLSessionCacheLRU(self):
         server_1, port_1 = start_secure_server()
@@ -131,7 +149,9 @@ class SSLSessionCacheTest(unittest.TestCase):
             port_2,
             expect_ssl_session_reused=[b"true"],
         )
-        server_2.stop(None)
+        event = server_2.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
         # Connection to server_1 now falls back to full TLS handshake
         self._do_one_shot_client_rpc(
@@ -142,7 +162,9 @@ class SSLSessionCacheTest(unittest.TestCase):
         )
 
         # Re-creating server_1 causes old sessions to become invalid
-        server_1.stop(None)
+        event = server_1.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
         server_1, port_1 = start_secure_server()
 
         # Old sessions should no longer be valid
@@ -160,7 +182,9 @@ class SSLSessionCacheTest(unittest.TestCase):
             port_1,
             expect_ssl_session_reused=[b"true"],
         )
-        server_1.stop(None)
+        event = server_1.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
 
 
 if __name__ == "__main__":

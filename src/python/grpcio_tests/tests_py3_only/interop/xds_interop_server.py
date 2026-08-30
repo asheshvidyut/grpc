@@ -47,7 +47,7 @@ native_debug.install_failure_signal_handler()
 #  It currently only implements enough functionality to pass the xDS security
 #  tests.
 
-_LISTEN_HOST = "0.0.0.0"
+_LISTEN_HOST = "127.0.0.1"
 _PROMETHEUS_PORT = 9464
 
 _THREAD_POOL_SIZE = 256

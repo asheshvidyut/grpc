@@ -60,7 +60,9 @@ class ChannelConnectivityTest(unittest.TestCase):
     def test_lonely_channel_connectivity(self):
         callback = _Callback()
 
-        channel = grpc.insecure_channel("localhost:12345")
+        channel = grpc.insecure_channel(
+            "127.0.0.1:12345", options=(("grpc.enable_http_proxy", 0),)
+        )
         channel.subscribe(callback.update, try_to_connect=False)
         first_connectivities = callback.block_until_connectivities_satisfy(bool)
         channel.subscribe(callback.update, try_to_connect=True)
@@ -92,12 +94,15 @@ class ChannelConnectivityTest(unittest.TestCase):
         server = grpc.server(
             recording_thread_pool, options=(("grpc.so_reuseport", 0),)
         )
-        port = server.add_insecure_port("[::]:0")
+        port = server.add_insecure_port("127.0.0.1:0")
         server.start()
         first_callback = _Callback()
         second_callback = _Callback()
 
-        channel = grpc.insecure_channel("localhost:{}".format(port))
+        channel = grpc.insecure_channel(
+            "127.0.0.1:{}".format(port),
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         channel.subscribe(first_callback.update, try_to_connect=False)
         first_connectivities = (
             first_callback.block_until_connectivities_satisfy(bool)
@@ -123,7 +128,10 @@ class ChannelConnectivityTest(unittest.TestCase):
             _ready_in_connectivities
         )
         channel.close()
-        server.stop(None)
+        event = server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
+        recording_thread_pool._tp_executor.shutdown(wait=False)
 
         self.assertSequenceEqual(
             (grpc.ChannelConnectivity.IDLE,), first_connectivities
@@ -152,20 +160,26 @@ class ChannelConnectivityTest(unittest.TestCase):
         server = grpc.server(
             recording_thread_pool, options=(("grpc.so_reuseport", 0),)
         )
-        port = server.add_insecure_port("[::]:0")
+        port = server.add_insecure_port("127.0.0.1:0")
         server.start()
         callback = _Callback()
 
-        channel = grpc.insecure_channel("localhost:{}".format(port))
+        channel = grpc.insecure_channel(
+            "127.0.0.1:{}".format(port),
+            options=(("grpc.enable_http_proxy", 0),),
+        )
         channel.subscribe(callback.update, try_to_connect=True)
         callback.block_until_connectivities_satisfy(_ready_in_connectivities)
         # Now take down the server and confirm that channel readiness is repudiated.
-        server.stop(None)
+        event = server.stop(None)
+        if event is not None:
+            event.wait(timeout=10)
         callback.block_until_connectivities_satisfy(
             _last_connectivity_is_not_ready
         )
         channel.unsubscribe(callback.update)
         channel.close()
+        recording_thread_pool._tp_executor.shutdown(wait=False)
         self.assertFalse(recording_thread_pool.was_used())
 
 

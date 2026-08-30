@@ -111,7 +111,16 @@ class InteropTestCaseMixin:
 class InsecureLocalInteropTest(InteropTestCaseMixin, AioTestBase):
     async def setUp(self):
         address, self._server = await start_test_server()
-        self._channel = aio.insecure_channel(address)
+        self._channel = aio.insecure_channel(
+            address,
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
+        )
+        await self._channel.channel_ready()
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)
 
     async def tearDown(self):
@@ -132,6 +141,10 @@ class SecureLocalInteropTest(InteropTestCaseMixin, AioTestBase):
                 "grpc.ssl_target_name_override",
                 _SERVER_HOST_OVERRIDE,
             ),
+            ("grpc.enable_http_proxy", 0),
+            ("grpc.initial_reconnect_backoff_ms", 100),
+            ("grpc.min_reconnect_backoff_ms", 100),
+            ("grpc.max_reconnect_backoff_ms", 500),
         )
 
         address, self._server = await start_test_server(
@@ -140,6 +153,7 @@ class SecureLocalInteropTest(InteropTestCaseMixin, AioTestBase):
         self._channel = aio.secure_channel(
             address, channel_credentials, channel_options
         )
+        await self._channel.channel_ready()
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)
 
     async def tearDown(self):

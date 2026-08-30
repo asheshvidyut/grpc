@@ -127,10 +127,10 @@ class ServerClientMixin:
         self.server.register_completion_queue(self.server_completion_queue)
         if server_credentials:
             self.port = self.server.add_http2_port(
-                b"[::]:0", server_credentials
+                b"127.0.0.1:0", server_credentials
             )
         else:
-            self.port = self.server.add_http2_port(b"[::]:0")
+            self.port = self.server.add_http2_port(b"127.0.0.1:0")
         self.server.start()
         self.client_completion_queue = cygrpc.CompletionQueue()
         if client_credentials:
@@ -139,15 +139,21 @@ class ServerClientMixin:
                     cygrpc.ChannelArgKey.ssl_target_name_override,
                     host_override,
                 ),
+                (
+                    b"grpc.enable_http_proxy",
+                    0,
+                ),
             )
             self.client_channel = cygrpc.Channel(
-                "localhost:{}".format(self.port).encode(),
+                "127.0.0.1:{}".format(self.port).encode(),
                 client_channel_arguments,
                 client_credentials,
             )
         else:
             self.client_channel = cygrpc.Channel(
-                "localhost:{}".format(self.port).encode(), set(), None
+                "127.0.0.1:{}".format(self.port).encode(),
+                ((b"grpc.enable_http_proxy", 0),),
+                None,
             )
         if host_override:
             self.host_argument = None  # default host

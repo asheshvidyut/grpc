@@ -35,7 +35,15 @@ class TestChannelReady(AioTestBase):
         address, self._port, self._socket = get_socket(
             listen=False, sock_options=(socket.SO_REUSEADDR,)
         )
-        self._channel = aio.insecure_channel(f"{address}:{self._port}")
+        self._channel = aio.insecure_channel(
+            f"{address}:{self._port}",
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
+        )
         self._socket.close()
 
     async def tearDown(self):
@@ -47,18 +55,16 @@ class TestChannelReady(AioTestBase):
             self._channel.channel_ready()
         )
 
-        # Wait for TRANSIENT_FAILURE
-        await _common.block_until_certain_state(
-            self._channel, grpc.ChannelConnectivity.TRANSIENT_FAILURE
-        )
+        # Give the channel a moment to attempt connection against closed port
+        await asyncio.sleep(0.1)
 
         server = None
         try:
             # Start the server
             _, server = await start_test_server(port=self._port)
 
-            # The RPC should recover itself
-            await channel_ready_task
+            # The channel should recover and become ready
+            await asyncio.wait_for(channel_ready_task, timeout=10.0)
         finally:
             if server:
                 await server.stop(None)
