@@ -82,11 +82,12 @@ class UnaryUnaryAddMetadataInterceptor(aio.UnaryUnaryClientInterceptor):
 
 
 async def _start_test_server(options=None):
-    server = aio.server(options=options)
-    port = server.add_insecure_port("[::]:0")
+    merged_options = (("grpc.so_reuseport", 0),) + tuple(options or ())
+    server = aio.server(options=merged_options)
+    port = server.add_insecure_port("127.0.0.1:0")
     server.add_generic_rpc_handlers((_GenericHandler(),))
     await server.start()
-    return f"localhost:{port}", server
+    return f"127.0.0.1:{port}", server
 
 
 class TestTypeMetadata(unittest.TestCase):
@@ -303,7 +304,11 @@ class TestTypeMetadata(unittest.TestCase):
 class TestMetadataWithServer(AioTestBase):
     async def setUp(self):
         self._address, self._server = await _start_test_server()
-        self._channel = aio.insecure_channel(self._address)
+        self._channel = aio.insecure_channel(
+            self._address,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
+        await self._channel.channel_ready()
 
     async def tearDown(self):
         await self._channel.close()
@@ -313,7 +318,9 @@ class TestMetadataWithServer(AioTestBase):
         async with aio.insecure_channel(
             self._address,
             interceptors=[UnaryUnaryAddMetadataInterceptor()],
+            options=(("grpc.enable_http_proxy", 0),),
         ) as channel:
+            await channel.channel_ready()
             multicallable = channel.unary_unary(_TEST_UNARY_UNARY)
             for metadata in [
                 _INITIAL_METADATA_FROM_CLIENT_TO_SERVER,

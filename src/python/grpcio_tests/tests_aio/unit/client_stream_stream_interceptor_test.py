@@ -229,8 +229,8 @@ class TestInterceptedStreamStreamCallWithRegisteredMethods(AioTestBase):
     _METHOD_NAME = "StreamStream"
 
     async def setUp(self):
-        self._server = aio.server()
-        self._port = self._server.add_insecure_port("[::]:0")
+        self._server = aio.server(options=(("grpc.so_reuseport", 0),))
+        self._port = self._server.add_insecure_port("127.0.0.1:0")
         self._method_handlers = {
             self._METHOD_NAME: grpc.stream_stream_rpc_method_handler(
                 self._stream_stream_handler
@@ -253,9 +253,11 @@ class TestInterceptedStreamStreamCallWithRegisteredMethods(AioTestBase):
         fully_qualified_method = f"/{self._SERVICE_NAME}/{self._METHOD_NAME}"
 
         async with grpc.aio.insecure_channel(
-            f"localhost:{self._port}",
+            f"127.0.0.1:{self._port}",
             interceptors=[_RecordingStreamStreamInterceptor(record)],
+            options=(("grpc.enable_http_proxy", 0),),
         ) as channel:
+            await channel.channel_ready()
             multi_callable = channel.stream_stream(
                 fully_qualified_method, _registered_method=True
             )

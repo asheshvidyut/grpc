@@ -18,20 +18,35 @@ which a test needs to spy on the bytes put on the wire between a server and
 a client.
 """
 
-import datetime
-import select
 import socket
 import threading
+import time
 
 from tests.unit.framework.common import get_socket
 
-_TCP_PROXY_BUFFER_SIZE = 1024
-_TCP_PROXY_TIMEOUT = datetime.timedelta(milliseconds=500)
+_BUFFER_SIZE = 8192
 
 
-def _init_proxy_socket(gateway_address, gateway_port):
-    proxy_socket = socket.create_connection((gateway_address, gateway_port))
-    return proxy_socket
+def _init_proxy_socket(gateway_address, gateway_port, stop_event=None):
+    for i in range(10):
+        if stop_event is not None and stop_event.is_set():
+            return None
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(0.5)
+            sock.connect((gateway_address, gateway_port))
+            sock.settimeout(None)
+            return sock
+        except Exception:
+            try:
+                sock.close()
+            except Exception:
+                pass
+            if stop_event is not None and stop_event.is_set():
+                return None
+            if i == 9:
+                raise
+            time.sleep(0.02)
 
 
 class TcpProxy:
@@ -43,6 +58,7 @@ class TcpProxy:
         self._gateway_port = gateway_port
 
         self._byte_count_lock = threading.RLock()
+        self._socket_lock = threading.Lock()
         self._sent_byte_count = 0
         self._received_byte_count = 0
 
@@ -50,81 +66,128 @@ class TcpProxy:
 
         self._port = None
         self._listen_socket = None
-        self._proxy_socket = None
+        self._active_sockets = []
+        self._threads = []
 
-        # The following three attributes are owned by the serving thread.
-        self._northbound_data = b""
-        self._southbound_data = b""
-        self._client_sockets = []
-
-        self._thread = threading.Thread(target=self._run_proxy)
+        self._accept_thread = threading.Thread(target=self._run_accept_loop)
 
     def start(self):
         _, self._port, self._listen_socket = get_socket(
-            bind_address=self._bind_address
+            bind_address=self._bind_address,
+            listen=True,
+            sock_options=(socket.SO_REUSEADDR,),
         )
-        self._proxy_socket = _init_proxy_socket(
-            self._gateway_address, self._gateway_port
-        )
-        self._thread.start()
+        self._accept_thread.start()
 
     def get_port(self):
         return self._port
 
-    def _handle_reads(self, sockets_to_read):
-        for socket_to_read in sockets_to_read:
-            if socket_to_read is self._listen_socket:
-                client_socket, client_address = socket_to_read.accept()
-                self._client_sockets.append(client_socket)
-            elif socket_to_read is self._proxy_socket:
-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
-                with self._byte_count_lock:
-                    self._received_byte_count += len(data)
-                self._northbound_data += data
-            elif socket_to_read in self._client_sockets:
-                data = socket_to_read.recv(_TCP_PROXY_BUFFER_SIZE)
-                if data:
-                    with self._byte_count_lock:
-                        self._sent_byte_count += len(data)
-                    self._southbound_data += data
-                else:
-                    self._client_sockets.remove(socket_to_read)
-            else:
-                raise RuntimeError("Unidentified socket appeared in read set.")
-
-    def _handle_writes(self, sockets_to_write):
-        for socket_to_write in sockets_to_write:
-            if socket_to_write is self._proxy_socket:
-                if self._southbound_data:
-                    self._proxy_socket.sendall(self._southbound_data)
-                    self._southbound_data = b""
-            elif socket_to_write in self._client_sockets:
-                if self._northbound_data:
-                    socket_to_write.sendall(self._northbound_data)
-                    self._northbound_data = b""
-
-    def _run_proxy(self):
+    def _pipe(self, src, dst, is_southbound):
         while not self._stop_event.is_set():
-            expected_reads = (self._listen_socket, self._proxy_socket) + tuple(
-                self._client_sockets
+            try:
+                data = src.recv(_BUFFER_SIZE)
+                if not data:
+                    break
+                with self._byte_count_lock:
+                    if is_southbound:
+                        self._sent_byte_count += len(data)
+                    else:
+                        self._received_byte_count += len(data)
+                dst.sendall(data)
+            except Exception:
+                break
+        try:
+            dst.shutdown(socket.SHUT_WR)
+        except Exception:
+            pass
+
+    def _run_accept_loop(self):
+        while not self._stop_event.is_set():
+            try:
+                client_sock, _ = self._listen_socket.accept()
+            except Exception:
+                break
+
+            if self._stop_event.is_set():
+                try:
+                    client_sock.close()
+                except Exception:
+                    pass
+                break
+
+            try:
+                proxy_sock = _init_proxy_socket(
+                    self._gateway_address,
+                    self._gateway_port,
+                    self._stop_event,
+                )
+                if proxy_sock is None:
+                    try:
+                        client_sock.close()
+                    except Exception:
+                        pass
+                    break
+            except Exception:
+                try:
+                    client_sock.close()
+                except Exception:
+                    pass
+                continue
+
+            with self._socket_lock:
+                self._active_sockets.extend([client_sock, proxy_sock])
+
+            t1 = threading.Thread(
+                target=self._pipe,
+                args=(client_sock, proxy_sock, True),
             )
-            expected_writes = expected_reads
-            sockets_to_read, sockets_to_write, _ = select.select(
-                expected_reads,
-                expected_writes,
-                (),
-                _TCP_PROXY_TIMEOUT.total_seconds(),
+            t2 = threading.Thread(
+                target=self._pipe,
+                args=(proxy_sock, client_sock, False),
             )
-            self._handle_reads(sockets_to_read)
-            self._handle_writes(sockets_to_write)
-        for client_socket in self._client_sockets:
-            client_socket.close()
+            t1.daemon = True
+            t2.daemon = True
+            t1.start()
+            t2.start()
+            with self._socket_lock:
+                self._threads.extend([t1, t2])
 
     def stop(self):
         self._stop_event.set()
-        self._thread.join()
-        self._listen_socket.close()
-        self._proxy_socket.close()
+        with self._socket_lock:
+            for sock in self._active_sockets:
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                except Exception:
+                    pass
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+            self._active_sockets = []
+        if self._listen_socket:
+            port = self._port
+            addr = self._bind_address
+            try:
+                self._listen_socket.close()
+            except Exception:
+                pass
+            if port and addr:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(0.1)
+                    s.connect((addr, port))
+                    s.close()
+                except Exception:
+                    pass
+        if self._accept_thread.is_alive():
+            self._accept_thread.join(timeout=1.0)
+        with self._socket_lock:
+            threads = list(self._threads)
+            self._threads = []
+        for t in threads:
+            if t.is_alive():
+                t.join(timeout=0.5)
 
     def get_byte_count(self):
         with self._byte_count_lock:
@@ -132,7 +195,7 @@ class TcpProxy:
 
     def reset_byte_count(self):
         with self._byte_count_lock:
-            self._byte_count = 0
+            self._sent_byte_count = 0
             self._received_byte_count = 0
 
     def __enter__(self):

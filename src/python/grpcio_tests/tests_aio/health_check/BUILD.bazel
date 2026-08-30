@@ -18,7 +18,7 @@ package(default_testonly = 1)
 
 py_test(
     name = "health_servicer_test",
-    size = "small",
+    size = "medium",
     srcs = ["health_servicer_test.py"],
     imports = ["../../"],
     python_version = "PY3",

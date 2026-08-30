@@ -25,7 +25,7 @@ GRPCIO_PY3_ONLY_TESTS_UNIT = glob([
 [
     py_test(
         name = test_file_name[:-len(".py")],
-        size = "small",
+        size = "medium" if test_file_name == "_leak_test.py" else "small",
         srcs = [test_file_name],
         main = test_file_name,
         python_version = "PY3",

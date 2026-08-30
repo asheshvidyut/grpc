@@ -42,6 +42,10 @@ def not_really_secure_channel(
                 "grpc.ssl_target_name_override",
                 server_host_override,
             ),
+            (
+                "grpc.enable_http_proxy",
+                0,
+            ),
         ),
     )
     return implementations.Channel(channel)

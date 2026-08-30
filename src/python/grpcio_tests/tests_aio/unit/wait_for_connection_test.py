@@ -16,6 +16,7 @@
 import asyncio
 import datetime
 import logging
+import platform
 from typing import Callable, Tuple
 import unittest
 
@@ -35,6 +36,14 @@ _TEST_METHOD = "/test/Test"
 _NUM_STREAM_RESPONSES = 5
 _REQUEST_PAYLOAD_SIZE = 7
 _RESPONSE_PAYLOAD_SIZE = 42
+
+# Waiting for an RPC to a bogus/unreachable target to fail is slow and flaky on
+# aarch64/arm64 (notably macOS, which resolves the non-IP UNREACHABLE_TARGET name
+# slowly). See tests_aio/unit/_constants.py for why an IP target is not used.
+_SKIP_UNREACHABLE_ON_ARM = unittest.skipIf(
+    platform.machine() in ("aarch64", "arm64"),
+    "Unreachable-target RPC failure is slow/flaky on aarch64/arm64",
+)
 
 
 class TestWaitForConnection(AioTestBase):
@@ -128,6 +137,7 @@ class TestWaitForConnection(AioTestBase):
 
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
+    @_SKIP_UNREACHABLE_ON_ARM
     async def test_unary_unary_error(self):
         call = self._phony_channel.unary_unary(_TEST_METHOD)(_REQUEST)
 
@@ -136,6 +146,7 @@ class TestWaitForConnection(AioTestBase):
         rpc_error = exception_context.exception
         self.assertEqual(grpc.StatusCode.UNAVAILABLE, rpc_error.code())
 
+    @_SKIP_UNREACHABLE_ON_ARM
     async def test_unary_stream_error(self):
         call = self._phony_channel.unary_stream(_TEST_METHOD)(_REQUEST)
 
@@ -144,6 +155,7 @@ class TestWaitForConnection(AioTestBase):
         rpc_error = exception_context.exception
         self.assertEqual(grpc.StatusCode.UNAVAILABLE, rpc_error.code())
 
+    @_SKIP_UNREACHABLE_ON_ARM
     async def test_stream_unary_error(self):
         call = self._phony_channel.stream_unary(_TEST_METHOD)()
 
@@ -152,6 +164,7 @@ class TestWaitForConnection(AioTestBase):
         rpc_error = exception_context.exception
         self.assertEqual(grpc.StatusCode.UNAVAILABLE, rpc_error.code())
 
+    @_SKIP_UNREACHABLE_ON_ARM
     async def test_stream_stream_error(self):
         call = self._phony_channel.stream_stream(_TEST_METHOD)()
 

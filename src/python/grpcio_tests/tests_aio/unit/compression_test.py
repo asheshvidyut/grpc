@@ -102,18 +102,28 @@ class _GenericHandler(grpc.GenericRpcHandler):
 
 
 async def _start_test_server(options=None):
-    server = aio.server(options=options)
-    port = server.add_insecure_port("[::]:0")
+    merged_options = (("grpc.so_reuseport", 0),) + tuple(options or ())
+    server = aio.server(options=merged_options)
+    port = server.add_insecure_port("127.0.0.1:0")
     server.add_generic_rpc_handlers((_GenericHandler(),))
     await server.start()
-    return f"localhost:{port}", server
+    return f"127.0.0.1:{port}", server
 
 
 class TestCompression(AioTestBase):
     async def setUp(self):
         server_options = (_GZIP_DISABLED_CHANNEL_ARGUMENT,)
         self._address, self._server = await _start_test_server(server_options)
-        self._channel = aio.insecure_channel(self._address)
+        self._channel = aio.insecure_channel(
+            self._address,
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
+        )
+        await self._channel.channel_ready()
 
     async def tearDown(self):
         await self._channel.close()
@@ -122,8 +132,16 @@ class TestCompression(AioTestBase):
     async def test_channel_level_compression_baned_compression(self):
         # GZIP is disabled, this call should fail
         async with aio.insecure_channel(
-            self._address, compression=grpc.Compression.Gzip
+            self._address,
+            compression=grpc.Compression.Gzip,
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
         ) as channel:
+            await channel.channel_ready()
             multicallable = channel.unary_unary(_TEST_UNARY_UNARY)
             call = multicallable(_REQUEST)
             with self.assertRaises(aio.AioRpcError) as exception_context:
@@ -134,10 +152,19 @@ class TestCompression(AioTestBase):
     async def test_channel_level_compression_allowed_compression(self):
         # Deflate is allowed, this call should succeed
         async with aio.insecure_channel(
-            self._address, compression=grpc.Compression.Deflate
+            self._address,
+            compression=grpc.Compression.Deflate,
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
         ) as channel:
+            await channel.channel_ready()
             multicallable = channel.unary_unary(_TEST_UNARY_UNARY)
             call = multicallable(_REQUEST)
+            self.assertEqual(_RESPONSE, await call)
             self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def test_client_call_level_compression_baned_compression(self):
@@ -155,6 +182,7 @@ class TestCompression(AioTestBase):
 
         # Deflate is allowed, this call should succeed
         call = multicallable(_REQUEST, compression=grpc.Compression.Deflate)
+        self.assertEqual(_RESPONSE, await call)
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def test_server_call_level_compression(self):
@@ -186,12 +214,24 @@ class TestCompression(AioTestBase):
         self.assertEqual(grpc.StatusCode.OK, await call.code())
 
     async def test_server_default_compression_algorithm(self):
-        server = aio.server(compression=grpc.Compression.Deflate)
-        port = server.add_insecure_port("[::]:0")
+        server = aio.server(
+            compression=grpc.Compression.Deflate,
+            options=(("grpc.so_reuseport", 0),),
+        )
+        port = server.add_insecure_port("127.0.0.1:0")
         server.add_generic_rpc_handlers((_GenericHandler(),))
         await server.start()
 
-        async with aio.insecure_channel(f"localhost:{port}") as channel:
+        async with aio.insecure_channel(
+            f"127.0.0.1:{port}",
+            options=(
+                ("grpc.enable_http_proxy", 0),
+                ("grpc.initial_reconnect_backoff_ms", 100),
+                ("grpc.min_reconnect_backoff_ms", 100),
+                ("grpc.max_reconnect_backoff_ms", 500),
+            ),
+        ) as channel:
+            await channel.channel_ready()
             multicallable = channel.unary_unary(_TEST_UNARY_UNARY)
             call = multicallable(_REQUEST)
             self.assertEqual(_RESPONSE, await call)

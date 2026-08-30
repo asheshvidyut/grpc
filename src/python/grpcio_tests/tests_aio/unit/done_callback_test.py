@@ -39,6 +39,7 @@ class TestClientSideDoneCallback(AioTestBase):
     async def setUp(self):
         address, self._server = await start_test_server()
         self._channel = aio.insecure_channel(address)
+        await self._channel.channel_ready()
         self._stub = test_pb2_grpc.TestServiceStub(self._channel)
 
     async def tearDown(self):
@@ -129,9 +130,12 @@ class TestClientSideDoneCallback(AioTestBase):
 
 class TestServerSideDoneCallback(AioTestBase):
     async def setUp(self):
-        self._server = aio.server()
-        port = self._server.add_insecure_port("[::]:0")
-        self._channel = aio.insecure_channel("localhost:%d" % port)
+        self._server = aio.server(options=(("grpc.so_reuseport", 0),))
+        port = self._server.add_insecure_port("127.0.0.1:0")
+        self._channel = aio.insecure_channel(
+            "127.0.0.1:%d" % port,
+            options=(("grpc.enable_http_proxy", 0),),
+        )
 
     async def tearDown(self):
         await self._channel.close()
@@ -145,6 +149,7 @@ class TestServerSideDoneCallback(AioTestBase):
         )
         self._server.add_generic_rpc_handlers((generic_handler,))
         await self._server.start()
+        await self._channel.channel_ready()
 
     async def test_unary_unary(self):
         validation_future = self.loop.create_future()
