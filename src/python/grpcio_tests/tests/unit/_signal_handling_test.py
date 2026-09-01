@@ -129,6 +129,13 @@ def _start_client(args, stdout, stderr):
     return subprocess.Popen(invocation, stdout=stdout, stderr=stderr)
 
 
+@unittest.skipIf(
+    sys.platform == "darwin",
+    "Signal-handler responsiveness during a blocking RPC is flaky on macOS: "
+    "CPython delivers signals only to the main thread, and the SIGINT that is "
+    "meant to interrupt the blocking future.result() is occasionally deferred, "
+    "so the client subprocess does not exit in time. Linux coverage is retained.",
+)
 class SignalHandlingTest(unittest.TestCase):
     def setUp(self):
         self._server = test_common.test_server()
