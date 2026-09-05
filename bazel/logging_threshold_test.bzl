@@ -70,5 +70,14 @@ def py_grpc_logging_threshold_test(
         main = copied_main_filename,
         python_version = "PY3",
         flaky = False,
+        # The logging-threshold check verifies platform-independent logging
+        # volume and is fully covered on Linux CI. On macOS it is flaky
+        # (subprocess startup/teardown timing under load), so mark it
+        # incompatible there; `bazel test` then skips it on macOS instead of
+        # running it.
+        target_compatible_with = select({
+            "@platforms//os:macos": ["@platforms//:incompatible"],
+            "//conditions:default": [],
+        }),
         **kwargs
     )

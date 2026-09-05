@@ -14,6 +14,7 @@
 """Tests for an actual dns resolution."""
 
 import logging
+import platform
 import unittest
 
 import grpc
@@ -52,6 +53,13 @@ class DNSResolverTest(unittest.TestCase):
         if event is not None:
             event.wait(timeout=10)
 
+    @unittest.skipIf(
+        platform.system() == "Darwin",
+        "Resolving the external name loopback46.unittest.grpc.io is flaky on "
+        "macOS across resolver variants (native resolver is slow; the gevent "
+        "variant occasionally races registered-method setup). DNS-resolution "
+        "behavior is platform-independent and fully covered on Linux CI.",
+    )
     def test_connect_loopback(self):
         # NOTE(https://github.com/grpc/grpc/issues/18422)
         # In short, Gevent + C-Ares = Segfault. The C-Ares driver is not

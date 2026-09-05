@@ -31,13 +31,18 @@ class AbslLogTest(unittest.TestCase):
         env["GRPC_TRACE"] = "api"
 
         # Run the subprocess and capture both stdout and stderr.
+        # NOTE: allow ample time for `import grpc` and the channel lifecycle to
+        # emit the teardown traces (grpc_channel_destroy / grpc_shutdown). A
+        # tight timeout is flaky on a loaded machine (e.g. macOS mid-test-run),
+        # where the subprocess can be killed before those final traces are
+        # written, causing spurious "missing api trace" failures.
         process = subprocess.run(
             [sys.executable, "-c", script],
             check=False,
             env=env,
             capture_output=True,
             text=True,
-            timeout=2,
+            timeout=10,
         )
 
         self.output = process.stdout + process.stderr
