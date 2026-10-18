@@ -115,16 +115,14 @@ py_library(
     internal_py_grpc_test(
         name = test_file_name[:-3],
         size = (
-            "medium"
-            if test_file_name
-            in (
-                "_compression_test.py",
-                "_grpc_shutdown_test.py",
-                "_metadata_flags_test.py",
-                "_rpc_part_1_test.py",
-                "_rpc_part_2_test.py",
-            )
-            else "small"
+            "medium" if test_file_name in
+                        (
+                            "_compression_test.py",
+                            "_grpc_shutdown_test.py",
+                            "_metadata_flags_test.py",
+                            "_rpc_part_1_test.py",
+                            "_rpc_part_2_test.py",
+                        ) else "small"
         ),
         srcs = [test_file_name],
         data = [
