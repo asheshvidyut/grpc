@@ -137,7 +137,9 @@ class ChannelCloseTest(unittest.TestCase):
             _registered_method=True,
         )
         request_iterator = _Pipe(())
-        response_iterator = multi_callable(request_iterator, wait_for_ready=True)
+        response_iterator = multi_callable(
+            request_iterator, wait_for_ready=True
+        )
         channel.close()
         request_iterator.close()
 
@@ -153,7 +155,9 @@ class ChannelCloseTest(unittest.TestCase):
             _registered_method=True,
         )
         request_iterator = _Pipe((b"abc",))
-        response_iterator = multi_callable(request_iterator, wait_for_ready=True)
+        response_iterator = multi_callable(
+            request_iterator, wait_for_ready=True
+        )
         next(response_iterator)
         channel.close()
         request_iterator.close()
@@ -170,7 +174,9 @@ class ChannelCloseTest(unittest.TestCase):
                 _registered_method=True,
             )
             request_iterator = _Pipe((b"abc",))
-            response_iterator = multi_callable(request_iterator, wait_for_ready=True)
+            response_iterator = multi_callable(
+                request_iterator, wait_for_ready=True
+            )
             next(response_iterator)
         request_iterator.close()
 
@@ -191,7 +197,9 @@ class ChannelCloseTest(unittest.TestCase):
             )
             response_iterators = []
             for request_iterator in request_iterators:
-                response_iterator = multi_callable(request_iterator, wait_for_ready=True)
+                response_iterator = multi_callable(
+                    request_iterator, wait_for_ready=True
+                )
                 next(response_iterator)
                 response_iterators.append(response_iterator)
         for request_iterator in request_iterators:
@@ -210,7 +218,9 @@ class ChannelCloseTest(unittest.TestCase):
             _registered_method=True,
         )
         request_iterator = _Pipe((b"abc",))
-        response_iterator = multi_callable(request_iterator, wait_for_ready=True)
+        response_iterator = multi_callable(
+            request_iterator, wait_for_ready=True
+        )
         next(response_iterator)
         start = time.time()
         end = start + _MORE_TIME
@@ -241,7 +251,9 @@ class ChannelCloseTest(unittest.TestCase):
                 _registered_method=True,
             )
             endless_iterator = itertools.repeat(b"abc")
-            stream_response_iterator = stream_multi_callable(endless_iterator, wait_for_ready=True)
+            stream_response_iterator = stream_multi_callable(
+                endless_iterator, wait_for_ready=True
+            )
             future = channel.unary_unary(
                 grpc._common.fully_qualified_method(_SERVICE_NAME, _UNARY_URI),
                 _registered_method=True,

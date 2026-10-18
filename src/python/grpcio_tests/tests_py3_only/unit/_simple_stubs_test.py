@@ -436,7 +436,9 @@ class SimpleStubsTest(unittest.TestCase):
                 )
                 rpc_finished_event.set()
             except Exception as e:
-                logging.exception("RPC in test_default_wait_for_ready failed: %s", e)
+                logging.exception(
+                    "RPC in test_default_wait_for_ready failed: %s", e
+                )
                 rpc_failed_event.set()
 
         t = threading.Thread(target=_send_rpc)

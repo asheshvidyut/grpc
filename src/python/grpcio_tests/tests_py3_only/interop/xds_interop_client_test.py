@@ -150,9 +150,13 @@ class XdsInteropClientTest(unittest.TestCase):
                 for _, method_str in _METHODS:
                     for status in delta[method_str]:
                         if status == 0 and method_str == target_method_str:
-                            self.assertGreater(delta[method_str][status], 0, delta)
+                            self.assertGreater(
+                                delta[method_str][status], 0, delta
+                            )
                         else:
-                            self.assertEqual(delta[method_str][status], 0, delta)
+                            self.assertEqual(
+                                delta[method_str][status], 0, delta
+                            )
         finally:
             channel.close()
 

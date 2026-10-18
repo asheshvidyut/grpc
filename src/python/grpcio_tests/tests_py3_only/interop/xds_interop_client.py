@@ -358,7 +358,7 @@ def _on_rpc_done(
 
 
 def _remove_completed_rpcs(
-    rpc_futures: Mapping[int, FutureFromCallType]
+    rpc_futures: Mapping[int, FutureFromCallType],
 ) -> None:
     logger.debug("Removing completed RPCs")
     done = [
